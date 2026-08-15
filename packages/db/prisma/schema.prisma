@@ -1,0 +1,2225 @@
+// GRID-X of OSWAR — database schema
+// Implements the entity list from Section 11 of the GRID-X Software Product Blueprint
+// plus the status workflows described in Sections 5, 8 and 11.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===========================================================================
+// ENUMS — every workflow / classification in the blueprint
+// ===========================================================================
+
+/// Section 4 — user roles (management + partner)
+enum RoleCode {
+  GROUP_ADMIN
+  GRIDX_HEAD
+  OPERATIONS_HEAD
+  ENGINEERING_USER
+  PROCUREMENT_USER
+  QUALITY_INSPECTOR
+  STORES_USER
+  FINANCE_USER
+  LOGISTICS_COORDINATOR
+  MANAGEMENT_VIEWER
+  PARTNER_OWNER
+  PARTNER_SUPERVISOR
+  PARTNER_WORKER
+}
+
+enum UserType {
+  INTERNAL
+  PARTNER
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+}
+
+/// Section 5, Module 1 — partner approval workflow
+enum PartnerApprovalStatus {
+  DRAFT
+  DOCUMENT_REVIEW
+  CAPABILITY_AUDIT
+  TRIAL_APPROVED
+  APPROVED
+  CERTIFIED
+  STRATEGIC
+  SUSPENDED
+}
+
+enum PartnerLevel {
+  L1_MICRO
+  L2_SMALL
+  L3_MEDIUM
+  L4_STRATEGIC
+}
+
+/// Section 12 — partner scorecard categories
+enum PartnerCategory {
+  A
+  B
+  C
+  D
+  SUSPENDED
+}
+
+enum PartnerAuditStatus {
+  NOT_AUDITED
+  SCHEDULED
+  IN_PROGRESS
+  PASSED
+  FAILED
+}
+
+/// Module 1 — capability profile
+enum ProcessType {
+  CUTTING
+  BENDING
+  WELDING
+  FABRICATION
+  MACHINING
+  DRILLING
+  GRINDING
+  PAINTING
+  ASSEMBLY
+  PACKING
+  ELECTRICAL_WIRING
+  TRANSPORT
+}
+
+enum MachineCondition {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+  UNDER_REPAIR
+}
+
+enum OwnershipStatus {
+  OWNED
+  RENTED
+  LEASED
+}
+
+enum PartnerDocumentType {
+  UDYAM_CERTIFICATE
+  GST_CERTIFICATE
+  PAN_CARD
+  BANK_PROOF
+  ISO_CERTIFICATE
+  INSURANCE
+  SAFETY_COMPLIANCE
+  FACTORY_LICENSE
+  NDA
+  AGREEMENT
+  OTHER
+}
+
+/// Module 2 — criticality classes
+enum CriticalityClass {
+  CLASS_A // Critical — retain in-house
+  CLASS_B // Controlled outsourcing
+  CLASS_C // Standard outsourcing
+  CLASS_D // Cottage or micro-unit suitable
+}
+
+enum InspectionLevel {
+  LEVEL_1_VISUAL
+  LEVEL_2_SAMPLING
+  LEVEL_3_FULL_DIMENSIONAL
+  LEVEL_4_CRITICAL_100_PERCENT
+}
+
+/// Module 3 — drawing status
+enum DrawingStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  RELEASED
+  SUPERSEDED
+  ARCHIVED
+}
+
+enum DrawingAccessMode {
+  VIEW_ONLY
+  VIEW_AND_DOWNLOAD
+}
+
+enum DrawingAccessEvent {
+  GRANTED
+  REVOKED
+  VIEWED
+  DOWNLOADED
+}
+
+enum EngineeringChangeStatus {
+  RAISED
+  UNDER_REVIEW
+  APPROVED
+  IMPLEMENTED
+  REJECTED
+}
+
+/// Module 4 — job status workflow
+enum JobStatus {
+  DRAFT
+  AWAITING_PARTNER_ACCEPTANCE
+  ACCEPTED
+  MATERIAL_PENDING
+  MATERIAL_ISSUED
+  IN_PRODUCTION
+  INSPECTION_REQUESTED
+  UNDER_INSPECTION
+  REWORK
+  QUALITY_ACCEPTED
+  DISPATCHED
+  RECEIVED
+  CLOSED
+  CANCELLED
+}
+
+enum JobSource {
+  SALES_ORDER
+  WORK_ORDER
+  INTERNAL_PRODUCTION
+  REPLENISHMENT
+  MANUAL
+}
+
+enum JobPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum MaterialResponsibility {
+  OSWAR_SUPPLIED
+  PARTNER_SUPPLIED
+}
+
+/// Module 7 — partner milestones
+enum MilestoneType {
+  JOB_ACCEPTED
+  MATERIAL_RECEIVED
+  PRODUCTION_STARTED
+  FIRST_PIECE_READY
+  BATCH_25_PERCENT
+  BATCH_50_PERCENT
+  BATCH_READY_FOR_INSPECTION
+  DISPATCHED
+}
+
+/// Module 7 — delay reasons
+enum DelayReason {
+  MATERIAL_SHORTAGE
+  DRAWING_CLARIFICATION
+  MACHINE_BREAKDOWN
+  LABOUR_SHORTAGE
+  POWER_ISSUE
+  QUALITY_ISSUE
+  TRANSPORT_DELAY
+  OSWAR_APPROVAL_PENDING
+  PARTNER_PLANNING_FAILURE
+}
+
+enum ResponsibleParty {
+  PARTNER
+  OSWAR
+  SHARED
+  EXTERNAL
+}
+
+enum ClarificationStatus {
+  OPEN
+  ANSWERED
+  CLOSED
+}
+
+/// Module 6 — material transaction types
+enum MaterialTransactionType {
+  ISSUED_TO_PARTNER
+  RECEIVED_BY_PARTNER
+  CONSUMED
+  SCRAP_GENERATED
+  SCRAP_RETURNED
+  UNUSED_MATERIAL_RETURNED
+  SHORTAGE
+  EXCESS
+  REJECTED_MATERIAL
+  REPLACEMENT_MATERIAL
+}
+
+enum MaterialIssueStatus {
+  DRAFT
+  PREPARED
+  ISSUED
+  ACKNOWLEDGED
+  PARTIALLY_RECONCILED
+  RECONCILED
+  CANCELLED
+}
+
+enum ReconciliationStatus {
+  PENDING
+  BALANCED
+  SHORTAGE
+  EXCESS
+  DISPUTED
+}
+
+/// Module 8 — quality
+enum InspectionType {
+  INCOMING_MATERIAL
+  FIRST_ARTICLE
+  IN_PROCESS
+  FINAL
+  RECEIVING
+  PARTNER_AUDIT
+}
+
+enum InspectionStatus {
+  REQUESTED
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum InspectionDecision {
+  ACCEPTED
+  ACCEPTED_WITH_DEVIATION
+  REWORK_REQUIRED
+  REJECTED
+  HOLD_FOR_ENGINEERING_REVIEW
+}
+
+enum ResultVerdict {
+  PASS
+  FAIL
+  NOT_APPLICABLE
+}
+
+enum DefectType {
+  DIMENSIONAL
+  WELD_DEFECT
+  SURFACE_FINISH
+  MATERIAL_DEFECT
+  PAINT_DEFECT
+  ASSEMBLY_ERROR
+  MISSING_OPERATION
+  DAMAGE_IN_TRANSIT
+  DOCUMENTATION
+  OTHER
+}
+
+enum CorrectiveActionStage {
+  ISSUE_RAISED
+  CONTAINMENT
+  ROOT_CAUSE
+  CORRECTIVE_ACTION
+  VERIFICATION
+  CLOSED
+}
+
+enum ReworkStatus {
+  ISSUED
+  IN_PROGRESS
+  READY_FOR_REINSPECTION
+  COMPLETED
+  SCRAPPED
+}
+
+enum DeviationStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+}
+
+/// Module 9 — tooling
+enum ToolCategory {
+  TOOL
+  FIXTURE
+  GAUGE
+}
+
+enum ToolCondition {
+  NEW
+  GOOD
+  WORN
+  DAMAGED
+  SCRAPPED
+}
+
+enum ToolIssueStatus {
+  ISSUED
+  RETURNED
+  OVERDUE
+  DAMAGED
+  LOST
+}
+
+/// Module 10 — logistics
+enum ShipmentDirection {
+  OSWAR_TO_PARTNER
+  PARTNER_TO_OSWAR
+  PARTNER_TO_PARTNER
+}
+
+enum ShipmentStatus {
+  PLANNED
+  PICKUP_DUE
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  DELAYED
+  CANCELLED
+}
+
+/// Module 11 — invoices
+enum InvoiceStatus {
+  DRAFT
+  RAISED
+  QUANTITY_VERIFIED
+  QUALITY_VERIFIED
+  MATERIAL_RECONCILED
+  FINANCE_APPROVED
+  PAYMENT_SCHEDULED
+  PAID
+  HELD
+  REJECTED
+}
+
+enum PaymentMode {
+  NEFT
+  RTGS
+  IMPS
+  UPI
+  CHEQUE
+  CASH
+}
+
+enum AdjustmentType {
+  QUALITY_INCENTIVE
+  ON_TIME_DELIVERY_INCENTIVE
+  REWORK_DEDUCTION
+  MATERIAL_SHORTAGE_DEDUCTION
+  APPROVED_PENALTY
+  OTHER_INCENTIVE
+  OTHER_DEDUCTION
+}
+
+/// Module 12 — scorecard KPIs
+enum KpiCode {
+  FIRST_PASS_QUALITY
+  ON_TIME_IN_FULL_DELIVERY
+  MATERIAL_UTILISATION
+  REWORK_RESPONSE
+  CAPACITY_RELIABILITY
+  DOCUMENTATION_DISCIPLINE
+  SAFETY_AND_COMPLIANCE
+}
+
+enum AllocationRecommendation {
+  INCREASE_ALLOCATION
+  MAINTAIN_ALLOCATION
+  DEVELOPMENT_PLAN
+  REDUCE_ALLOCATION
+  SUSPEND_PARTNER
+}
+
+enum CapacityPeriodType {
+  WEEKLY
+  MONTHLY
+}
+
+/// Section 13 — notifications
+enum NotificationEvent {
+  NEW_JOB_ASSIGNED
+  JOB_ACCEPTANCE_PENDING
+  MATERIAL_READY_FOR_PICKUP
+  MATERIAL_RECEIPT_NOT_ACKNOWLEDGED
+  JOB_MILESTONE_OVERDUE
+  INSPECTION_REQUESTED
+  INSPECTION_DELAYED
+  REWORK_ISSUED
+  DRAWING_REVISION_CHANGED
+  INVOICE_APPROVED
+  INVOICE_HELD
+  PAYMENT_RELEASED
+  PARTNER_RATING_REDUCED
+  COMPLIANCE_DOCUMENT_EXPIRING
+  FIXTURE_CALIBRATION_DUE
+  JOB_ACCEPTED
+  JOB_DECLINED
+  JOB_DELAY_REPORTED
+  JOB_CLARIFICATION_RAISED
+  JOB_CLARIFICATION_ANSWERED
+  JOB_CLOSED
+  MATERIAL_ISSUED
+  MATERIAL_ACKNOWLEDGED
+  INSPECTION_COMPLETED
+  SHIPMENT_DISPATCHED
+  SHIPMENT_RECEIVED
+  INVOICE_SUBMITTED
+  PARTNER_STATUS_CHANGED
+  DRAWING_ACCESS_GRANTED
+  SCORECARD_PUBLISHED
+  CORRECTIVE_ACTION_DUE
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  WHATSAPP
+  SMS
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  READ
+}
+
+enum FileCategory {
+  DRAWING
+  PHOTOGRAPH
+  INSPECTION_DOCUMENT
+  INVOICE
+  PARTNER_CERTIFICATE
+  AUDIT_REPORT
+  PROOF_OF_DELIVERY
+  OTHER
+}
+
+enum Language {
+  EN
+  HI
+}
+
+// ===========================================================================
+// ORGANISATION AND USERS
+// ===========================================================================
+
+model Company {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  name         String
+  legalName    String?
+  gstNumber    String?
+  panNumber    String?
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  pincode      String?
+  country      String   @default("India")
+  currency     String   @default("INR")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  userCompanies    UserCompany[]
+  partners         Partner[]
+  components       Component[]
+  products         Product[]
+  jobs             GridJob[]
+  drawings         Drawing[]
+  materialIssues   MaterialIssue[]
+  invoices         PartnerInvoice[]
+  tools            Tool[]
+  shipments        Shipment[]
+  inspectionPlans  InspectionPlan[]
+  partnerRates     PartnerRate[]
+  imsSyncLogs      ImsSyncLog[]
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  code        RoleCode @unique
+  name        String
+  description String?
+  isPartnerRole Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users           User[]
+  rolePermissions RolePermission[]
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  code        String   @unique // e.g. partner:create
+  resource    String
+  action      String
+  description String?
+
+  rolePermissions RolePermission[]
+
+  @@index([resource])
+}
+
+model RolePermission {
+  id           String @id @default(cuid())
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+}
+
+model User {
+  id                 String     @id @default(cuid())
+  email              String?    @unique
+  phone              String?    @unique
+  name               String
+  passwordHash       String?
+  userType           UserType   @default(INTERNAL)
+  status             UserStatus @default(ACTIVE)
+  roleId             String
+  partnerId          String?
+  designation        String?
+  language           Language   @default(EN)
+  twoFactorEnabled   Boolean    @default(false)
+  twoFactorSecret    String?
+  lastLoginAt        DateTime?
+  passwordUpdatedAt  DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  role            Role          @relation(fields: [roleId], references: [id])
+  partner         Partner?      @relation(fields: [partnerId], references: [id])
+  companies       UserCompany[]
+  refreshTokens   RefreshToken[]
+  otpCodes        OtpCode[]
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+
+  createdPartners        Partner[]                @relation("PartnerCreatedBy")
+  createdJobs            GridJob[]                @relation("JobCreatedBy")
+  jobAssignments         JobAssignment[]          @relation("JobAssignedBy")
+  jobStatusHistories     JobStatusHistory[]
+  milestoneUpdates       JobMilestone[]
+  drawingUploads         Drawing[]                @relation("DrawingUploadedBy")
+  drawingRevisions       DrawingRevision[]        @relation("RevisionCreatedBy")
+  drawingApprovals       DrawingRevision[]        @relation("RevisionApprovedBy")
+  drawingAcks            DrawingAcknowledgement[]
+  drawingAccessLogs      DrawingAccessLog[]
+  materialIssuesCreated  MaterialIssue[]          @relation("MaterialIssueCreatedBy")
+  materialAcks           MaterialReceiptAcknowledgement[]
+  reconciliations        MaterialReconciliation[]
+  inspectionsRequested   Inspection[]             @relation("InspectionRequestedBy")
+  inspectionsPerformed   Inspection[]             @relation("InspectionInspector")
+  nonConformances        NonConformance[]         @relation("NcRaisedBy")
+  correctiveActions      CorrectiveAction[]       @relation("CaOwner")
+  reworkOrders           ReworkOrder[]            @relation("ReworkIssuedBy")
+  deviationApprovals     DeviationApproval[]      @relation("DeviationDecidedBy")
+  invoicesSubmitted      PartnerInvoice[]         @relation("InvoiceSubmittedBy")
+  paymentApprovals       PaymentApproval[]        @relation("PaymentApprover")
+  paymentRecords         PaymentRecord[]          @relation("PaymentRecordedBy")
+  partnerAudits          PartnerAudit[]           @relation("AuditAuditor")
+  capacityDeclarations   CapacityDeclaration[]    @relation("CapacityDeclaredBy")
+  toolIssues             ToolIssue[]              @relation("ToolIssuedBy")
+  calibrationRecords     CalibrationRecord[]      @relation("CalibrationBy")
+  shipmentsCreated       Shipment[]               @relation("ShipmentCreatedBy")
+  clarificationsRaised   JobClarification[]       @relation("ClarificationRaisedBy")
+  clarificationsAnswered JobClarification[]       @relation("ClarificationAnsweredBy")
+  partnerStatusChanges   PartnerStatusHistory[]   @relation("PartnerStatusChangedBy")
+  engineeringChanges     EngineeringChange[]      @relation("EcRaisedBy")
+  approvedEngineeringChanges EngineeringChange[]  @relation("EcApprovedBy")
+  uploadedFiles          StoredFile[]             @relation("FileUploadedBy")
+  jobDelaysReported      JobDelay[]               @relation("DelayReportedBy")
+
+  @@index([userType, status])
+  @@index([partnerId])
+}
+
+model UserCompany {
+  id        String   @id @default(cuid())
+  userId    String
+  companyId String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companyId])
+}
+
+model RefreshToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  familyId   String
+  userAgent  String?
+  ipAddress  String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  replacedBy String?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+}
+
+model OtpCode {
+  id         String    @id @default(cuid())
+  userId     String?
+  phone      String
+  codeHash   String
+  purpose    String    @default("LOGIN")
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([phone])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  actorLabel String?
+  action     String
+  entityType String
+  entityId   String?
+  companyId  String?
+  before     Json?
+  after      Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model StoredFile {
+  id           String       @id @default(cuid())
+  key          String       @unique
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  category     FileCategory @default(OTHER)
+  checksum     String?
+  uploadedById String?
+  createdAt    DateTime     @default(now())
+
+  uploadedBy User? @relation("FileUploadedBy", fields: [uploadedById], references: [id])
+
+  drawingRevisions DrawingRevision[]
+  partnerDocuments PartnerDocument[]
+  photographs      Photograph[]
+
+  @@index([category])
+}
+
+/// Generic photograph attachment used by milestones, inspections, material and logistics
+model Photograph {
+  id         String   @id @default(cuid())
+  fileId     String
+  entityType String
+  entityId   String
+  caption    String?
+  takenAt    DateTime @default(now())
+  latitude   Float?
+  longitude  Float?
+  createdAt  DateTime @default(now())
+
+  file StoredFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([entityType, entityId])
+}
+
+// ===========================================================================
+// PARTNER MANAGEMENT (Module 1)
+// ===========================================================================
+
+model Partner {
+  id               String                @id @default(cuid())
+  partnerCode      String                @unique
+  companyId        String
+  businessName     String
+  ownerName        String
+  phone            String
+  altPhone         String?
+  email            String?
+  addressLine1     String
+  addressLine2     String?
+  city             String
+  state            String
+  pincode          String
+  latitude         Float?
+  longitude        Float?
+  distanceKm       Float?
+  udyamNumber      String?
+  gstNumber        String?
+  panNumber        String?
+  bankName         String?
+  bankAccountName  String?
+  bankAccountNo    String?
+  bankIfsc         String?
+  category         PartnerCategory       @default(C)
+  level            PartnerLevel          @default(L2_SMALL)
+  approvalStatus   PartnerApprovalStatus @default(DRAFT)
+  auditStatus      PartnerAuditStatus    @default(NOT_AUDITED)
+  paymentTermsDays Int                   @default(30)
+  maxCapacityHours Float                 @default(0)
+  maxOpenJobs      Int                   @default(10)
+  isActive         Boolean               @default(true)
+  suspendedReason  String?
+  currentScore     Float?
+  notes            String?
+  createdById      String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  company   Company @relation(fields: [companyId], references: [id])
+  createdBy User?   @relation("PartnerCreatedBy", fields: [createdById], references: [id])
+
+  users              User[]
+  locations          PartnerLocation[]
+  documents          PartnerDocument[]
+  capabilities       PartnerCapability[]
+  machines           PartnerMachine[]
+  employees          PartnerEmployee[]
+  audits             PartnerAudit[]
+  statusHistory      PartnerStatusHistory[]
+  approvedComponents ApprovedPartnerComponent[]
+  jobs               GridJob[]
+  assignments        JobAssignment[]
+  materialIssues     MaterialIssue[]
+  drawingAccess      DrawingAccess[]
+  drawingAcks        DrawingAcknowledgement[]
+  drawingAccessLogs  DrawingAccessLog[]
+  inspections        Inspection[]
+  nonConformances    NonConformance[]
+  rates              PartnerRate[]
+  incentiveRules     PartnerIncentiveRule[]
+  deductions         PartnerDeduction[]
+  invoices           PartnerInvoice[]
+  scores             PartnerScore[]
+  kpis               PartnerKPI[]
+  capacityDeclarations CapacityDeclaration[]
+  capacityAllocations  CapacityAllocation[]
+  toolIssues         ToolIssue[]
+  shipmentsFrom      Shipment[]            @relation("ShipmentFromPartner")
+  shipmentsTo        Shipment[]            @relation("ShipmentToPartner")
+
+  @@index([companyId, approvalStatus])
+  @@index([category])
+}
+
+model PartnerLocation {
+  id          String   @id @default(cuid())
+  partnerId   String
+  label       String
+  addressLine1 String
+  addressLine2 String?
+  city        String
+  state       String
+  pincode     String
+  latitude    Float?
+  longitude   Float?
+  isPrimary   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+}
+
+model PartnerDocument {
+  id           String              @id @default(cuid())
+  partnerId    String
+  type         PartnerDocumentType
+  documentNo   String?
+  fileId       String?
+  issueDate    DateTime?
+  expiryDate   DateTime?
+  verified     Boolean             @default(false)
+  verifiedAt   DateTime?
+  remarks      String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  partner Partner     @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  file    StoredFile? @relation(fields: [fileId], references: [id])
+
+  @@index([partnerId, type])
+  @@index([expiryDate])
+}
+
+model PartnerCapability {
+  id             String      @id @default(cuid())
+  partnerId      String
+  process        ProcessType
+  isCapable      Boolean     @default(true)
+  isApproved     Boolean     @default(false)
+  maxSizeMm      Float?
+  maxWeightKg    Float?
+  toleranceMm    Float?
+  monthlyCapacityHours Float @default(0)
+  remarks        String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@unique([partnerId, process])
+}
+
+model PartnerMachine {
+  id                String           @id @default(cuid())
+  partnerId         String
+  machineType       String
+  make              String?
+  model             String?
+  size              String?
+  capacity          String?
+  accuracy          String?
+  condition         MachineCondition @default(GOOD)
+  photoFileId       String?
+  ownership         OwnershipStatus  @default(OWNED)
+  quantity          Int              @default(1)
+  lastServicedAt    DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+}
+
+model PartnerEmployee {
+  id         String   @id @default(cuid())
+  partnerId  String
+  name       String
+  skill      String?
+  phone      String?
+  isSupervisor Boolean @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId])
+}
+
+model PartnerAudit {
+  id            String             @id @default(cuid())
+  partnerId     String
+  auditorId     String?
+  auditDate     DateTime
+  auditType     String             @default("CAPABILITY")
+  score         Float?
+  status        PartnerAuditStatus @default(IN_PROGRESS)
+  findings      String?
+  reportFileId  String?
+  nextAuditDate DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  auditor User?   @relation("AuditAuditor", fields: [auditorId], references: [id])
+
+  @@index([partnerId, auditDate])
+}
+
+model PartnerStatusHistory {
+  id           String                @id @default(cuid())
+  partnerId    String
+  fromStatus   PartnerApprovalStatus?
+  toStatus     PartnerApprovalStatus
+  reason       String?
+  changedById  String?
+  createdAt    DateTime              @default(now())
+
+  partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  changedBy User?   @relation("PartnerStatusChangedBy", fields: [changedById], references: [id])
+
+  @@index([partnerId, createdAt])
+}
+
+// ===========================================================================
+// COMPONENTS AND PROCESSES (Module 2)
+// ===========================================================================
+
+model Product {
+  id          String   @id @default(cuid())
+  companyId   String
+  code        String
+  name        String
+  description String?
+  imsRef      String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company    Company     @relation(fields: [companyId], references: [id])
+  components Component[]
+  jobs       GridJob[]
+
+  @@unique([companyId, code])
+}
+
+/// Raw material / stock item, mirrored from the OSWAR IMS
+model Item {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  name           String
+  uom            String   @default("KG")
+  materialGrade  String?
+  unitWeightKg   Float?
+  standardRate   Float?
+  imsRef         String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  componentItems     ComponentItem[]
+  materialIssueItems MaterialIssueItem[]
+  consumptions       MaterialConsumption[]
+  scrapReturns       ScrapReturn[]
+  reconciliations    MaterialReconciliation[]
+}
+
+model Process {
+  id            String      @id @default(cuid())
+  code          ProcessType @unique
+  name          String
+  description   String?
+  standardRatePerHour Float  @default(0)
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  componentProcesses ComponentProcess[]
+  capacityDeclarations CapacityDeclaration[]
+  capacityAllocations  CapacityAllocation[]
+}
+
+model Component {
+  id                       String           @id @default(cuid())
+  companyId                String
+  componentCode            String
+  name                     String
+  productId                String?
+  drawingNumber            String?
+  materialGrade            String?
+  theoreticalWeightKg      Float?
+  primaryProcess           ProcessType
+  inspectionLevel          InspectionLevel  @default(LEVEL_2_SAMPLING)
+  criticality              CriticalityClass @default(CLASS_C)
+  standardCycleTimeMinutes Float?
+  standardConversionRate   Float?
+  packagingRequirement     String?
+  outsourcingEligibilityScore Int           @default(50)
+  scrapAllowancePercent    Float            @default(5)
+  isActive                 Boolean          @default(true)
+  createdAt                DateTime         @default(now())
+  updatedAt                DateTime         @updatedAt
+
+  company            Company                    @relation(fields: [companyId], references: [id])
+  product            Product?                   @relation(fields: [productId], references: [id])
+  processes          ComponentProcess[]
+  items              ComponentItem[]
+  criticalityHistory ComponentCriticality[]
+  approvedPartners   ApprovedPartnerComponent[]
+  drawings           Drawing[]
+  jobs               GridJob[]
+  jobItems           GridJobItem[]
+  inspectionPlans    InspectionPlan[]
+  rates              PartnerRate[]
+
+  @@unique([companyId, componentCode])
+  @@index([criticality])
+}
+
+model ComponentProcess {
+  id                String      @id @default(cuid())
+  componentId       String
+  processId         String
+  sequence          Int         @default(1)
+  cycleTimeMinutes  Float?
+  isOutsourced      Boolean     @default(true)
+  remarks           String?
+
+  component Component @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  process   Process   @relation(fields: [processId], references: [id])
+
+  @@unique([componentId, processId, sequence])
+}
+
+/// Bill of material link between a component and its raw material items
+model ComponentItem {
+  id             String @id @default(cuid())
+  componentId    String
+  itemId         String
+  quantityPerUnit Float
+  uom            String @default("KG")
+
+  component Component @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  item      Item      @relation(fields: [itemId], references: [id])
+
+  @@unique([componentId, itemId])
+}
+
+model ComponentCriticality {
+  id           String           @id @default(cuid())
+  componentId  String
+  criticality  CriticalityClass
+  reason       String?
+  approvedBy   String?
+  effectiveFrom DateTime        @default(now())
+  createdAt    DateTime         @default(now())
+
+  component Component @relation(fields: [componentId], references: [id], onDelete: Cascade)
+
+  @@index([componentId])
+}
+
+model ApprovedPartnerComponent {
+  id                String   @id @default(cuid())
+  componentId       String
+  partnerId         String
+  approvedAt        DateTime @default(now())
+  approvedBy        String?
+  firstArticleDone  Boolean  @default(false)
+  firstArticleDate  DateTime?
+  isActive          Boolean  @default(true)
+  remarks           String?
+
+  component Component @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  partner   Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@unique([componentId, partnerId])
+}
+
+// ===========================================================================
+// DRAWINGS AND REVISION CONTROL (Module 3)
+// ===========================================================================
+
+model Drawing {
+  id             String   @id @default(cuid())
+  companyId      String
+  componentId    String?
+  drawingNumber  String
+  title          String
+  description    String?
+  currentRevisionId String? @unique
+  uploadedById   String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  company         Company           @relation(fields: [companyId], references: [id])
+  component       Component?        @relation(fields: [componentId], references: [id])
+  uploadedBy      User?             @relation("DrawingUploadedBy", fields: [uploadedById], references: [id])
+  currentRevision DrawingRevision?  @relation("CurrentRevision", fields: [currentRevisionId], references: [id])
+  revisions       DrawingRevision[] @relation("DrawingRevisions")
+  engineeringChanges EngineeringChange[]
+
+  @@unique([companyId, drawingNumber])
+}
+
+model DrawingRevision {
+  id            String        @id @default(cuid())
+  drawingId     String
+  revisionCode  String // A, B, C ... or 01, 02
+  revisionNo    Int
+  status        DrawingStatus @default(DRAFT)
+  fileId        String?
+  previewFileId String?
+  changeNote    String?
+  issueDate     DateTime?
+  expiryDate    DateTime?
+  releasedAt    DateTime?
+  supersededAt  DateTime?
+  createdById   String?
+  approvedById  String?
+  approvedAt    DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  drawing     Drawing     @relation("DrawingRevisions", fields: [drawingId], references: [id], onDelete: Cascade)
+  currentOf   Drawing?    @relation("CurrentRevision")
+  file        StoredFile? @relation(fields: [fileId], references: [id])
+  createdBy   User?       @relation("RevisionCreatedBy", fields: [createdById], references: [id])
+  approvedBy  User?       @relation("RevisionApprovedBy", fields: [approvedById], references: [id])
+
+  access           DrawingAccess[]
+  acknowledgements DrawingAcknowledgement[]
+  accessLogs       DrawingAccessLog[]
+  jobs             GridJob[]
+  jobItems         GridJobItem[]
+  engineeringChanges EngineeringChange[]
+
+  @@unique([drawingId, revisionCode])
+  @@index([status])
+}
+
+model DrawingAccess {
+  id          String            @id @default(cuid())
+  revisionId  String
+  partnerId   String
+  jobId       String?
+  mode        DrawingAccessMode @default(VIEW_ONLY)
+  grantedAt   DateTime          @default(now())
+  grantedBy   String?
+  revokedAt   DateTime?
+  revokedBy   String?
+  expiresAt   DateTime?
+
+  revision DrawingRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  partner  Partner         @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  job      GridJob?        @relation(fields: [jobId], references: [id])
+
+  @@unique([revisionId, partnerId, jobId])
+  @@index([partnerId])
+}
+
+model DrawingAcknowledgement {
+  id             String   @id @default(cuid())
+  revisionId     String
+  partnerId      String
+  acknowledgedById String?
+  acknowledgedAt DateTime @default(now())
+  remarks        String?
+
+  revision       DrawingRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  partner        Partner         @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  acknowledgedBy User?           @relation(fields: [acknowledgedById], references: [id])
+
+  @@unique([revisionId, partnerId])
+}
+
+/// Drawing access logging required by the non-functional security requirements
+model DrawingAccessLog {
+  id         String             @id @default(cuid())
+  revisionId String
+  partnerId  String?
+  userId     String?
+  jobId      String?
+  event      DrawingAccessEvent
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime           @default(now())
+
+  revision DrawingRevision @relation(fields: [revisionId], references: [id], onDelete: Cascade)
+  partner  Partner?        @relation(fields: [partnerId], references: [id])
+  user     User?           @relation(fields: [userId], references: [id])
+
+  @@index([revisionId, createdAt])
+  @@index([partnerId])
+}
+
+model EngineeringChange {
+  id            String                  @id @default(cuid())
+  ecNumber      String                  @unique
+  drawingId     String?
+  revisionId    String?
+  title         String
+  description   String
+  status        EngineeringChangeStatus @default(RAISED)
+  raisedById    String?
+  raisedAt      DateTime                @default(now())
+  approvedAt    DateTime?
+  implementedAt DateTime?
+  impact        String?
+  decisionNote  String?
+  approvedById  String?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  drawing    Drawing?         @relation(fields: [drawingId], references: [id])
+  revision   DrawingRevision? @relation(fields: [revisionId], references: [id])
+  raisedBy   User?            @relation("EcRaisedBy", fields: [raisedById], references: [id])
+  approvedBy User?            @relation("EcApprovedBy", fields: [approvedById], references: [id])
+}
+
+// ===========================================================================
+// JOBS (Module 4)
+// ===========================================================================
+
+model GridJob {
+  id                  String                 @id @default(cuid())
+  jobNumber           String                 @unique
+  companyId           String
+  source              JobSource              @default(MANUAL)
+  sourceRef           String?
+  customerProject     String?
+  productId           String?
+  componentId         String
+  drawingRevisionId   String?
+  quantity            Float
+  acceptedQuantity    Float                  @default(0)
+  rejectedQuantity    Float                  @default(0)
+  reworkQuantity      Float                  @default(0)
+  dispatchedQuantity  Float                  @default(0)
+  receivedQuantity    Float                  @default(0)
+  partnerId           String?
+  plannedStartDate    DateTime?
+  dueDate             DateTime
+  materialResponsibility MaterialResponsibility @default(OSWAR_SUPPLIED)
+  rate                Float
+  inspectionPlanId    String?
+  deliveryLocation    String?
+  priority            JobPriority            @default(NORMAL)
+  status              JobStatus              @default(DRAFT)
+  acceptedAt          DateTime?
+  declinedAt          DateTime?
+  declineReason       String?
+  productionStartedAt DateTime?
+  completedAt         DateTime?
+  closedAt            DateTime?
+  classAOverrideById  String?
+  classAOverrideReason String?
+  notes               String?
+  createdById         String?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  company         Company          @relation(fields: [companyId], references: [id])
+  product         Product?         @relation(fields: [productId], references: [id])
+  component       Component        @relation(fields: [componentId], references: [id])
+  drawingRevision DrawingRevision? @relation(fields: [drawingRevisionId], references: [id])
+  partner         Partner?         @relation(fields: [partnerId], references: [id])
+  inspectionPlan  InspectionPlan?  @relation(fields: [inspectionPlanId], references: [id])
+  createdBy       User?            @relation("JobCreatedBy", fields: [createdById], references: [id])
+
+  items           GridJobItem[]
+  assignments     JobAssignment[]
+  milestones      JobMilestone[]
+  statusHistory   JobStatusHistory[]
+  delays          JobDelay[]
+  clarifications  JobClarification[]
+  materialIssues  MaterialIssue[]
+  consumptions    MaterialConsumption[]
+  scrapReturns    ScrapReturn[]
+  reconciliations MaterialReconciliation[]
+  inspections     Inspection[]
+  nonConformances NonConformance[]
+  reworkOrders    ReworkOrder[]
+  drawingAccess   DrawingAccess[]
+  shipmentItems   ShipmentItem[]
+  invoiceItems    PartnerInvoiceItem[]
+  capacityAllocations CapacityAllocation[]
+  toolIssues      ToolIssue[]
+
+  @@index([companyId, status])
+  @@index([partnerId, status])
+  @@index([dueDate])
+}
+
+/// Line items — a job may cover several components when raised from one order
+model GridJobItem {
+  id                String   @id @default(cuid())
+  jobId             String
+  componentId       String
+  drawingRevisionId String?
+  quantity          Float
+  acceptedQuantity  Float    @default(0)
+  rejectedQuantity  Float    @default(0)
+  rate              Float
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  job             GridJob          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  component       Component        @relation(fields: [componentId], references: [id])
+  drawingRevision DrawingRevision? @relation(fields: [drawingRevisionId], references: [id])
+
+  @@index([jobId])
+}
+
+model JobAssignment {
+  id            String    @id @default(cuid())
+  jobId         String
+  partnerId     String
+  assignedById  String?
+  assignedAt    DateTime  @default(now())
+  recommendationScore Float?
+  recommendationDetail Json?
+  isActive      Boolean   @default(true)
+  respondedAt   DateTime?
+  accepted      Boolean?
+  declineReason String?
+
+  job        GridJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  partner    Partner @relation(fields: [partnerId], references: [id])
+  assignedBy User?   @relation("JobAssignedBy", fields: [assignedById], references: [id])
+
+  @@index([jobId])
+  @@index([partnerId])
+}
+
+model JobMilestone {
+  id                   String        @id @default(cuid())
+  jobId                String
+  type                 MilestoneType
+  quantityCompleted    Float?
+  remarks              String?
+  expectedCompletionDate DateTime?
+  reportedById         String?
+  reportedAt           DateTime      @default(now())
+  dueAt                DateTime?
+  isOverdue            Boolean       @default(false)
+  syncedFromOffline    Boolean       @default(false)
+  clientRequestId      String?       @unique
+
+  job        GridJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  reportedBy User?   @relation(fields: [reportedById], references: [id])
+
+  @@index([jobId, type])
+}
+
+model JobStatusHistory {
+  id          String    @id @default(cuid())
+  jobId       String
+  fromStatus  JobStatus?
+  toStatus    JobStatus
+  reason      String?
+  changedById String?
+  createdAt   DateTime  @default(now())
+
+  job       GridJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  changedBy User?   @relation(fields: [changedById], references: [id])
+
+  @@index([jobId, createdAt])
+}
+
+model JobDelay {
+  id            String           @id @default(cuid())
+  jobId         String
+  reason        DelayReason
+  responsibility ResponsibleParty
+  delayDays     Int              @default(0)
+  detail        String?
+  expectedCompletionDate DateTime?
+  reportedById  String?
+  reportedAt    DateTime         @default(now())
+  resolvedAt    DateTime?
+
+  job        GridJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  reportedBy User?   @relation("DelayReportedBy", fields: [reportedById], references: [id])
+
+  @@index([jobId])
+  @@index([reason])
+}
+
+model JobClarification {
+  id           String              @id @default(cuid())
+  jobId        String
+  question     String
+  answer       String?
+  status       ClarificationStatus @default(OPEN)
+  raisedById   String?
+  answeredById String?
+  raisedAt     DateTime            @default(now())
+  answeredAt   DateTime?
+
+  job        GridJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  raisedBy   User?   @relation("ClarificationRaisedBy", fields: [raisedById], references: [id])
+  answeredBy User?   @relation("ClarificationAnsweredBy", fields: [answeredById], references: [id])
+
+  @@index([jobId, status])
+}
+
+// ===========================================================================
+// MATERIALS (Module 6)
+// ===========================================================================
+
+model MaterialIssue {
+  id             String              @id @default(cuid())
+  challanNumber  String              @unique
+  companyId      String
+  jobId          String
+  partnerId      String
+  status         MaterialIssueStatus @default(DRAFT)
+  issueDate      DateTime?
+  expectedReturnDate DateTime?
+  totalIssueWeightKg Float           @default(0)
+  vehicleNumber  String?
+  driverName     String?
+  remarks        String?
+  createdById    String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  company   Company @relation(fields: [companyId], references: [id])
+  job       GridJob @relation(fields: [jobId], references: [id])
+  partner   Partner @relation(fields: [partnerId], references: [id])
+  createdBy User?   @relation("MaterialIssueCreatedBy", fields: [createdById], references: [id])
+
+  items            MaterialIssueItem[]
+  acknowledgements MaterialReceiptAcknowledgement[]
+  shipmentItems    ShipmentItem[]
+
+  @@index([jobId])
+  @@index([partnerId, status])
+}
+
+model MaterialIssueItem {
+  id              String  @id @default(cuid())
+  materialIssueId String
+  itemId          String
+  quantity        Float
+  uom             String  @default("KG")
+  issueWeightKg   Float
+  batchNumber     String?
+  heatNumber      String?
+  theoreticalQuantity Float?
+  remarks         String?
+
+  materialIssue MaterialIssue @relation(fields: [materialIssueId], references: [id], onDelete: Cascade)
+  item          Item          @relation(fields: [itemId], references: [id])
+
+  @@index([materialIssueId])
+}
+
+model MaterialReceiptAcknowledgement {
+  id               String   @id @default(cuid())
+  materialIssueId  String
+  acknowledgedById String?
+  receivedWeightKg Float
+  shortageWeightKg Float    @default(0)
+  damageRemarks    String?
+  acknowledgedAt   DateTime @default(now())
+  signatureName    String?
+  clientRequestId  String?  @unique
+
+  materialIssue  MaterialIssue @relation(fields: [materialIssueId], references: [id], onDelete: Cascade)
+  acknowledgedBy User?         @relation(fields: [acknowledgedById], references: [id])
+
+  @@index([materialIssueId])
+}
+
+model MaterialConsumption {
+  id              String   @id @default(cuid())
+  jobId           String
+  itemId          String
+  theoreticalKg   Float
+  actualKg        Float
+  variancePercent Float    @default(0)
+  recordedAt      DateTime @default(now())
+  remarks         String?
+
+  job  GridJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  item Item    @relation(fields: [itemId], references: [id])
+
+  @@index([jobId])
+}
+
+model ScrapReturn {
+  id            String   @id @default(cuid())
+  jobId         String
+  itemId        String
+  scrapWeightKg Float
+  returnedWeightKg Float  @default(0)
+  scrapPercent  Float    @default(0)
+  returnedAt    DateTime @default(now())
+  challanNumber String?
+  remarks       String?
+
+  job  GridJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  item Item    @relation(fields: [itemId], references: [id])
+
+  @@index([jobId])
+}
+
+model MaterialReconciliation {
+  id               String               @id @default(cuid())
+  jobId            String
+  itemId           String
+  issuedKg         Float
+  consumedKg       Float
+  scrapReturnedKg  Float                @default(0)
+  unusedReturnedKg Float                @default(0)
+  shortageKg       Float                @default(0)
+  excessKg         Float                @default(0)
+  status           ReconciliationStatus @default(PENDING)
+  transactionType  MaterialTransactionType @default(CONSUMED)
+  deductionAmount  Float                @default(0)
+  reconciledById   String?
+  reconciledAt     DateTime?
+  remarks          String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  job          GridJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  item         Item    @relation(fields: [itemId], references: [id])
+  reconciledBy User?   @relation(fields: [reconciledById], references: [id])
+
+  @@unique([jobId, itemId])
+  @@index([status])
+}
+
+// ===========================================================================
+// QUALITY (Module 8)
+// ===========================================================================
+
+model InspectionPlan {
+  id             String          @id @default(cuid())
+  companyId      String
+  componentId    String
+  name           String
+  inspectionType InspectionType  @default(FINAL)
+  samplingPlan   String?
+  version        Int             @default(1)
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  company         Company                   @relation(fields: [companyId], references: [id])
+  component       Component                 @relation(fields: [componentId], references: [id])
+  characteristics InspectionCharacteristic[]
+  inspections     Inspection[]
+  jobs            GridJob[]
+
+  @@index([componentId])
+}
+
+model InspectionCharacteristic {
+  id               String  @id @default(cuid())
+  inspectionPlanId String
+  sequence         Int     @default(1)
+  characteristic   String
+  specification    String
+  nominalValue     Float?
+  upperTolerance   Float?
+  lowerTolerance   Float?
+  unit             String?
+  measuringInstrument String?
+  isCritical       Boolean @default(false)
+
+  inspectionPlan InspectionPlan     @relation(fields: [inspectionPlanId], references: [id], onDelete: Cascade)
+  results        InspectionResult[]
+
+  @@index([inspectionPlanId])
+}
+
+model Inspection {
+  id               String              @id @default(cuid())
+  inspectionNumber String              @unique
+  jobId            String
+  partnerId        String?
+  inspectionPlanId String?
+  type             InspectionType
+  status           InspectionStatus    @default(REQUESTED)
+  decision         InspectionDecision?
+  offeredQuantity  Float               @default(0)
+  inspectedQuantity Float              @default(0)
+  acceptedQuantity Float               @default(0)
+  rejectedQuantity Float               @default(0)
+  reworkQuantity   Float               @default(0)
+  requestedById    String?
+  requestedAt      DateTime            @default(now())
+  inspectorId      String?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  dueAt            DateTime?
+  remarks          String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  job            GridJob         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  partner        Partner?        @relation(fields: [partnerId], references: [id])
+  inspectionPlan InspectionPlan? @relation(fields: [inspectionPlanId], references: [id])
+  requestedBy    User?           @relation("InspectionRequestedBy", fields: [requestedById], references: [id])
+  inspector      User?           @relation("InspectionInspector", fields: [inspectorId], references: [id])
+
+  results         InspectionResult[]
+  nonConformances NonConformance[]
+  reworkOrders    ReworkOrder[]
+  deviations      DeviationApproval[]
+
+  @@index([status, type])
+  @@index([jobId])
+}
+
+model InspectionResult {
+  id               String        @id @default(cuid())
+  inspectionId     String
+  characteristicId String?
+  characteristicName String
+  specification    String?
+  tolerance        String?
+  actualValue      String?
+  numericValue     Float?
+  measuringInstrument String?
+  verdict          ResultVerdict @default(PASS)
+  sampleNumber     Int           @default(1)
+  remarks          String?
+  recordedAt       DateTime      @default(now())
+
+  inspection     Inspection                @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  characteristic InspectionCharacteristic? @relation(fields: [characteristicId], references: [id])
+
+  @@index([inspectionId])
+}
+
+model NonConformance {
+  id               String     @id @default(cuid())
+  ncNumber         String     @unique
+  jobId            String
+  inspectionId     String?
+  partnerId        String?
+  defectType       DefectType
+  quantityAffected Float
+  probableCause    String?
+  responsibility   ResponsibleParty @default(PARTNER)
+  reworkCost       Float      @default(0)
+  materialLoss     Float      @default(0)
+  customerImpact   String?
+  correctiveActionRequired Boolean @default(true)
+  raisedById       String?
+  raisedAt         DateTime   @default(now())
+  closedAt         DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  job        GridJob     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  inspection Inspection? @relation(fields: [inspectionId], references: [id])
+  partner    Partner?    @relation(fields: [partnerId], references: [id])
+  raisedBy   User?       @relation("NcRaisedBy", fields: [raisedById], references: [id])
+
+  correctiveActions CorrectiveAction[]
+  reworkOrders      ReworkOrder[]
+
+  @@index([jobId])
+  @@index([defectType])
+}
+
+model CorrectiveAction {
+  id               String                @id @default(cuid())
+  caNumber         String                @unique
+  nonConformanceId String
+  stage            CorrectiveActionStage @default(ISSUE_RAISED)
+  containment      String?
+  rootCause        String?
+  correctiveAction String?
+  verification     String?
+  ownerId          String?
+  dueDate          DateTime?
+  closedAt         DateTime?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  nonConformance NonConformance @relation(fields: [nonConformanceId], references: [id], onDelete: Cascade)
+  owner          User?          @relation("CaOwner", fields: [ownerId], references: [id])
+
+  @@index([stage])
+}
+
+model ReworkOrder {
+  id               String       @id @default(cuid())
+  reworkNumber     String       @unique
+  jobId            String
+  inspectionId     String?
+  nonConformanceId String?
+  quantity         Float
+  instructions     String
+  status           ReworkStatus @default(ISSUED)
+  estimatedCost    Float        @default(0)
+  chargeToPartner  Boolean      @default(true)
+  issuedById       String?
+  issuedAt         DateTime     @default(now())
+  completedAt      DateTime?
+  dueDate          DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  job            GridJob         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  inspection     Inspection?     @relation(fields: [inspectionId], references: [id])
+  nonConformance NonConformance? @relation(fields: [nonConformanceId], references: [id])
+  issuedBy       User?           @relation("ReworkIssuedBy", fields: [issuedById], references: [id])
+
+  @@index([status])
+  @@index([jobId])
+}
+
+model DeviationApproval {
+  id           String          @id @default(cuid())
+  inspectionId String
+  requestNote  String
+  status       DeviationStatus @default(REQUESTED)
+  decidedById  String?
+  decidedAt    DateTime?
+  decisionNote String?
+  createdAt    DateTime        @default(now())
+
+  inspection Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  decidedBy  User?      @relation("DeviationDecidedBy", fields: [decidedById], references: [id])
+
+  @@index([inspectionId])
+}
+
+// ===========================================================================
+// LOGISTICS (Module 10)
+// ===========================================================================
+
+model Vehicle {
+  id            String   @id @default(cuid())
+  registrationNo String  @unique
+  vehicleType   String
+  capacityKg    Float?
+  ownerName     String?
+  driverName    String?
+  driverPhone   String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  shipments Shipment[]
+}
+
+model Shipment {
+  id              String            @id @default(cuid())
+  shipmentNumber  String            @unique
+  companyId       String
+  direction       ShipmentDirection
+  fromPartnerId   String?
+  toPartnerId     String?
+  pickupLocation  String
+  deliveryLocation String
+  materialType    String?
+  weightKg        Float             @default(0)
+  vehicleId       String?
+  driverName      String?
+  driverPhone     String?
+  plannedPickupAt DateTime
+  actualPickupAt  DateTime?
+  expectedDeliveryAt DateTime?
+  actualDeliveryAt DateTime?
+  status          ShipmentStatus    @default(PLANNED)
+  transportCost   Float             @default(0)
+  remarks         String?
+  createdById     String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  company     Company  @relation(fields: [companyId], references: [id])
+  fromPartner Partner? @relation("ShipmentFromPartner", fields: [fromPartnerId], references: [id])
+  toPartner   Partner? @relation("ShipmentToPartner", fields: [toPartnerId], references: [id])
+  vehicle     Vehicle? @relation(fields: [vehicleId], references: [id])
+  createdBy   User?    @relation("ShipmentCreatedBy", fields: [createdById], references: [id])
+
+  items            ShipmentItem[]
+  proofOfDelivery  ProofOfDelivery?
+
+  @@index([status, plannedPickupAt])
+}
+
+model ShipmentItem {
+  id              String  @id @default(cuid())
+  shipmentId      String
+  jobId           String?
+  materialIssueId String?
+  description     String
+  quantity        Float   @default(0)
+  weightKg        Float   @default(0)
+
+  shipment      Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  job           GridJob?       @relation(fields: [jobId], references: [id])
+  materialIssue MaterialIssue? @relation(fields: [materialIssueId], references: [id])
+
+  @@index([shipmentId])
+}
+
+model ProofOfDelivery {
+  id           String   @id @default(cuid())
+  shipmentId   String   @unique
+  receivedBy   String
+  receivedAt   DateTime @default(now())
+  signatureFileId String?
+  photoFileId  String?
+  remarks      String?
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+}
+
+// ===========================================================================
+// COMMERCIALS (Module 11)
+// ===========================================================================
+
+model PartnerRate {
+  id             String    @id @default(cuid())
+  companyId      String
+  partnerId      String
+  componentId    String
+  conversionRate Float
+  currency       String    @default("INR")
+  effectiveFrom  DateTime
+  effectiveTo    DateTime?
+  minimumBatch   Float     @default(1)
+  isActive       Boolean   @default(true)
+  approvedBy     String?
+  previousRate   Float?
+  revisionNote   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  company   Company   @relation(fields: [companyId], references: [id])
+  partner   Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  component Component @relation(fields: [componentId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId, componentId, effectiveFrom])
+}
+
+model PartnerIncentiveRule {
+  id          String         @id @default(cuid())
+  partnerId   String?
+  type        AdjustmentType
+  name        String
+  percentage  Float?
+  fixedAmount Float?
+  condition   String?
+  isActive    Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  partner Partner? @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+}
+
+model PartnerDeduction {
+  id          String         @id @default(cuid())
+  partnerId   String
+  invoiceId   String?
+  type        AdjustmentType
+  reason      String
+  amount      Float
+  approvedBy  String?
+  approvedAt  DateTime?
+  createdAt   DateTime       @default(now())
+
+  partner Partner         @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  invoice PartnerInvoice? @relation(fields: [invoiceId], references: [id])
+
+  @@index([partnerId])
+}
+
+model PartnerInvoice {
+  id              String        @id @default(cuid())
+  invoiceNumber   String        @unique
+  partnerInvoiceNo String?
+  companyId       String
+  partnerId       String
+  status          InvoiceStatus @default(DRAFT)
+  invoiceDate     DateTime      @default(now())
+  periodFrom      DateTime?
+  periodTo        DateTime?
+  basicAmount     Float         @default(0)
+  incentiveAmount Float         @default(0)
+  deductionAmount Float         @default(0)
+  taxAmount       Float         @default(0)
+  netAmount       Float         @default(0)
+  currency        String        @default("INR")
+  fileId          String?
+  holdReason      String?
+  quantityVerifiedAt DateTime?
+  qualityVerifiedAt  DateTime?
+  materialReconciledAt DateTime?
+  financeApprovedAt  DateTime?
+  paymentScheduledFor DateTime?
+  paidAt          DateTime?
+  submittedById   String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  company     Company @relation(fields: [companyId], references: [id])
+  partner     Partner @relation(fields: [partnerId], references: [id])
+  submittedBy User?   @relation("InvoiceSubmittedBy", fields: [submittedById], references: [id])
+
+  items       PartnerInvoiceItem[]
+  approvals   PaymentApproval[]
+  payments    PaymentRecord[]
+  deductions  PartnerDeduction[]
+
+  @@index([partnerId, status])
+  @@index([status, invoiceDate])
+}
+
+model PartnerInvoiceItem {
+  id               String @id @default(cuid())
+  invoiceId        String
+  jobId            String
+  acceptedQuantity Float
+  conversionRate   Float
+  amount           Float
+  description      String?
+
+  invoice PartnerInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  job     GridJob        @relation(fields: [jobId], references: [id])
+
+  @@index([invoiceId])
+}
+
+model PaymentApproval {
+  id         String   @id @default(cuid())
+  invoiceId  String
+  stage      String // QUANTITY | QUALITY | MATERIAL | FINANCE
+  approved   Boolean
+  approverId String?
+  remarks    String?
+  createdAt  DateTime @default(now())
+
+  invoice  PartnerInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  approver User?          @relation("PaymentApprover", fields: [approverId], references: [id])
+
+  @@index([invoiceId])
+}
+
+model PaymentRecord {
+  id            String      @id @default(cuid())
+  invoiceId     String
+  amount        Float
+  mode          PaymentMode @default(NEFT)
+  referenceNo   String?
+  paidAt        DateTime    @default(now())
+  recordedById  String?
+  remarks       String?
+
+  invoice    PartnerInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  recordedBy User?          @relation("PaymentRecordedBy", fields: [recordedById], references: [id])
+
+  @@index([invoiceId])
+}
+
+// ===========================================================================
+// PERFORMANCE (Module 12 + Module 5)
+// ===========================================================================
+
+model PartnerScore {
+  id              String                   @id @default(cuid())
+  partnerId       String
+  periodMonth     Int
+  periodYear      Int
+  totalScore      Float
+  category        PartnerCategory
+  recommendation  AllocationRecommendation
+  jobsCompleted   Int                      @default(0)
+  jobsOnTime      Int                      @default(0)
+  quantityAccepted Float                   @default(0)
+  quantityRejected Float                   @default(0)
+  computedAt      DateTime                 @default(now())
+  remarks         String?
+
+  partner Partner      @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  kpis    PartnerKPI[]
+
+  @@unique([partnerId, periodYear, periodMonth])
+}
+
+model PartnerKPI {
+  id          String  @id @default(cuid())
+  partnerId   String
+  scoreId     String?
+  code        KpiCode
+  weight      Float
+  value       Float
+  weighted    Float
+  periodMonth Int
+  periodYear  Int
+
+  partner Partner       @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  score   PartnerScore? @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+
+  @@index([partnerId, periodYear, periodMonth])
+}
+
+model CapacityDeclaration {
+  id                 String             @id @default(cuid())
+  partnerId          String
+  processId          String
+  periodType         CapacityPeriodType @default(WEEKLY)
+  periodStart        DateTime
+  periodEnd          DateTime
+  availableHours     Float
+  availableWorkers   Int                @default(0)
+  availableMachines  Int                @default(0)
+  committedHours     Float              @default(0)
+  maintenanceShutdownHours Float        @default(0)
+  expectedBottleneck String?
+  declaredById       String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  partner    Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  process    Process @relation(fields: [processId], references: [id])
+  declaredBy User?   @relation("CapacityDeclaredBy", fields: [declaredById], references: [id])
+
+  allocations CapacityAllocation[]
+
+  @@unique([partnerId, processId, periodStart])
+  @@index([periodStart])
+}
+
+model CapacityAllocation {
+  id            String   @id @default(cuid())
+  declarationId String?
+  partnerId     String
+  processId     String
+  jobId         String?
+  allocatedHours Float
+  periodStart   DateTime
+  periodEnd     DateTime
+  createdAt     DateTime @default(now())
+
+  declaration CapacityDeclaration? @relation(fields: [declarationId], references: [id])
+  partner     Partner              @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  process     Process              @relation(fields: [processId], references: [id])
+  job         GridJob?             @relation(fields: [jobId], references: [id])
+
+  @@index([partnerId, periodStart])
+}
+
+// ===========================================================================
+// ASSETS — TOOLING, FIXTURES, GAUGES (Module 9)
+// ===========================================================================
+
+model Tool {
+  id                    String        @id @default(cuid())
+  toolCode              String        @unique
+  companyId             String
+  category              ToolCategory  @default(TOOL)
+  description           String
+  ownerName             String        @default("OSWAR")
+  currentPartnerId      String?
+  condition             ToolCondition @default(GOOD)
+  calibrationRequired   Boolean       @default(false)
+  calibrationFrequencyDays Int?
+  lastCalibratedAt      DateTime?
+  nextCalibrationDue    DateTime?
+  photoFileId           String?
+  replacementValue      Float         @default(0)
+  isActive              Boolean       @default(true)
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  issues       ToolIssue[]
+  calibrations CalibrationRecord[]
+
+  @@index([category])
+  @@index([nextCalibrationDue])
+}
+
+model ToolIssue {
+  id             String          @id @default(cuid())
+  toolId         String
+  partnerId      String
+  jobId          String?
+  issuedById     String?
+  issueDate      DateTime        @default(now())
+  expectedReturnDate DateTime?
+  actualReturnDate DateTime?
+  conditionOnIssue ToolCondition @default(GOOD)
+  conditionOnReturn ToolCondition?
+  status         ToolIssueStatus @default(ISSUED)
+  remarks        String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  tool     Tool     @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  partner  Partner  @relation(fields: [partnerId], references: [id])
+  job      GridJob? @relation(fields: [jobId], references: [id])
+  issuedBy User?    @relation("ToolIssuedBy", fields: [issuedById], references: [id])
+
+  @@index([toolId])
+  @@index([partnerId, status])
+}
+
+model CalibrationRecord {
+  id             String   @id @default(cuid())
+  toolId         String
+  calibratedAt   DateTime @default(now())
+  nextDueAt      DateTime?
+  agency         String?
+  certificateNo  String?
+  result         String?
+  performedById  String?
+  createdAt      DateTime @default(now())
+
+  tool        Tool  @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  performedBy User? @relation("CalibrationBy", fields: [performedById], references: [id])
+
+  @@index([toolId])
+}
+
+// ===========================================================================
+// NOTIFICATIONS (Section 13) AND IMS INTEGRATION (Section 10)
+// ===========================================================================
+
+model Notification {
+  id        String              @id @default(cuid())
+  userId    String
+  event     NotificationEvent
+  channel   NotificationChannel @default(IN_APP)
+  status    NotificationStatus  @default(PENDING)
+  title     String
+  body      String
+  entityType String?
+  entityId  String?
+  link      String?
+  readAt    DateTime?
+  sentAt    DateTime?
+  error     String?
+  createdAt DateTime            @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([event])
+}
+
+model ImsSyncLog {
+  id         String   @id @default(cuid())
+  companyId  String?
+  direction  String // INBOUND | OUTBOUND
+  entity     String
+  recordRef  String?
+  payload    Json?
+  success    Boolean  @default(true)
+  message    String?
+  createdAt  DateTime @default(now())
+
+  company Company? @relation(fields: [companyId], references: [id])
+
+  @@index([entity, createdAt])
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model NumberSequence {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  prefix    String
+  nextValue Int      @default(1)
+  padding   Int      @default(5)
+  updatedAt DateTime @updatedAt
+}
