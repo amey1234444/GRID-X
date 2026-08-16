@@ -38,6 +38,12 @@ export interface AppConfig {
       apiToken?: string;
     };
   };
+  ims: {
+    enabled: boolean;
+    baseUrl?: string;
+    apiKey?: string;
+    timeoutMs: number;
+  };
   sentryDsn?: string;
   webAppUrl: string;
 }
@@ -95,6 +101,12 @@ export default function configuration(): AppConfig {
         apiUrl: process.env.WHATSAPP_API_URL || undefined,
         apiToken: process.env.WHATSAPP_API_TOKEN || undefined,
       },
+    },
+    ims: {
+      enabled: bool(process.env.IMS_ENABLED, false),
+      baseUrl: process.env.IMS_BASE_URL || undefined,
+      apiKey: process.env.IMS_API_KEY || undefined,
+      timeoutMs: num(process.env.IMS_TIMEOUT_MS, 15000),
     },
     sentryDsn: process.env.SENTRY_DSN || undefined,
     webAppUrl: process.env.WEB_APP_URL ?? 'http://localhost:3000',

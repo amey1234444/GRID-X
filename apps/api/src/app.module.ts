@@ -15,6 +15,17 @@ import { PartnersModule } from './partners/partners.module';
 import { MastersModule } from './masters/masters.module';
 import { DrawingsModule } from './drawings/drawings.module';
 import { JobsModule } from './jobs/jobs.module';
+import { CapacityModule } from './capacity/capacity.module';
+import { MaterialsModule } from './materials/materials.module';
+import { QualityModule } from './quality/quality.module';
+import { LogisticsModule } from './logistics/logistics.module';
+import { CommercialsModule } from './commercials/commercials.module';
+import { ToolingModule } from './tooling/tooling.module';
+import { ScorecardsModule } from './scorecards/scorecards.module';
+import { DashboardsModule } from './dashboards/dashboards.module';
+import { ReportsModule } from './reports/reports.module';
+import { ImsModule } from './ims/ims.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -30,6 +41,17 @@ import { JobsModule } from './jobs/jobs.module';
     MastersModule,
     DrawingsModule,
     JobsModule,
+    CapacityModule,
+    MaterialsModule,
+    QualityModule,
+    LogisticsModule,
+    CommercialsModule,
+    ToolingModule,
+    ScorecardsModule,
+    DashboardsModule,
+    ReportsModule,
+    ImsModule,
+    AdminModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
