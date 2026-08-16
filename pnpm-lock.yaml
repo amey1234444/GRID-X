@@ -136,6 +136,12 @@ importers:
         specifier: 5.22.0
         version: 5.22.0(prisma@5.22.0)
     devDependencies:
+      '@gridx/shared':
+        specifier: workspace:*
+        version: link:../shared
+      argon2:
+        specifier: 0.41.1
+        version: 0.41.1
       dotenv:
         specifier: 16.4.5
         version: 16.4.5

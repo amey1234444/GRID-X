@@ -29,6 +29,8 @@
     "@prisma/client": "5.22.0"
   },
   "devDependencies": {
+    "@gridx/shared": "workspace:*",
+    "argon2": "0.41.1",
     "dotenv": "16.4.5",
     "dotenv-cli": "7.4.4",
     "prisma": "5.22.0",
