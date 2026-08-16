@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 224 32% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 32% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 32% 12%;
+    --primary: 243 75% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 20% 97%;
+    --secondary-foreground: 224 28% 20%;
+    --muted: 220 20% 97%;
+    --muted-foreground: 220 12% 46%;
+    --accent: 243 100% 97%;
+    --accent-foreground: 243 60% 40%;
+    --destructive: 0 74% 52%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 62% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 32 95% 44%;
+    --warning-foreground: 0 0% 100%;
+    --border: 220 16% 91%;
+    --input: 220 16% 91%;
+    --ring: 243 75% 59%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 226 32% 7%;
+    --foreground: 220 20% 96%;
+    --card: 226 28% 10%;
+    --card-foreground: 220 20% 96%;
+    --popover: 226 28% 10%;
+    --popover-foreground: 220 20% 96%;
+    --primary: 243 90% 68%;
+    --primary-foreground: 226 40% 8%;
+    --secondary: 226 20% 15%;
+    --secondary-foreground: 220 20% 96%;
+    --muted: 226 20% 15%;
+    --muted-foreground: 220 12% 65%;
+    --accent: 243 40% 20%;
+    --accent-foreground: 243 90% 88%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 55% 45%;
+    --success-foreground: 226 40% 8%;
+    --warning: 32 90% 55%;
+    --warning-foreground: 226 40% 8%;
+    --border: 226 18% 20%;
+    --input: 226 18% 22%;
+    --ring: 243 90% 68%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+
+  ::selection {
+    @apply bg-primary/20;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .grid-pattern {
+    background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.6) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.6) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+
+  .radial-fade {
+    mask-image: radial-gradient(ellipse at center, black 35%, transparent 75%);
+  }
+
+  .glass {
+    @apply bg-background/70 backdrop-blur-xl;
+  }
+}
