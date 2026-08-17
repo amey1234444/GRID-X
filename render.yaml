@@ -28,9 +28,14 @@ services:
     # We install pnpm with npm instead of `corepack enable`: the corepack
     # bundled with Node 20.x ships an outdated signing key and dies with
     # "Cannot find matching keyid" when it resolves a pnpm version.
+    #
+    # --prod=false is required: NODE_ENV=production below applies to the build
+    # too, and pnpm reads it as --prod, which skips every devDependency. That
+    # drops typescript, @nestjs/cli, tailwindcss and postcss, so the compilers
+    # fall through to whatever happens to be on the image PATH.
     buildCommand: >-
       npm install -g pnpm@$PNPM_VERSION &&
-      pnpm install --frozen-lockfile &&
+      pnpm install --frozen-lockfile --prod=false &&
       pnpm --filter @gridx/shared build &&
       pnpm --filter @gridx/db build:ci &&
       pnpm --filter @gridx/api build &&
@@ -131,10 +136,10 @@ services:
     region: singapore
     branch: main
     healthCheckPath: /
-    # Same corepack workaround as the API service.
+    # Same corepack and --prod=false workarounds as the API service.
     buildCommand: >-
       npm install -g pnpm@$PNPM_VERSION &&
-      pnpm install --frozen-lockfile &&
+      pnpm install --frozen-lockfile --prod=false &&
       pnpm --filter @gridx/shared build &&
       pnpm --filter @gridx/web build
     startCommand: pnpm --filter @gridx/web start
