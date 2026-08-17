@@ -9,8 +9,6 @@ export interface ActionState {
   success?: string;
 }
 
-export const idleAction: ActionState = { error: null };
-
 function text(data: FormData, key: string): string | undefined {
   const value = data.get(key);
   if (typeof value !== 'string') return undefined;
@@ -50,11 +48,11 @@ export async function changePartnerStatusAction(
   data: FormData,
 ): Promise<ActionState> {
   const partnerId = text(data, 'partnerId');
-  const approvalStatus = text(data, 'approvalStatus');
-  if (!partnerId || !approvalStatus) return { error: 'Select a status' };
+  const toStatus = text(data, 'toStatus');
+  if (!partnerId || !toStatus) return { error: 'Select a status' };
   return send(
     `/partners/${partnerId}/status`,
-    { approvalStatus, remarks: text(data, 'remarks') },
+    { toStatus, reason: text(data, 'reason') },
     ['/app/partners', `/app/partners/${partnerId}`],
   );
 }
@@ -77,12 +75,10 @@ export async function recordPartnerAuditAction(
     {
       auditDate: text(data, 'auditDate'),
       auditType: text(data, 'auditType') ?? 'CAPABILITY',
-      capabilityScore: number(data, 'capabilityScore') ?? 0,
-      qualitySystemScore: number(data, 'qualitySystemScore') ?? 0,
-      safetyScore: number(data, 'safetyScore') ?? 0,
-      housekeepingScore: number(data, 'housekeepingScore') ?? 0,
-      observations: text(data, 'observations'),
-      recommendation: text(data, 'recommendation'),
+      score: number(data, 'score'),
+      status: text(data, 'status') ?? 'IN_PROGRESS',
+      findings: text(data, 'findings'),
+      nextAuditDate: text(data, 'nextAuditDate'),
     },
     [`/app/partners/${partnerId}`],
   );
@@ -948,4 +944,403 @@ export async function updateSettingAction(_state: ActionState, data: FormData): 
     value = raw;
   }
   return send(`/settings/${key}`, { value }, ['/app/admin/settings'], 'PATCH');
+}
+
+// ---------------------------------------------------------------------------
+// Partner onboarding and profile
+// ---------------------------------------------------------------------------
+
+export async function createPartnerAction(_state: ActionState, data: FormData): Promise<ActionState> {
+  const companyId = text(data, 'companyId');
+  const businessName = text(data, 'businessName');
+  const ownerName = text(data, 'ownerName');
+  const phone = text(data, 'phone');
+  const addressLine1 = text(data, 'addressLine1');
+  const city = text(data, 'city');
+  const state = text(data, 'state');
+  const pincode = text(data, 'pincode');
+  if (
+    !companyId ||
+    !businessName ||
+    !ownerName ||
+    !phone ||
+    !addressLine1 ||
+    !city ||
+    !state ||
+    !pincode
+  ) {
+    return { error: 'Business, owner, phone, address, city, state and pincode are required' };
+  }
+  return send(
+    '/partners',
+    {
+      companyId,
+      businessName,
+      ownerName,
+      phone,
+      altPhone: text(data, 'altPhone'),
+      email: text(data, 'email'),
+      addressLine1,
+      addressLine2: text(data, 'addressLine2'),
+      city,
+      state,
+      pincode,
+      distanceKm: number(data, 'distanceKm'),
+      udyamNumber: text(data, 'udyamNumber'),
+      gstNumber: text(data, 'gstNumber'),
+      panNumber: text(data, 'panNumber'),
+      bankName: text(data, 'bankName'),
+      bankAccountName: text(data, 'bankAccountName'),
+      bankAccountNo: text(data, 'bankAccountNo'),
+      bankIfsc: text(data, 'bankIfsc'),
+      level: text(data, 'level') ?? 'L2_SMALL',
+      paymentTermsDays: number(data, 'paymentTermsDays') ?? 30,
+      maxCapacityHours: number(data, 'maxCapacityHours') ?? 0,
+      maxOpenJobs: number(data, 'maxOpenJobs') ?? 10,
+      notes: text(data, 'notes'),
+    },
+    ['/app/partners'],
+  );
+}
+
+export async function addPartnerCapabilityAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const partnerId = text(data, 'partnerId');
+  const process = text(data, 'process');
+  if (!partnerId || !process) return { error: 'Select a process' };
+  return send(
+    `/partners/${partnerId}/capabilities`,
+    {
+      process,
+      isCapable: true,
+      isApproved: bool(data, 'isApproved'),
+      maxSizeMm: number(data, 'maxSizeMm'),
+      maxWeightKg: number(data, 'maxWeightKg'),
+      toleranceMm: number(data, 'toleranceMm'),
+      monthlyCapacityHours: number(data, 'monthlyCapacityHours') ?? 0,
+      remarks: text(data, 'remarks'),
+    },
+    [`/app/partners/${partnerId}`],
+  );
+}
+
+export async function addPartnerMachineAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const partnerId = text(data, 'partnerId');
+  const machineType = text(data, 'machineType');
+  if (!partnerId || !machineType) return { error: 'Machine type is required' };
+  return send(
+    `/partners/${partnerId}/machines`,
+    {
+      machineType,
+      make: text(data, 'make'),
+      model: text(data, 'model'),
+      size: text(data, 'size'),
+      capacity: text(data, 'capacity'),
+      accuracy: text(data, 'accuracy'),
+      condition: text(data, 'condition') ?? 'GOOD',
+      ownership: text(data, 'ownership') ?? 'OWNED',
+      quantity: number(data, 'quantity') ?? 1,
+    },
+    [`/app/partners/${partnerId}`],
+  );
+}
+
+export async function addPartnerEmployeeAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const partnerId = text(data, 'partnerId');
+  const name = text(data, 'name');
+  if (!partnerId || !name) return { error: 'Employee name is required' };
+  return send(
+    `/partners/${partnerId}/employees`,
+    {
+      name,
+      skill: text(data, 'skill'),
+      phone: text(data, 'phone'),
+      isSupervisor: bool(data, 'isSupervisor'),
+    },
+    [`/app/partners/${partnerId}`],
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Engineering masters
+// ---------------------------------------------------------------------------
+
+export async function createComponentAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const companyId = text(data, 'companyId');
+  const componentCode = text(data, 'componentCode');
+  const name = text(data, 'name');
+  const primaryProcess = text(data, 'primaryProcess');
+  if (!companyId || !componentCode || !name || !primaryProcess) {
+    return { error: 'Code, name and primary process are required' };
+  }
+  return send(
+    '/components',
+    {
+      companyId,
+      componentCode,
+      name,
+      primaryProcess,
+      productId: text(data, 'productId'),
+      drawingNumber: text(data, 'drawingNumber'),
+      materialGrade: text(data, 'materialGrade'),
+      theoreticalWeightKg: number(data, 'theoreticalWeightKg'),
+      inspectionLevel: text(data, 'inspectionLevel') ?? 'LEVEL_2_SAMPLING',
+      criticality: text(data, 'criticality') ?? 'CLASS_C',
+      standardCycleTimeMinutes: number(data, 'standardCycleTimeMinutes'),
+      standardConversionRate: number(data, 'standardConversionRate'),
+      packagingRequirement: text(data, 'packagingRequirement'),
+      outsourcingEligibilityScore: number(data, 'outsourcingEligibilityScore') ?? 50,
+      scrapAllowancePercent: number(data, 'scrapAllowancePercent') ?? 5,
+    },
+    ['/app/engineering/components'],
+  );
+}
+
+export async function approvePartnerComponentAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const componentId = text(data, 'componentId');
+  const partnerId = text(data, 'partnerId');
+  if (!componentId || !partnerId) return { error: 'Select a partner' };
+  return send(
+    `/components/${componentId}/approved-partners`,
+    {
+      partnerId,
+      firstArticleDone: bool(data, 'firstArticleDone'),
+      remarks: text(data, 'remarks'),
+    },
+    [`/app/engineering/components/${componentId}`],
+  );
+}
+
+export async function addComponentProcessAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const componentId = text(data, 'componentId');
+  const processCode = text(data, 'processCode');
+  if (!componentId || !processCode) return { error: 'Select a process' };
+  return send(
+    `/components/${componentId}/processes`,
+    {
+      processCode,
+      sequence: number(data, 'sequence') ?? 1,
+      cycleTimeMinutes: number(data, 'cycleTimeMinutes'),
+      isOutsourced: data.get('isOutsourced') === null ? true : bool(data, 'isOutsourced'),
+      remarks: text(data, 'remarks'),
+    },
+    [`/app/engineering/components/${componentId}`],
+  );
+}
+
+export async function createItemAction(_state: ActionState, data: FormData): Promise<ActionState> {
+  const code = text(data, 'code');
+  const name = text(data, 'name');
+  if (!code || !name) return { error: 'Item code and name are required' };
+  return send(
+    '/items',
+    {
+      code,
+      name,
+      uom: text(data, 'uom') ?? 'KG',
+      materialGrade: text(data, 'materialGrade'),
+      unitWeightKg: number(data, 'unitWeightKg'),
+      standardRate: number(data, 'standardRate'),
+    },
+    ['/app/engineering/masters'],
+  );
+}
+
+export async function createProductAction(_state: ActionState, data: FormData): Promise<ActionState> {
+  const companyId = text(data, 'companyId');
+  const code = text(data, 'code');
+  const name = text(data, 'name');
+  if (!companyId || !code || !name) return { error: 'Product code and name are required' };
+  return send(
+    '/products',
+    { companyId, code, name, description: text(data, 'description') },
+    ['/app/engineering/masters'],
+  );
+}
+
+export async function createDrawingAction(_state: ActionState, data: FormData): Promise<ActionState> {
+  const companyId = text(data, 'companyId');
+  const drawingNumber = text(data, 'drawingNumber');
+  const title = text(data, 'title');
+  if (!companyId || !drawingNumber || !title) return { error: 'Drawing number and title are required' };
+  return send(
+    '/drawings',
+    {
+      companyId,
+      drawingNumber,
+      title,
+      componentId: text(data, 'componentId'),
+      description: text(data, 'description'),
+    },
+    ['/app/engineering/drawings'],
+  );
+}
+
+export async function raiseEngineeringChangeAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const title = text(data, 'title');
+  const description = text(data, 'description');
+  if (!title || !description) return { error: 'Title and description are required' };
+  return send(
+    '/drawings/engineering-changes',
+    {
+      drawingId: text(data, 'drawingId'),
+      revisionId: text(data, 'revisionId'),
+      title,
+      description,
+      impact: text(data, 'impact'),
+    },
+    ['/app/engineering/drawings', '/app/engineering/changes'],
+  );
+}
+
+export async function decideEngineeringChangeAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const changeId = text(data, 'changeId');
+  const status = text(data, 'status');
+  if (!changeId || !status) return { error: 'Select a decision' };
+  return send(
+    `/drawings/engineering-changes/${changeId}/decision`,
+    { status, note: text(data, 'note') },
+    ['/app/engineering/changes'],
+  );
+}
+
+export async function createInspectionPlanAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const companyId = text(data, 'companyId');
+  const componentId = text(data, 'componentId');
+  const name = text(data, 'name');
+  const characteristic = text(data, 'characteristic');
+  const specification = text(data, 'specification');
+  if (!companyId || !componentId || !name || !characteristic || !specification) {
+    return { error: 'Component, plan name and the first characteristic are required' };
+  }
+  return send(
+    '/quality/plans',
+    {
+      companyId,
+      componentId,
+      name,
+      inspectionType: text(data, 'inspectionType') ?? 'FINAL',
+      samplingPlan: text(data, 'samplingPlan'),
+      characteristics: [
+        {
+          sequence: 1,
+          characteristic,
+          specification,
+          unit: text(data, 'unit'),
+          measuringInstrument: text(data, 'measuringInstrument'),
+          isCritical: bool(data, 'isCritical'),
+        },
+      ],
+    },
+    ['/app/engineering/inspection-plans'],
+  );
+}
+
+export async function createReworkAction(_state: ActionState, data: FormData): Promise<ActionState> {
+  const jobId = text(data, 'jobId');
+  const quantity = number(data, 'quantity');
+  const instructions = text(data, 'instructions');
+  if (!jobId || !quantity || !instructions) {
+    return { error: 'Job, quantity and instructions are required' };
+  }
+  return send(
+    '/quality/rework',
+    {
+      jobId,
+      nonConformanceId: text(data, 'nonConformanceId'),
+      inspectionId: text(data, 'inspectionId'),
+      quantity,
+      instructions,
+      estimatedCost: number(data, 'estimatedCost') ?? 0,
+      chargeToPartner: data.get('chargeToPartner') === null ? true : bool(data, 'chargeToPartner'),
+      dueDate: text(data, 'dueDate'),
+    },
+    ['/app/quality/rework', '/inspector/rework'],
+  );
+}
+
+export async function recordProofOfDeliveryAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const shipmentId = text(data, 'shipmentId');
+  const receivedBy = text(data, 'receivedBy');
+  if (!shipmentId || !receivedBy) return { error: 'Who received the shipment?' };
+  return send(
+    `/logistics/shipments/${shipmentId}/proof-of-delivery`,
+    { receivedBy, receivedAt: text(data, 'receivedAt'), remarks: text(data, 'remarks') },
+    ['/app/logistics/shipments', `/app/logistics/shipments/${shipmentId}`],
+  );
+}
+
+export async function decideDeviationAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const deviationId = text(data, 'deviationId');
+  const status = text(data, 'status');
+  if (!deviationId || !status) return { error: 'Select a decision' };
+  return send(
+    `/quality/deviations/${deviationId}`,
+    { status, decisionNote: text(data, 'decisionNote') },
+    ['/app/quality/inspections'],
+    'PATCH',
+  );
+}
+
+export async function createRevisionAction(_state: ActionState, data: FormData): Promise<ActionState> {
+  const drawingId = text(data, 'drawingId');
+  const revisionCode = text(data, 'revisionCode');
+  if (!drawingId || !revisionCode) return { error: 'A revision code is required' };
+  return send(
+    `/drawings/${drawingId}/revisions`,
+    { revisionCode, changeNote: text(data, 'changeNote') },
+    ['/app/engineering/drawings', `/app/engineering/drawings/${drawingId}`],
+  );
+}
+
+export async function revokeDrawingAccessAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const accessId = text(data, 'accessId');
+  const drawingId = text(data, 'drawingId');
+  if (!accessId) return { error: 'Missing access record' };
+  return send(`/drawings/access/${accessId}/revoke`, {}, [
+    '/app/engineering/drawings',
+    ...(drawingId ? [`/app/engineering/drawings/${drawingId}`] : []),
+  ]);
+}
+
+export async function updateProcessRateAction(_state: ActionState, data: FormData): Promise<ActionState> {
+  const processId = text(data, 'processId');
+  const standardRatePerHour = number(data, 'standardRatePerHour');
+  if (!processId || standardRatePerHour === undefined) return { error: 'A rate is required' };
+  return send(`/processes/${processId}`, { standardRatePerHour }, ['/app/engineering/masters'], 'PATCH');
 }

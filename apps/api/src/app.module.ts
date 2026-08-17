@@ -26,6 +26,7 @@ import { DashboardsModule } from './dashboards/dashboards.module';
 import { ReportsModule } from './reports/reports.module';
 import { ImsModule } from './ims/ims.module';
 import { AdminModule } from './admin/admin.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { AdminModule } from './admin/admin.module';
     ReportsModule,
     ImsModule,
     AdminModule,
+    HealthModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

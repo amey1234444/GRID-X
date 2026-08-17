@@ -456,3 +456,343 @@ export interface ImsLogRow {
   message: string | null;
   createdAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// Detail shapes
+// ---------------------------------------------------------------------------
+
+export interface PartnerDetail {
+  id: string;
+  partnerCode: string;
+  businessName: string;
+  ownerName: string;
+  phone: string;
+  altPhone: string | null;
+  email: string | null;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  state: string;
+  pincode: string;
+  distanceKm: number | null;
+  udyamNumber: string | null;
+  gstNumber: string | null;
+  panNumber: string | null;
+  bankName: string | null;
+  bankAccountName: string | null;
+  bankAccountNo: string | null;
+  bankIfsc: string | null;
+  category: string;
+  level: string;
+  approvalStatus: string;
+  auditStatus: string;
+  paymentTermsDays: number;
+  maxCapacityHours: number;
+  maxOpenJobs: number;
+  isActive: boolean;
+  suspendedReason: string | null;
+  currentScore: number | null;
+  notes: string | null;
+  openJobs: number;
+  canAllocate: boolean;
+  company: { id: string; name: string };
+  capabilities: {
+    id: string;
+    process: string;
+    isCapable: boolean;
+    isApproved: boolean;
+    maxSizeMm: number | null;
+    maxWeightKg: number | null;
+    toleranceMm: number | null;
+    monthlyCapacityHours: number;
+  }[];
+  machines: {
+    id: string;
+    machineType: string;
+    make: string | null;
+    model: string | null;
+    capacity: string | null;
+    condition: string;
+    ownership: string;
+    quantity: number;
+  }[];
+  documents: {
+    id: string;
+    type: string;
+    documentNo: string | null;
+    expiryDate: string | null;
+    verified: boolean;
+  }[];
+  employees: { id: string; name: string; skill: string | null; phone: string | null; isSupervisor: boolean }[];
+  audits: {
+    id: string;
+    auditDate: string;
+    auditType: string;
+    score: number | null;
+    status: string;
+    findings: string | null;
+    nextAuditDate: string | null;
+  }[];
+  statusHistory: {
+    id: string;
+    fromStatus: string | null;
+    toStatus: string;
+    reason: string | null;
+    createdAt: string;
+    changedBy: { id: string; name: string } | null;
+  }[];
+  approvedComponents: {
+    id: string;
+    firstArticleDone: boolean;
+    component: { id: string; componentCode: string; name: string };
+  }[];
+  scores: { id: string; periodMonth: number; periodYear: number; totalScore: number; category: string }[];
+  rates: { id: string; conversionRate: number; component: { componentCode: string; name: string } }[];
+  users: { id: string; name: string; phone: string | null; email: string | null; status: string }[];
+  _count: { jobs: number; invoices: number; nonConformances: number };
+}
+
+export interface JobDetail {
+  id: string;
+  jobNumber: string;
+  status: string;
+  priority: string;
+  quantity: number;
+  acceptedQuantity: number;
+  rejectedQuantity: number;
+  reworkQuantity: number;
+  rate: number;
+  source: string;
+  sourceRef: string | null;
+  customerProject: string | null;
+  materialResponsibility: string;
+  deliveryLocation: string | null;
+  notes: string | null;
+  plannedStartDate: string | null;
+  dueDate: string;
+  acceptedAt: string | null;
+  declinedAt: string | null;
+  declineReason: string | null;
+  productionStartedAt: string | null;
+  completedAt: string | null;
+  closedAt: string | null;
+  dispatchedQuantity: number;
+  receivedQuantity: number;
+  classAOverrideReason: string | null;
+  component: {
+    id: string;
+    componentCode: string;
+    name: string;
+    criticality: string;
+    inspectionLevel: string;
+    materialGrade: string | null;
+    theoreticalWeightKg: number | null;
+    processes: { id: string; sequence: number; process: { code: string; name: string } }[];
+  };
+  partner: {
+    id: string;
+    partnerCode: string;
+    businessName: string;
+    ownerName: string;
+    phone: string;
+    city: string;
+    currentScore: number | null;
+    category: string;
+  } | null;
+  drawingRevision: {
+    id: string;
+    revisionCode: string;
+    status: string;
+    drawing: { id: string; drawingNumber: string; title: string };
+  } | null;
+  inspectionPlan: {
+    id: string;
+    name: string;
+    characteristics: { id: string; sequence: number; characteristic: string; specification: string; unit: string | null; measuringInstrument: string | null; isCritical: boolean }[];
+  } | null;
+  assignments: {
+    id: string;
+    accepted: boolean | null;
+    assignedAt: string;
+    respondedAt: string | null;
+    declineReason: string | null;
+    partner: { id: string; businessName: string } | null;
+  }[];
+  milestones: {
+    id: string;
+    type: string;
+    quantityCompleted: number | null;
+    remarks: string | null;
+    reportedAt: string;
+    syncedFromOffline: boolean;
+  }[];
+  statusHistory: { id: string; fromStatus: string | null; toStatus: string; reason: string | null; createdAt: string }[];
+  delays: { id: string; reason: string; responsibility: string; delayDays: number; detail: string | null; reportedAt: string }[];
+  clarifications: { id: string; question: string; answer: string | null; status: string; raisedAt: string }[];
+  materialIssues: {
+    id: string;
+    challanNumber: string;
+    status: string;
+    issueDate: string;
+    totalIssueWeightKg: number;
+    items: { id: string; quantity: number; uom: string; issueWeightKg: number | null; item: { code: string; name: string } }[];
+  }[];
+  inspections: {
+    id: string;
+    inspectionNumber: string;
+    type: string;
+    status: string;
+    decision: string | null;
+    offeredQuantity: number;
+    acceptedQuantity: number;
+    rejectedQuantity: number;
+    requestedAt: string;
+  }[];
+  reworkOrders: { id: string; reworkNumber: string; status: string; quantity: number }[];
+  invoiceItems: { id: string; amount: number; invoice: { id: string; invoiceNumber: string; status: string } }[];
+  reconciliations: {
+    id: string;
+    status: string;
+    issuedKg: number;
+    consumedKg: number;
+    scrapReturnedKg: number;
+    unusedReturnedKg: number;
+    shortageKg: number;
+    excessKg: number;
+    deductionAmount: number;
+    item: { code: string; name: string };
+  }[];
+}
+
+export interface InspectionDetail extends InspectionRow {
+  remarks: string | null;
+  inspectionPlan: {
+    id: string;
+    name: string;
+    characteristics: {
+      id: string;
+      sequence: number;
+      characteristic: string;
+      specification: string;
+      unit: string | null;
+      measuringInstrument: string | null;
+      isCritical: boolean;
+    }[];
+  } | null;
+  results: {
+    id: string;
+    characteristicName: string;
+    specification: string | null;
+    actualValue: string | null;
+    verdict: string;
+    sampleNumber: number;
+    remarks: string | null;
+    recordedAt: string;
+  }[];
+  nonConformances: { id: string; ncNumber: string; defectType: string; quantityAffected: number }[];
+  reworkOrders: { id: string; reworkNumber: string; status: string; quantity: number }[];
+  deviations: { id: string; status: string; requestNote: string | null; decisionNote: string | null }[];
+}
+
+export interface ReconciliationRow {
+  itemId: string;
+  itemCode: string;
+  itemName: string;
+  issuedKg: number;
+  consumedKg: number;
+  scrapReturnedKg: number;
+  unusedReturnedKg: number;
+  balanceKg: number;
+  status: string;
+  deductionAmount: number;
+}
+
+export interface InvoiceableJob {
+  jobId: string;
+  jobNumber: string;
+  componentCode: string;
+  componentName: string;
+  acceptedQuantity: number;
+  conversionRate: number;
+  amount: number;
+}
+
+export interface EngineeringChangeRow {
+  id: string;
+  ecNumber: string;
+  title: string;
+  description: string;
+  impact: string | null;
+  status: string;
+  raisedAt: string;
+  decisionNote: string | null;
+  drawing: { id: string; drawingNumber: string } | null;
+}
+
+export interface DrawingDetail {
+  id: string;
+  drawingNumber: string;
+  title: string;
+  description: string | null;
+  component: { id: string; componentCode: string; name: string } | null;
+  revisions: {
+    id: string;
+    revisionCode: string;
+    status: string;
+    changeNote: string | null;
+    issueDate: string | null;
+    expiryDate: string | null;
+    releasedAt: string | null;
+    createdAt: string;
+    acknowledgements: { id: string; acknowledgedAt: string; partner: { id: string; businessName: string } | null }[];
+    access: {
+      id: string;
+      mode: string;
+      revokedAt: string | null;
+      partner: { id: string; businessName: string } | null;
+    }[];
+  }[];
+}
+
+export interface ComponentDetail extends ComponentRow {
+  packagingRequirement: string | null;
+  processes: { id: string; sequence: number; cycleTimeMinutes: number | null; isOutsourced: boolean; process: { code: string; name: string } }[];
+  items: { id: string; quantityPerUnit: number; uom: string; item: { code: string; name: string } }[];
+  approvedPartners: {
+    id: string;
+    firstArticleDone: boolean;
+    remarks: string | null;
+    partner: { id: string; partnerCode: string; businessName: string; approvalStatus: string };
+  }[];
+  drawings: { id: string; drawingNumber: string; title: string }[];
+}
+
+export interface PartnerDashboard {
+  partnerId: string;
+  businessName: string;
+  category: string;
+  score: number | null;
+  newJobs: number;
+  activeJobs: number;
+  awaitingMaterialAck: number;
+  pendingInspections: number;
+  reworkOpen: number;
+  invoicesPending: number;
+  paymentsDue: number;
+  jobs: JobRow[];
+}
+
+export const emptyPartnerDashboard = (): PartnerDashboard => ({
+  partnerId: '',
+  businessName: '',
+  category: 'C',
+  score: null,
+  newJobs: 0,
+  activeJobs: 0,
+  awaitingMaterialAck: 0,
+  pendingInspections: 0,
+  reworkOpen: 0,
+  invoicesPending: 0,
+  paymentsDue: 0,
+  jobs: [],
+});

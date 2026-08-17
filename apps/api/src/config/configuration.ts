@@ -60,7 +60,7 @@ function num(value: string | undefined, fallback: number): number {
 
 export default function configuration(): AppConfig {
   return {
-    port: num(process.env.API_PORT, 4000),
+    port: num(process.env.PORT ?? process.env.API_PORT, 4000),
     globalPrefix: process.env.API_GLOBAL_PREFIX ?? 'api',
     corsOrigins: (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
       .split(',')
