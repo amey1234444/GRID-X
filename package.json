@@ -19,6 +19,7 @@
     "db:migrate": "pnpm --filter @gridx/db migrate",
     "db:seed": "pnpm --filter @gridx/db seed",
     "db:reset": "pnpm --filter @gridx/db reset",
+    "db:studio": "pnpm --filter @gridx/db studio",
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\""
   },
   "devDependencies": {

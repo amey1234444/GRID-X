@@ -17,11 +17,25 @@ The platform is a pnpm monorepo:
 
 ```bash
 pnpm install
-cp .env.example .env            # point DATABASE_URL at your PostgreSQL instance
+cp .env.example .env            # defaults match the bundled Postgres container
+docker compose up -d --wait     # PostgreSQL 16 on localhost:5432
 pnpm --filter @gridx/db generate
-pnpm --filter @gridx/db push
+pnpm --filter @gridx/db migrate # applies prisma/migrations to the database
 pnpm --filter @gridx/db seed
 pnpm dev                        # API on :4000, web on :3000
 ```
 
-API docs are served at `http://localhost:4000/docs`.
+If you already run PostgreSQL yourself, skip `docker compose` and point
+`DATABASE_URL` at your own instance instead.
+
+API docs are served at `http://localhost:4000/api/docs`, and the health check
+used by Render is at `http://localhost:4000/api/health`.
+
+Useful database commands, all of which read `.env` at the repository root:
+
+| Command | What it does |
+| --- | --- |
+| `pnpm db:migrate` | Create and apply a migration after editing `schema.prisma` |
+| `pnpm db:seed` | Load roles, partners, components, drawings and a sample job lifecycle |
+| `pnpm db:reset` | Drop everything, re-apply migrations and re-seed |
+| `pnpm db:studio` | Browse the data in Prisma Studio |
