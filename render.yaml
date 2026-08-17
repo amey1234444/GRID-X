@@ -1,0 +1,152 @@
+# ---------------------------------------------------------------------------
+# GRID-X on Render — API (NestJS) + Web (Next.js) + managed PostgreSQL.
+#
+# Deploy with a Blueprint: Render dashboard → New → Blueprint → pick this repo.
+# Secrets marked `sync: false` must be filled in the Render dashboard; nothing
+# secret is committed here. See docs/deployment-render.md for the full runbook.
+# ---------------------------------------------------------------------------
+
+databases:
+  - name: gridx-postgres
+    databaseName: gridx
+    user: gridx
+    plan: basic-256mb
+    postgresMajorVersion: "16"
+    ipAllowList: []
+
+services:
+  # -------------------------------------------------------------------------
+  # GRID-X API — NestJS REST API, Swagger at /api/docs, health at /api/health
+  # -------------------------------------------------------------------------
+  - type: web
+    name: gridx-api
+    runtime: node
+    plan: starter
+    region: singapore
+    branch: main
+    healthCheckPath: /api/health
+    buildCommand: >-
+      corepack enable &&
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @gridx/shared build &&
+      pnpm --filter @gridx/db build:ci &&
+      pnpm --filter @gridx/api build &&
+      pnpm --filter @gridx/db deploy:ci
+    startCommand: pnpm --filter @gridx/api start
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20.18.1"
+      - key: PNPM_VERSION
+        value: "9.15.9"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gridx-postgres
+          property: connectionString
+      - key: API_GLOBAL_PREFIX
+        value: api
+      - key: CORS_ORIGINS
+        fromService:
+          type: web
+          name: gridx-web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: WEB_APP_URL
+        fromService:
+          type: web
+          name: gridx-web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_TTL
+        value: 15m
+      - key: JWT_REFRESH_TTL
+        value: 30d
+      - key: SESSION_IDLE_TIMEOUT_MINUTES
+        value: "60"
+      - key: OTP_TTL_MINUTES
+        value: "10"
+      # Object storage: switch STORAGE_DRIVER to s3 and fill the S3_* values with
+      # an S3-compatible bucket (AWS S3, Cloudflare R2, Supabase Storage, GCS).
+      # Render disks are not shared across instances, so `local` is dev-only.
+      - key: STORAGE_DRIVER
+        value: s3
+      - key: STORAGE_SIGNED_URL_TTL_SECONDS
+        value: "300"
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_REGION
+        value: ap-south-1
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_FORCE_PATH_STYLE
+        value: "true"
+      - key: NOTIFY_EMAIL_ENABLED
+        value: "false"
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        value: GRID-X <no-reply@oswar.example>
+      - key: NOTIFY_WHATSAPP_ENABLED
+        value: "false"
+      - key: WHATSAPP_API_URL
+        sync: false
+      - key: WHATSAPP_API_TOKEN
+        sync: false
+      # IMS boundary — GRID-X consumes masters from IMS and pushes back status.
+      - key: IMS_ENABLED
+        value: "false"
+      - key: IMS_BASE_URL
+        sync: false
+      - key: IMS_API_KEY
+        sync: false
+      - key: IMS_TIMEOUT_MS
+        value: "15000"
+      - key: SENTRY_DSN
+        sync: false
+
+  # -------------------------------------------------------------------------
+  # GRID-X Web — marketing site, Control, Partner PWA and Inspector
+  # -------------------------------------------------------------------------
+  - type: web
+    name: gridx-web
+    runtime: node
+    plan: starter
+    region: singapore
+    branch: main
+    healthCheckPath: /
+    buildCommand: >-
+      corepack enable &&
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @gridx/shared build &&
+      pnpm --filter @gridx/web build
+    startCommand: pnpm --filter @gridx/web start
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20.18.1"
+      - key: PNPM_VERSION
+        value: "9.15.9"
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_APP_NAME
+        value: GRID-X
+      # Points at the API service; the /api suffix matches API_GLOBAL_PREFIX.
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: gridx-api
+          envVarKey: RENDER_EXTERNAL_URL
