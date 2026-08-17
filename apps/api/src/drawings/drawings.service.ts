@@ -85,6 +85,7 @@ export class DrawingsService {
       drawingNumber: drawing.drawingNumber,
       title: drawing.title,
       componentCode: drawing.component?.componentCode ?? null,
+      currentRevisionId: drawing.currentRevision?.id ?? null,
       currentRevisionCode: drawing.currentRevision?.revisionCode ?? null,
       status: drawing.currentRevision?.status ?? null,
       revisionCount: drawing._count.revisions,

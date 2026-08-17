@@ -164,6 +164,7 @@ export interface DrawingSummary {
   drawingNumber: string;
   title: string;
   componentCode: string | null;
+  currentRevisionId: string | null;
   currentRevisionCode: string | null;
   status: DrawingStatus | null;
   releasedAt: string | null;

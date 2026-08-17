@@ -139,6 +139,38 @@ async function apiFetchWithToken<T>(
   return { status: response.status, data: payload as T, error: null };
 }
 
+/** Fetches a non-JSON response (CSV exports) with the current session. */
+export async function apiFetchText(
+  path: string,
+): Promise<{ status: number; body: string | null; contentType: string; error: string | null }> {
+  const tokens = readTokens();
+  if (!tokens) return { status: 401, body: null, contentType: 'text/plain', error: 'Not authenticated' };
+
+  const request = async (accessToken: string) =>
+    fetch(`${API_URL}${path.startsWith('/') ? path : `/${path}`}`, {
+      headers: { authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
+    });
+
+  let response = await request(tokens.accessToken);
+  if (response.status === 401) {
+    const refreshed = await refreshSession(tokens.refreshToken);
+    if (!refreshed) {
+      clearTokens();
+      return { status: 401, body: null, contentType: 'text/plain', error: 'Session expired' };
+    }
+    writeTokens(refreshed);
+    response = await request(refreshed.accessToken);
+  }
+
+  const body = await response.text();
+  const contentType = response.headers.get('content-type') ?? 'text/plain';
+  if (!response.ok) {
+    return { status: response.status, body: null, contentType, error: `Export failed with status ${response.status}` };
+  }
+  return { status: response.status, body, contentType, error: null };
+}
+
 /** Convenience wrapper for server components: returns the value or a fallback. */
 export async function apiGet<T>(path: string, fallback: T): Promise<T> {
   const result = await apiFetch<T>(path);

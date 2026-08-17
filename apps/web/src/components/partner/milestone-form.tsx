@@ -1,0 +1,131 @@
+'use client';
+
+import { useState } from 'react';
+import { MILESTONE_LABELS, MILESTONE_TYPES, MILESTONES_REQUIRING_PHOTO } from '@gridx/shared';
+import { CheckCircle2, CloudUpload, Loader2 } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { newRequestId, submit } from '@/lib/offline';
+import type { Language } from '@/lib/i18n';
+
+type Outcome = 'sent' | 'queued' | 'rejected' | null;
+
+export function MilestoneForm({
+  jobId,
+  language,
+}: {
+  jobId: string;
+  language: Language;
+}): React.JSX.Element {
+  const [type, setType] = useState<string>(MILESTONE_TYPES[0]);
+  const [quantity, setQuantity] = useState('');
+  const [remarks, setRemarks] = useState('');
+  const [pending, setPending] = useState(false);
+  const [outcome, setOutcome] = useState<Outcome>(null);
+
+  const onSubmit = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    setPending(true);
+    setOutcome(null);
+    const result = await submit({
+      clientRequestId: newRequestId(),
+      path: `/jobs/${jobId}/milestones`,
+      label: MILESTONE_LABELS[type as keyof typeof MILESTONE_LABELS] ?? type,
+      body: {
+        type,
+        quantityCompleted: quantity === '' ? undefined : Number(quantity),
+        remarks: remarks === '' ? undefined : remarks,
+        photographFileIds: [],
+      },
+    });
+    setOutcome(result);
+    setPending(false);
+    if (result !== 'rejected') {
+      setQuantity('');
+      setRemarks('');
+    }
+  };
+
+  const photoNeeded = MILESTONES_REQUIRING_PHOTO.includes(type as (typeof MILESTONES_REQUIRING_PHOTO)[number]);
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-4 rounded-xl border bg-card p-4">
+      <div className="space-y-2">
+        <Label htmlFor="milestone-type">{language === 'HI' ? 'प्रगति' : 'Milestone'}</Label>
+        <Select value={type} onValueChange={setType}>
+          <SelectTrigger id="milestone-type">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {MILESTONE_TYPES.map((value) => (
+              <SelectItem key={value} value={value}>
+                {MILESTONE_LABELS[value]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="milestone-quantity">{language === 'HI' ? 'पूरी मात्रा' : 'Quantity completed'}</Label>
+          <Input
+            id="milestone-quantity"
+            type="number"
+            inputMode="numeric"
+            value={quantity}
+            onChange={(event) => setQuantity(event.currentTarget.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="milestone-remarks">{language === 'HI' ? 'टिप्पणी' : 'Remarks'}</Label>
+          <Textarea
+            id="milestone-remarks"
+            rows={2}
+            value={remarks}
+            onChange={(event) => setRemarks(event.currentTarget.value)}
+          />
+        </div>
+      </div>
+      {photoNeeded ? (
+        <p className="flex items-start gap-2 rounded-md bg-secondary p-3 text-xs text-muted-foreground">
+          <CloudUpload className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          {language === 'HI'
+            ? 'इस चरण के लिए फ़ोटो चाहिए। नेटवर्क आने पर फ़ोटो अपलोड कतार से भेजी जाएगी।'
+            : 'This milestone expects photographic evidence. Photos are queued and uploaded when the connection returns.'}
+        </p>
+      ) : null}
+      <div className="flex items-center gap-3">
+        <Button type="submit" disabled={pending}>
+          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          {language === 'HI' ? 'भेजें' : 'Save update'}
+        </Button>
+        {outcome === 'sent' ? (
+          <span className="flex items-center gap-1.5 text-sm text-emerald-600">
+            <CheckCircle2 className="h-4 w-4" />
+            {language === 'HI' ? 'भेज दिया' : 'Sent'}
+          </span>
+        ) : null}
+        {outcome === 'queued' ? (
+          <span className="text-sm text-amber-600">
+            {language === 'HI' ? 'ऑफ़लाइन सुरक्षित — बाद में सिंक होगा' : 'Saved offline — will sync automatically'}
+          </span>
+        ) : null}
+        {outcome === 'rejected' ? (
+          <span className="text-sm text-destructive">
+            {language === 'HI' ? 'भेजने में समस्या — कृपया जाँचें' : 'Rejected by the server — check the values'}
+          </span>
+        ) : null}
+      </div>
+    </form>
+  );
+}

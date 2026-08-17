@@ -84,6 +84,7 @@ export interface DrawingRow {
   drawingNumber: string;
   title: string;
   componentCode: string | null;
+  currentRevisionId: string | null;
   currentRevisionCode: string | null;
   status: string | null;
   revisionCount: number;
