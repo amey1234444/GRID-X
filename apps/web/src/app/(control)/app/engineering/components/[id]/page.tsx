@@ -1,8 +1,16 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { PROCESS_TYPES } from '@gridx/shared';
+import { CRITICALITY_CLASSES, INSPECTION_LEVELS, PROCESS_TYPES } from '@gridx/shared';
 
-import { addComponentProcessAction, approvePartnerComponentAction } from '@/app/actions/control';
+import {
+  addComponentItemAction,
+  addComponentProcessAction,
+  approvePartnerComponentAction,
+  removeApprovedPartnerAction,
+  removeComponentItemAction,
+  removeComponentProcessAction,
+  updateComponentAction,
+} from '@/app/actions/control';
 import { ActionDialog } from '@/components/app/action-dialog';
 import { DataTable } from '@/components/app/data-table';
 import { DetailList } from '@/components/app/detail-list';
@@ -12,7 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatNumber, humanise } from '@/lib/format';
 import { optionsFrom } from '@/lib/options';
-import { partnerOptions } from '@/lib/reference';
+import { itemOptions, partnerOptions } from '@/lib/reference';
 import { apiFetch } from '@/lib/session';
 import type { ComponentDetail } from '@/lib/types';
 
@@ -21,9 +29,10 @@ export default async function ComponentDetailPage({
 }: {
   params: { id: string };
 }): Promise<React.JSX.Element> {
-  const [result, partners] = await Promise.all([
+  const [result, partners, items] = await Promise.all([
     apiFetch<ComponentDetail>(`/components/${params.id}`),
     partnerOptions(),
+    itemOptions(),
   ]);
   const component = result.data;
   if (!component) notFound();
@@ -35,6 +44,107 @@ export default async function ComponentDetailPage({
         description={`${component.componentCode}${component.product ? ` · ${component.product.name}` : ''}`}
         actions={
           <>
+            <ActionDialog
+              title="Edit component"
+              description="Only the fields you fill in are changed."
+              triggerLabel="Edit"
+              triggerVariant="outline"
+              action={updateComponentAction}
+              hidden={{ componentId: component.id }}
+              fields={[
+                { name: 'componentCode', label: 'Component code', defaultValue: component.componentCode },
+                { name: 'name', label: 'Name', defaultValue: component.name },
+                {
+                  name: 'primaryProcess',
+                  label: 'Primary process',
+                  type: 'select',
+                  options: optionsFrom(PROCESS_TYPES),
+                  defaultValue: component.primaryProcess,
+                },
+                {
+                  name: 'criticality',
+                  label: 'Criticality',
+                  type: 'select',
+                  options: optionsFrom(CRITICALITY_CLASSES),
+                  defaultValue: component.criticality,
+                },
+                {
+                  name: 'inspectionLevel',
+                  label: 'Inspection level',
+                  type: 'select',
+                  options: optionsFrom(INSPECTION_LEVELS),
+                  defaultValue: component.inspectionLevel,
+                },
+                { name: 'materialGrade', label: 'Material grade', defaultValue: component.materialGrade ?? undefined },
+                {
+                  name: 'theoreticalWeightKg',
+                  label: 'Theoretical weight (kg)',
+                  type: 'number',
+                  step: '0.001',
+                  defaultValue:
+                    component.theoreticalWeightKg === null ? undefined : String(component.theoreticalWeightKg),
+                },
+                {
+                  name: 'standardCycleTimeMinutes',
+                  label: 'Cycle time (min)',
+                  type: 'number',
+                  step: '0.1',
+                  defaultValue:
+                    component.standardCycleTimeMinutes === null
+                      ? undefined
+                      : String(component.standardCycleTimeMinutes),
+                },
+                {
+                  name: 'standardConversionRate',
+                  label: 'Standard conversion rate',
+                  type: 'number',
+                  step: '0.01',
+                  defaultValue:
+                    component.standardConversionRate === null
+                      ? undefined
+                      : String(component.standardConversionRate),
+                },
+                {
+                  name: 'scrapAllowancePercent',
+                  label: 'Scrap allowance (%)',
+                  type: 'number',
+                  step: '0.1',
+                  defaultValue: String(component.scrapAllowancePercent),
+                },
+                {
+                  name: 'outsourcingEligibilityScore',
+                  label: 'Outsourcing eligibility',
+                  type: 'number',
+                  defaultValue: String(component.outsourcingEligibilityScore),
+                },
+                {
+                  name: 'packagingRequirement',
+                  label: 'Packaging requirement',
+                  type: 'textarea',
+                  defaultValue: component.packagingRequirement ?? undefined,
+                  span: 2,
+                },
+              ]}
+            />
+            <ActionDialog
+              title="Add material line"
+              description="Bill of material lines drive the theoretical material quantity for each job."
+              triggerLabel="Add material"
+              triggerVariant="outline"
+              action={addComponentItemAction}
+              hidden={{ componentId: component.id }}
+              fields={[
+                { name: 'itemId', label: 'Item', type: 'select', required: true, options: items, span: 2 },
+                {
+                  name: 'quantityPerUnit',
+                  label: 'Quantity per unit',
+                  type: 'number',
+                  step: '0.001',
+                  required: true,
+                },
+                { name: 'uom', label: 'UOM', defaultValue: 'KG' },
+              ]}
+            />
             <ActionDialog
               title="Approve a partner"
               description="Only approved partner–component pairs can be allocated jobs."
@@ -125,6 +235,22 @@ export default async function ComponentDetailPage({
                 header: 'Outsourced',
                 render: (row: ComponentDetail['processes'][number]) => (row.isOutsourced ? 'Yes' : 'In-house'),
               },
+              {
+                key: 'actions',
+                header: '',
+                render: (row: ComponentDetail['processes'][number]) => (
+                  <ActionDialog
+                    title="Remove process step"
+                    triggerLabel="Remove"
+                    triggerSize="sm"
+                    triggerVariant="ghost"
+                    submitLabel="Remove"
+                    action={removeComponentProcessAction}
+                    hidden={{ componentId: component.id, componentProcessId: row.id }}
+                    fields={[]}
+                  />
+                ),
+              },
             ]}
             rows={component.processes}
             empty={{ title: 'No process route defined' }}
@@ -149,6 +275,22 @@ export default async function ComponentDetailPage({
                 header: 'Qty per unit',
                 align: 'right',
                 render: (row: ComponentDetail['items'][number]) => `${formatNumber(row.quantityPerUnit, 3)} ${row.uom}`,
+              },
+              {
+                key: 'actions',
+                header: '',
+                render: (row: ComponentDetail['items'][number]) => (
+                  <ActionDialog
+                    title="Remove material line"
+                    triggerLabel="Remove"
+                    triggerSize="sm"
+                    triggerVariant="ghost"
+                    submitLabel="Remove"
+                    action={removeComponentItemAction}
+                    hidden={{ componentId: component.id, componentItemId: row.id }}
+                    fields={[]}
+                  />
+                ),
               },
             ]}
             rows={component.items}
@@ -189,6 +331,23 @@ export default async function ComponentDetailPage({
                 key: 'remarks',
                 header: 'Remarks',
                 render: (row: ComponentDetail['approvedPartners'][number]) => row.remarks ?? '—',
+              },
+              {
+                key: 'actions',
+                header: '',
+                render: (row: ComponentDetail['approvedPartners'][number]) => (
+                  <ActionDialog
+                    title="Withdraw approval"
+                    description="The partner can no longer be allocated jobs for this component."
+                    triggerLabel="Withdraw"
+                    triggerSize="sm"
+                    triggerVariant="ghost"
+                    submitLabel="Withdraw"
+                    action={removeApprovedPartnerAction}
+                    hidden={{ componentId: component.id, approvalId: row.id }}
+                    fields={[]}
+                  />
+                ),
               },
             ]}
             rows={component.approvedPartners}

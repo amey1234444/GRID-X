@@ -30,7 +30,7 @@ export function InspectorShell({
             Inspector
           </Badge>
           <div className="ml-auto flex items-center gap-1">
-            <NotificationBell />
+            <NotificationBell inboxHref="/app/notifications" />
             <ThemeToggle />
             <UserMenu user={user} />
           </div>

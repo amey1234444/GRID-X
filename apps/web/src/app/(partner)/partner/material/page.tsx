@@ -112,6 +112,14 @@ export default async function PartnerMaterialPage({
                             },
                             { name: 'signatureName', label: hindi ? 'नाम' : 'Received by', required: true },
                             {
+                              name: 'photographFileIds',
+                              label: hindi ? 'फ़ोटो' : 'Photographs',
+                              type: 'files',
+                              category: 'PHOTOGRAPH',
+                              accept: 'image/*',
+                              span: 2,
+                            },
+                            {
                               name: 'damageRemarks',
                               label: hindi ? 'नुकसान' : 'Damage remarks',
                               type: 'textarea',

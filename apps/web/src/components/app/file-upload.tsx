@@ -36,6 +36,8 @@ export function FileUpload({
   accept,
   required = false,
   disabled = false,
+  onChange,
+  label,
 }: {
   name: string;
   category?: FileCategory;
@@ -43,6 +45,9 @@ export function FileUpload({
   accept?: string;
   required?: boolean;
   disabled?: boolean;
+  /** Controlled mode: receive the ids instead of relying on the hidden inputs. */
+  onChange?: (fileIds: string[]) => void;
+  label?: string;
 }): React.JSX.Element {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -86,13 +91,21 @@ export function FileUpload({
       }
     }
 
-    setFiles((current) => (multiple ? [...current, ...uploaded] : uploaded.slice(-1)));
+    setFiles((current) => {
+      const next = multiple ? [...current, ...uploaded] : uploaded.slice(-1);
+      onChange?.(next.map((file) => file.id));
+      return next;
+    });
     setPending(false);
     if (inputRef.current) inputRef.current.value = '';
   };
 
   const remove = (id: string): void => {
-    setFiles((current) => current.filter((file) => file.id !== id));
+    setFiles((current) => {
+      const next = current.filter((file) => file.id !== id);
+      onChange?.(next.map((file) => file.id));
+      return next;
+    });
   };
 
   return (
@@ -120,7 +133,7 @@ export function FileUpload({
           onClick={() => inputRef.current?.click()}
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
-          {pending ? 'Uploading…' : multiple ? 'Add files' : 'Choose file'}
+          {pending ? 'Uploading…' : (label ?? (multiple ? 'Add files' : 'Choose file'))}
         </Button>
         {files.length === 0 ? (
           <span

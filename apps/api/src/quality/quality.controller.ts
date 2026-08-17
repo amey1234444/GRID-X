@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import {
   PERMISSIONS,
@@ -9,6 +9,7 @@ import {
   createInspectionPlanSchema,
   createReworkSchema,
   decideDeviationSchema,
+  inspectionCharacteristicSchema,
   paginationSchema,
   requestInspectionSchema,
   saveInspectionResultsSchema,
@@ -49,6 +50,26 @@ export class QualityController {
     @Body(zodBody(createInspectionPlanSchema)) body: z.infer<typeof createInspectionPlanSchema>,
   ) {
     return this.quality.createPlan(user, body);
+  }
+
+  @Post('plans/:id/characteristics')
+  @RequirePermissions(PERMISSIONS.INSPECTION_PLAN_MANAGE)
+  addPlanCharacteristic(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body(zodBody(inspectionCharacteristicSchema))
+    body: z.infer<typeof inspectionCharacteristicSchema>,
+  ) {
+    return this.quality.addPlanCharacteristic(user, id, body);
+  }
+
+  @Delete('plans/characteristics/:characteristicId')
+  @RequirePermissions(PERMISSIONS.INSPECTION_PLAN_MANAGE)
+  removePlanCharacteristic(
+    @CurrentUser() user: RequestUser,
+    @Param('characteristicId') characteristicId: string,
+  ) {
+    return this.quality.removePlanCharacteristic(user, characteristicId);
   }
 
   @Get('inspections')

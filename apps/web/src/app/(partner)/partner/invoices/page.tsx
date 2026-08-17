@@ -73,6 +73,14 @@ export default async function PartnerInvoicesPage({
               { name: 'taxPercent', label: hindi ? 'जीएसटी %' : 'GST %', type: 'number', defaultValue: '18' },
               { name: 'periodFrom', label: hindi ? 'से' : 'Period from', type: 'date', required: true },
               { name: 'periodTo', label: hindi ? 'तक' : 'Period to', type: 'date', required: true },
+              {
+                name: 'fileId',
+                label: hindi ? 'बिल की कॉपी' : 'Invoice copy',
+                type: 'file',
+                category: 'INVOICE',
+                accept: 'application/pdf,image/*',
+                span: 2,
+              },
             ]}
           />
         }

@@ -166,6 +166,14 @@ export default async function ToolingPage({
               { name: 'replacementValue', label: 'Replacement value', type: 'number', step: '0.01' },
               { name: 'calibrationRequired', label: 'Calibration required', type: 'checkbox' },
               { name: 'calibrationFrequencyDays', label: 'Calibration frequency (days)', type: 'number' },
+              {
+                name: 'photoFileId',
+                label: 'Tool photograph',
+                type: 'file',
+                category: 'PHOTOGRAPH',
+                accept: 'image/*',
+                span: 2,
+              },
             ]}
           />
         }

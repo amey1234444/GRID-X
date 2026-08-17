@@ -102,6 +102,12 @@ export const CONTROL_NAVIGATION: NavSection[] = [
     items: [
       { label: 'Rates', href: '/app/commercial/rates', permission: PERMISSIONS.RATE_READ },
       { label: 'Invoices', href: '/app/commercial/invoices', permission: PERMISSIONS.INVOICE_READ },
+      { label: 'Payments', href: '/app/commercial/payments', permission: PERMISSIONS.INVOICE_READ },
+      {
+        label: 'Incentives & deductions',
+        href: '/app/commercial/incentives',
+        permission: PERMISSIONS.RATE_MANAGE,
+      },
     ],
   },
   {
@@ -109,6 +115,11 @@ export const CONTROL_NAVIGATION: NavSection[] = [
     href: '/app/reports',
     icon: 'BarChart3',
     permission: PERMISSIONS.REPORT_READ,
+  },
+  {
+    label: 'Notifications',
+    href: '/app/notifications',
+    icon: 'Bell',
   },
   {
     label: 'IMS integration',

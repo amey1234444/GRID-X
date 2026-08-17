@@ -11,7 +11,7 @@ import { StatusBadge } from '@/components/app/status-badge';
 import { formatCurrency, formatDateTime, formatNumber, humanise } from '@/lib/format';
 import { optionsFrom } from '@/lib/options';
 import { readPage, readParam, type SearchParams } from '@/lib/query';
-import { defaultCompanyId, partnerOptions, vehicleOptions } from '@/lib/reference';
+import { defaultCompanyId, jobOptions, partnerOptions, vehicleOptions } from '@/lib/reference';
 import { apiGet } from '@/lib/session';
 import { emptyPage, type Paginated, type ShipmentRow } from '@/lib/types';
 
@@ -29,10 +29,11 @@ export default async function ShipmentsPage({
     if (value) query.set(key, value);
   }
 
-  const [shipments, partners, vehicles, companyId] = await Promise.all([
+  const [shipments, partners, vehicles, jobs, companyId] = await Promise.all([
     apiGet<Paginated<ShipmentRow>>(`/logistics/shipments?${query.toString()}`, emptyPage<ShipmentRow>()),
     partnerOptions(),
     vehicleOptions(),
+    jobOptions(),
     defaultCompanyId(),
   ]);
 
@@ -96,6 +97,20 @@ export default async function ShipmentsPage({
               fields={[
                 { name: 'receivedBy', label: 'Received by', required: true, span: 2 },
                 { name: 'receivedAt', label: 'Received at', type: 'date' },
+                {
+                  name: 'signatureFileId',
+                  label: 'Signature',
+                  type: 'file',
+                  category: 'PROOF_OF_DELIVERY',
+                  accept: 'image/*',
+                },
+                {
+                  name: 'photoFileId',
+                  label: 'Delivery photograph',
+                  type: 'file',
+                  category: 'PROOF_OF_DELIVERY',
+                  accept: 'image/*',
+                },
                 { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
               ]}
             />
@@ -137,6 +152,21 @@ export default async function ShipmentsPage({
               { name: 'driverPhone', label: 'Driver phone' },
               { name: 'plannedPickupAt', label: 'Planned pickup', type: 'date', required: true },
               { name: 'expectedDeliveryAt', label: 'Expected delivery', type: 'date' },
+              {
+                name: 'items',
+                label: 'Contents',
+                type: 'rows',
+                addLabel: 'Add line',
+                minRows: 0,
+                help: 'Linking a job lets the shipment appear on that job’s timeline.',
+                span: 2,
+                columns: [
+                  { name: 'jobId', label: 'Job', type: 'select', options: jobs },
+                  { name: 'description', label: 'Description', required: true },
+                  { name: 'quantity', label: 'Quantity', type: 'number' },
+                  { name: 'weightKg', label: 'Weight (kg)', type: 'number', step: '0.001' },
+                ],
+              },
               { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
             ]}
           />
@@ -168,6 +198,7 @@ export default async function ShipmentsPage({
       <DataTable
         columns={columns}
         rows={shipments.data}
+        rowHref={(row) => `/app/logistics/shipments/${row.id}`}
         empty={{ title: 'No shipments', description: 'Create a shipment when material or finished parts move.' }}
       />
 

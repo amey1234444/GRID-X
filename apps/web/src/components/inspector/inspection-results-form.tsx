@@ -5,6 +5,7 @@ import { AlertCircle, Loader2 } from 'lucide-react';
 import { RESULT_VERDICTS } from '@gridx/shared';
 
 import { saveInspectionResultsAction, type ActionState } from '@/app/actions/control';
+import { FileUpload } from '@/components/app/file-upload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -120,6 +121,11 @@ export function InspectionResultsForm({
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="space-y-2">
+        <Label>Evidence photographs</Label>
+        <FileUpload name="photographFileIds" category="PHOTOGRAPH" accept="image/*" multiple />
       </div>
 
       {state.error ? (

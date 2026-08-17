@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { MILESTONE_LABELS, MILESTONE_TYPES, MILESTONES_REQUIRING_PHOTO } from '@gridx/shared';
 import { CheckCircle2, CloudUpload, Loader2 } from 'lucide-react';
 
+import { FileUpload } from '@/components/app/file-upload';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,6 +31,7 @@ export function MilestoneForm({
   const [type, setType] = useState<string>(MILESTONE_TYPES[0]);
   const [quantity, setQuantity] = useState('');
   const [remarks, setRemarks] = useState('');
+  const [photographFileIds, setPhotographFileIds] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>(null);
 
@@ -45,7 +47,7 @@ export function MilestoneForm({
         type,
         quantityCompleted: quantity === '' ? undefined : Number(quantity),
         remarks: remarks === '' ? undefined : remarks,
-        photographFileIds: [],
+        photographFileIds,
       },
     });
     setOutcome(result);
@@ -53,6 +55,7 @@ export function MilestoneForm({
     if (result !== 'rejected') {
       setQuantity('');
       setRemarks('');
+      setPhotographFileIds([]);
     }
   };
 
@@ -96,14 +99,29 @@ export function MilestoneForm({
           />
         </div>
       </div>
-      {photoNeeded ? (
-        <p className="flex items-start gap-2 rounded-md bg-secondary p-3 text-xs text-muted-foreground">
-          <CloudUpload className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          {language === 'HI'
-            ? 'इस चरण के लिए फ़ोटो चाहिए। नेटवर्क आने पर फ़ोटो अपलोड कतार से भेजी जाएगी।'
-            : 'This milestone expects photographic evidence. Photos are queued and uploaded when the connection returns.'}
-        </p>
-      ) : null}
+      <div className="space-y-2">
+        <Label>
+          {language === 'HI' ? 'फ़ोटो' : 'Photographs'}
+          {photoNeeded ? <span className="ml-1 text-destructive">*</span> : null}
+        </Label>
+        <FileUpload
+          name="photographFileIds"
+          category="PHOTOGRAPH"
+          accept="image/*"
+          multiple
+          required={photoNeeded}
+          onChange={setPhotographFileIds}
+          label={language === 'HI' ? 'फ़ोटो जोड़ें' : 'Add photos'}
+        />
+        {photoNeeded ? (
+          <p className="flex items-start gap-2 rounded-md bg-secondary p-3 text-xs text-muted-foreground">
+            <CloudUpload className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            {language === 'HI'
+              ? 'इस चरण के लिए फ़ोटो चाहिए। फ़ोटो भेजने के लिए नेटवर्क ज़रूरी है।'
+              : 'This milestone expects photographic evidence. Photos need a connection to upload; the update itself can still be saved offline.'}
+          </p>
+        ) : null}
+      </div>
       <div className="flex items-center gap-3">
         <Button type="submit" disabled={pending}>
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

@@ -10,6 +10,7 @@ import {
   createInspectionPlanSchema,
   createReworkSchema,
   decideDeviationSchema,
+  inspectionCharacteristicSchema,
   requestInspectionSchema,
   saveInspectionResultsSchema,
   updateReworkStatusSchema,
@@ -82,6 +83,55 @@ export class QualityService {
       after: { name: plan.name, characteristics: plan.characteristics.length },
     });
     return plan;
+  }
+
+  /** Appends a characteristic to an existing plan so plans can grow over time. */
+  async addPlanCharacteristic(
+    actor: RequestUser,
+    planId: string,
+    input: z.infer<typeof inspectionCharacteristicSchema>,
+  ) {
+    const plan = await this.prisma.inspectionPlan.findUniqueOrThrow({ where: { id: planId } });
+    const last = await this.prisma.inspectionCharacteristic.findFirst({
+      where: { inspectionPlanId: planId },
+      orderBy: { sequence: 'desc' },
+      select: { sequence: true },
+    });
+    const characteristic = await this.prisma.inspectionCharacteristic.create({
+      data: {
+        ...input,
+        sequence: input.sequence > 1 ? input.sequence : (last?.sequence ?? 0) + 1,
+        inspectionPlanId: planId,
+      },
+    });
+    await this.audit.record(actor, {
+      action: 'INSPECTION_CHARACTERISTIC_ADDED',
+      entityType: 'InspectionPlan',
+      entityId: planId,
+      companyId: plan.companyId,
+      after: { characteristic: characteristic.characteristic },
+    });
+    return characteristic;
+  }
+
+  async removePlanCharacteristic(actor: RequestUser, characteristicId: string) {
+    const characteristic = await this.prisma.inspectionCharacteristic.findUniqueOrThrow({
+      where: { id: characteristicId },
+    });
+    const remaining = await this.prisma.inspectionCharacteristic.count({
+      where: { inspectionPlanId: characteristic.inspectionPlanId },
+    });
+    if (remaining <= 1) {
+      throw new BadRequestException('A plan must keep at least one characteristic');
+    }
+    await this.prisma.inspectionCharacteristic.delete({ where: { id: characteristicId } });
+    await this.audit.record(actor, {
+      action: 'INSPECTION_CHARACTERISTIC_REMOVED',
+      entityType: 'InspectionPlan',
+      entityId: characteristic.inspectionPlanId,
+      before: { characteristic: characteristic.characteristic },
+    });
+    return { id: characteristicId, removed: true };
   }
 
   // -------------------------------------------------------------------------
@@ -510,14 +560,47 @@ export class QualityService {
       where: { id },
       data: {
         status: input.status,
+        completedQuantity: input.completedQuantity,
+        scrappedQuantity: input.scrappedQuantity,
+        actualCost: input.actualCost,
         completedAt: input.status === 'COMPLETED' ? new Date() : undefined,
       },
     });
+
+    // Rework charged to the partner becomes a deduction once the real cost is known.
+    if (input.status === 'COMPLETED' && rework.chargeToPartner && rework.actualCost > 0) {
+      const job = await this.prisma.gridJob.findUnique({
+        where: { id: rework.jobId },
+        select: { partnerId: true, jobNumber: true },
+      });
+      if (job?.partnerId) {
+        const existing = await this.prisma.partnerDeduction.findFirst({
+          where: { partnerId: job.partnerId, reason: { contains: rework.reworkNumber } },
+        });
+        if (!existing) {
+          await this.prisma.partnerDeduction.create({
+            data: {
+              partnerId: job.partnerId,
+              type: 'REWORK_DEDUCTION',
+              amount: rework.actualCost,
+              reason: `Rework ${rework.reworkNumber} on ${job.jobNumber}`,
+            },
+          });
+        }
+      }
+    }
+
     await this.audit.record(actor, {
       action: 'REWORK_STATUS_UPDATED',
       entityType: 'ReworkOrder',
       entityId: id,
-      after: { status: input.status, remarks: input.remarks },
+      after: {
+        status: input.status,
+        completedQuantity: input.completedQuantity,
+        scrappedQuantity: input.scrappedQuantity,
+        actualCost: input.actualCost,
+        remarks: input.remarks,
+      },
     });
     return rework;
   }

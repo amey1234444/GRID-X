@@ -1,6 +1,10 @@
 import { INSPECTION_TYPES } from '@gridx/shared';
 
-import { createInspectionPlanAction } from '@/app/actions/control';
+import {
+  addPlanCharacteristicAction,
+  createInspectionPlanAction,
+  removePlanCharacteristicAction,
+} from '@/app/actions/control';
 import { ActionDialog } from '@/components/app/action-dialog';
 import { DataTable } from '@/components/app/data-table';
 import { EmptyState } from '@/components/app/empty-state';
@@ -38,12 +42,33 @@ export default async function InspectionPlansPage(): Promise<React.JSX.Element> 
               { name: 'componentId', label: 'Component', type: 'select', required: true, options: components, span: 2 },
               { name: 'name', label: 'Plan name', required: true },
               { name: 'inspectionType', label: 'Inspection type', type: 'select', options: optionsFrom(INSPECTION_TYPES), defaultValue: 'FINAL' },
-              { name: 'samplingPlan', label: 'Sampling plan', placeholder: 'e.g. ISO 2859-1 Level II AQL 1.0' },
-              { name: 'characteristic', label: 'First characteristic', required: true },
-              { name: 'specification', label: 'Specification', required: true, placeholder: '25.00 ±0.05' },
-              { name: 'unit', label: 'Unit', placeholder: 'mm' },
-              { name: 'measuringInstrument', label: 'Instrument', placeholder: 'Vernier caliper' },
-              { name: 'isCritical', label: 'Critical characteristic', type: 'checkbox' },
+              { name: 'samplingPlan', label: 'Sampling plan', placeholder: 'e.g. ISO 2859-1 Level II AQL 1.0', span: 2 },
+              {
+                name: 'characteristics',
+                label: 'Characteristics',
+                type: 'rows',
+                addLabel: 'Add characteristic',
+                span: 2,
+                columns: [
+                  { name: 'characteristic', label: 'Characteristic', required: true },
+                  { name: 'specification', label: 'Specification', required: true, placeholder: '25.00 ±0.05' },
+                  { name: 'unit', label: 'Unit', placeholder: 'mm' },
+                  { name: 'measuringInstrument', label: 'Instrument', placeholder: 'Vernier caliper' },
+                  { name: 'nominalValue', label: 'Nominal value', type: 'number', step: '0.001' },
+                  { name: 'upperTolerance', label: 'Upper tolerance', type: 'number', step: '0.001' },
+                  { name: 'lowerTolerance', label: 'Lower tolerance', type: 'number', step: '0.001' },
+                  {
+                    name: 'isCritical',
+                    label: 'Critical',
+                    type: 'select',
+                    options: [
+                      { value: 'false', label: 'No' },
+                      { value: 'true', label: 'Yes' },
+                    ],
+                    defaultValue: 'false',
+                  },
+                ],
+              },
             ]}
           />
         }
@@ -63,10 +88,31 @@ export default async function InspectionPlansPage(): Promise<React.JSX.Element> 
                   {plan.name}
                   <StatusBadge status={plan.isActive ? 'ACTIVE' : 'INACTIVE'} />
                 </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  {plan.component.componentCode} · {humanise(plan.inspectionType)} · v{plan.version}
-                  {plan.samplingPlan ? ` · ${plan.samplingPlan}` : ''}
-                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className="text-sm text-muted-foreground">
+                    {plan.component.componentCode} · {humanise(plan.inspectionType)} · v{plan.version}
+                    {plan.samplingPlan ? ` · ${plan.samplingPlan}` : ''}
+                  </p>
+                  <ActionDialog
+                    title="Add characteristic"
+                    description="Appended to the end of the plan."
+                    triggerLabel="Add characteristic"
+                    triggerSize="sm"
+                    triggerVariant="outline"
+                    action={addPlanCharacteristicAction}
+                    hidden={{ planId: plan.id }}
+                    fields={[
+                      { name: 'characteristic', label: 'Characteristic', required: true, span: 2 },
+                      { name: 'specification', label: 'Specification', required: true, placeholder: '25.00 ±0.05' },
+                      { name: 'unit', label: 'Unit', placeholder: 'mm' },
+                      { name: 'measuringInstrument', label: 'Instrument', placeholder: 'Vernier caliper' },
+                      { name: 'nominalValue', label: 'Nominal value', type: 'number', step: '0.001' },
+                      { name: 'upperTolerance', label: 'Upper tolerance', type: 'number', step: '0.001' },
+                      { name: 'lowerTolerance', label: 'Lower tolerance', type: 'number', step: '0.001' },
+                      { name: 'isCritical', label: 'Critical characteristic', type: 'checkbox', span: 2 },
+                    ]}
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 <DataTable
@@ -92,6 +138,23 @@ export default async function InspectionPlansPage(): Promise<React.JSX.Element> 
                       key: 'instrument',
                       header: 'Instrument',
                       render: (row: InspectionPlanRow['characteristics'][number]) => row.measuringInstrument ?? '—',
+                    },
+                    {
+                      key: 'actions',
+                      header: '',
+                      render: (row: InspectionPlanRow['characteristics'][number]) => (
+                        <ActionDialog
+                          title="Remove characteristic"
+                          description="A plan must keep at least one characteristic."
+                          triggerLabel="Remove"
+                          triggerSize="sm"
+                          triggerVariant="ghost"
+                          submitLabel="Remove"
+                          action={removePlanCharacteristicAction}
+                          hidden={{ characteristicId: row.id }}
+                          fields={[]}
+                        />
+                      ),
                     },
                   ]}
                   rows={plan.characteristics}

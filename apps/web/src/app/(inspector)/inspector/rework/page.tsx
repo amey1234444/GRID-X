@@ -97,6 +97,16 @@ export default async function InspectorReworkPage({
                           ]),
                           span: 2,
                         },
+                        { name: 'completedQuantity', label: 'Completed quantity', type: 'number' },
+                        { name: 'scrappedQuantity', label: 'Scrapped quantity', type: 'number' },
+                        {
+                          name: 'actualCost',
+                          label: 'Actual cost',
+                          type: 'number',
+                          step: '0.01',
+                          help: 'Charged back to the partner when the order is completed.',
+                          span: 2,
+                        },
                         { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
                       ]}
                     />

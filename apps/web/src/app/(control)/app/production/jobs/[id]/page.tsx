@@ -1,6 +1,12 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { DELAY_REASONS, MILESTONE_TYPES, RESPONSIBLE_PARTIES } from '@gridx/shared';
+import {
+  DELAY_REASONS,
+  JOB_PRIORITIES,
+  MATERIAL_RESPONSIBILITIES,
+  MILESTONE_TYPES,
+  RESPONSIBLE_PARTIES,
+} from '@gridx/shared';
 
 import {
   allocateJobAction,
@@ -11,6 +17,7 @@ import {
   jobMilestoneAction,
   reportDelayAction,
   requestInspectionAction,
+  updateJobAction,
 } from '@/app/actions/control';
 import { ActionDialog } from '@/components/app/action-dialog';
 import { DataTable } from '@/components/app/data-table';
@@ -61,6 +68,58 @@ export default async function JobDetailPage({
         description={`${job.component.componentCode} · ${job.component.name} · ${formatNumber(job.quantity)} pcs due ${formatDate(job.dueDate)}`}
         actions={
           <>
+            <ActionDialog
+              title="Edit job"
+              description="Only the fields you fill in are changed."
+              triggerLabel="Edit"
+              triggerVariant="outline"
+              action={updateJobAction}
+              hidden={{ jobId: job.id }}
+              fields={[
+                { name: 'quantity', label: 'Quantity', type: 'number', defaultValue: String(job.quantity) },
+                {
+                  name: 'rate',
+                  label: 'Conversion rate',
+                  type: 'number',
+                  step: '0.01',
+                  defaultValue: String(job.rate),
+                },
+                { name: 'dueDate', label: 'Due date', type: 'date', defaultValue: job.dueDate.slice(0, 10) },
+                {
+                  name: 'plannedStartDate',
+                  label: 'Planned start',
+                  type: 'date',
+                  defaultValue: job.plannedStartDate ? job.plannedStartDate.slice(0, 10) : undefined,
+                },
+                {
+                  name: 'priority',
+                  label: 'Priority',
+                  type: 'select',
+                  options: optionsFrom(JOB_PRIORITIES),
+                  defaultValue: job.priority,
+                },
+                {
+                  name: 'materialResponsibility',
+                  label: 'Material responsibility',
+                  type: 'select',
+                  options: optionsFrom(MATERIAL_RESPONSIBILITIES),
+                  defaultValue: job.materialResponsibility,
+                },
+                {
+                  name: 'deliveryLocation',
+                  label: 'Delivery location',
+                  defaultValue: job.deliveryLocation ?? undefined,
+                  span: 2,
+                },
+                {
+                  name: 'customerProject',
+                  label: 'Customer / project',
+                  defaultValue: job.customerProject ?? undefined,
+                },
+                { name: 'sourceRef', label: 'Source reference', defaultValue: job.sourceRef ?? undefined },
+                { name: 'notes', label: 'Notes', type: 'textarea', defaultValue: job.notes ?? undefined, span: 2 },
+              ]}
+            />
             {job.partner === null ? (
               <ActionDialog
                 title="Allocate job"
@@ -70,10 +129,21 @@ export default async function JobDetailPage({
                 hidden={{ jobId: job.id }}
                 fields={[
                   { name: 'partnerId', label: 'Partner', type: 'select', required: true, options: partners, span: 2 },
-                  { name: 'rate', label: 'Conversion rate', type: 'number', step: '0.01' },
-                  { name: 'dueDate', label: 'Revised due date', type: 'date' },
+                  {
+                    name: 'rate',
+                    label: 'Conversion rate',
+                    type: 'number',
+                    step: '0.01',
+                    help: 'Leave blank to keep the job rate. Dates are changed with Edit job.',
+                  },
+                  {
+                    name: 'grantDrawingAccess',
+                    label: 'Drawing access',
+                    type: 'checkbox',
+                    defaultValue: 'on',
+                    placeholder: 'Grant access to the released revision',
+                  },
                   { name: 'classAOverrideReason', label: 'Class A authorisation reason', type: 'textarea', span: 2 },
-                  { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
                 ]}
               />
             ) : (
@@ -114,6 +184,14 @@ export default async function JobDetailPage({
                 { name: 'offeredQuantity', label: 'Offered quantity', type: 'number', required: true },
                 { name: 'inspectorId', label: 'Inspector', type: 'select', options: inspectors },
                 { name: 'dueAt', label: 'Due at', type: 'date' },
+                {
+                  name: 'photographFileIds',
+                  label: 'Photographs',
+                  type: 'files',
+                  category: 'PHOTOGRAPH',
+                  accept: 'image/*',
+                  span: 2,
+                },
                 { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
               ]}
             />
@@ -427,15 +505,33 @@ export default async function JobDetailPage({
               triggerLabel="Issue material"
               triggerSize="sm"
               action={createMaterialIssueAction}
-              hidden={{ jobId: job.id, partnerId: job.partner?.id }}
+              hidden={{ jobId: job.id }}
               fields={[
-                { name: 'itemId', label: 'Item', type: 'select', required: true, options: items, span: 2 },
-                { name: 'quantity', label: 'Quantity', type: 'number', required: true },
-                { name: 'uom', label: 'UOM', defaultValue: 'KG' },
-                { name: 'issueWeightKg', label: 'Issue weight (kg)', type: 'number', step: '0.001' },
-                { name: 'issueDate', label: 'Issue date', type: 'date' },
-                { name: 'transportMode', label: 'Transport mode' },
+                {
+                  name: 'items',
+                  label: 'Material lines',
+                  type: 'rows',
+                  addLabel: 'Add material line',
+                  span: 2,
+                  columns: [
+                    { name: 'itemId', label: 'Item', type: 'select', options: items, required: true },
+                    { name: 'quantity', label: 'Quantity', type: 'number', required: true },
+                    { name: 'uom', label: 'UOM', defaultValue: 'KG' },
+                    { name: 'issueWeightKg', label: 'Issue weight (kg)', type: 'number', step: '0.001', required: true },
+                    { name: 'batchNumber', label: 'Batch number' },
+                    { name: 'heatNumber', label: 'Heat number' },
+                  ],
+                },
+                { name: 'expectedReturnDate', label: 'Expected return', type: 'date' },
                 { name: 'vehicleNumber', label: 'Vehicle number' },
+                { name: 'driverName', label: 'Driver name' },
+                {
+                  name: 'photographFileIds',
+                  label: 'Loading photographs',
+                  type: 'files',
+                  category: 'PHOTOGRAPH',
+                  accept: 'image/*',
+                },
                 { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
               ]}
             />

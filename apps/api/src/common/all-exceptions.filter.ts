@@ -7,17 +7,21 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Prisma } from '@gridx/db';
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthedRequest } from './request-user';
+import { SentryService } from './sentry.service';
 
 /** Converts framework, Prisma and unexpected errors into the ApiError shape the web app expects. */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger('Http');
 
+  constructor(private readonly sentry?: SentryService) {}
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const context = host.switchToHttp();
     const response = context.getResponse<Response>();
-    const request = context.getRequest<Request>();
+    const request = context.getRequest<AuthedRequest>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Something went wrong';
@@ -53,8 +57,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
       message = 'Invalid request payload';
     }
 
+    // 4xx is the client's problem and stays out of the error tracker; 5xx is ours.
     if (status >= 500) {
       this.logger.error(`${request.method} ${request.url}`, exception as Error);
+      this.sentry?.captureException(exception, {
+        method: request.method,
+        path: request.url,
+        userId: request.user?.id,
+        statusCode: status,
+      });
     }
 
     response.status(status).json({

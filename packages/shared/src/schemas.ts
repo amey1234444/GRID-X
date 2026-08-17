@@ -575,6 +575,9 @@ export const createReworkSchema = z.object({
 
 export const updateReworkStatusSchema = z.object({
   status: z.enum(REWORK_STATUSES),
+  completedQuantity: nonNegative.optional(),
+  scrappedQuantity: nonNegative.optional(),
+  actualCost: nonNegative.optional(),
   remarks: optionalString,
 });
 

@@ -115,7 +115,6 @@ export default async function InspectionDetailPage({
                       options: optionsFrom(INSPECTION_DECISIONS),
                       span: 2,
                     },
-                    { name: 'inspectedQuantity', label: 'Inspected quantity', type: 'number', required: true },
                     { name: 'acceptedQuantity', label: 'Accepted quantity', type: 'number', required: true },
                     { name: 'rejectedQuantity', label: 'Rejected quantity', type: 'number', defaultValue: '0' },
                     { name: 'reworkQuantity', label: 'Rework quantity', type: 'number', defaultValue: '0' },
@@ -128,6 +127,14 @@ export default async function InspectionDetailPage({
                       defaultValue: 'PARTNER',
                     },
                     { name: 'probableCause', label: 'Probable cause', type: 'textarea', span: 2 },
+                    {
+                      name: 'photographFileIds',
+                      label: 'Evidence photographs',
+                      type: 'files',
+                      category: 'PHOTOGRAPH',
+                      accept: 'image/*',
+                      span: 2,
+                    },
                     { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
                   ]}
                 />

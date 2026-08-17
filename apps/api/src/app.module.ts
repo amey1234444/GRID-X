@@ -11,6 +11,8 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { PermissionsGuard } from './auth/permissions.guard';
+import { RateLimitGuard } from './common/rate-limit.guard';
+import { SentryService } from './common/sentry.service';
 import { PartnersModule } from './partners/partners.module';
 import { MastersModule } from './masters/masters.module';
 import { DrawingsModule } from './drawings/drawings.module';
@@ -56,8 +58,13 @@ import { HealthModule } from './health/health.module';
     HealthModule,
   ],
   providers: [
+    // Rate limiting runs first: credential stuffing should be rejected before
+    // any token parsing or database work happens.
+    { provide: APP_GUARD, useClass: RateLimitGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    SentryService,
   ],
+  exports: [SentryService],
 })
 export class AppModule {}

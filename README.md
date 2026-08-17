@@ -31,6 +31,28 @@ If you already run PostgreSQL yourself, skip `docker compose` and point
 API docs are served at `http://localhost:4000/api/docs`, and the health check
 used by Render is at `http://localhost:4000/api/health`.
 
+## Checks
+
+```bash
+pnpm typecheck   # every package
+pnpm lint
+pnpm test        # API unit tests (jest)
+```
+
+CI runs the same three commands on every push and pull request, and separately
+replays the Prisma migrations against a throwaway PostgreSQL 16 service to catch
+a `schema.prisma` edited without a matching migration — see
+`.github/workflows/ci.yml`.
+
+## File uploads
+
+Drawings, photographs, partner documents and invoice copies are uploaded through
+`POST /api/files/upload` and referenced by id. In development files land on local
+disk under `STORAGE_LOCAL_DIR`; in production set `STORAGE_DRIVER=s3` with the
+`S3_*` variables, because Render disks are per-instance and not shared. Drawings
+are only ever served through short-lived signed URLs, and every view is written
+to the drawing access log.
+
 Useful database commands, all of which read `.env` at the repository root:
 
 | Command | What it does |

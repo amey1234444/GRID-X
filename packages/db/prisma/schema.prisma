@@ -1740,6 +1740,10 @@ model ReworkOrder {
   instructions     String
   status           ReworkStatus @default(ISSUED)
   estimatedCost    Float        @default(0)
+  // Actuals captured when the rework is worked and closed out.
+  completedQuantity Float       @default(0)
+  scrappedQuantity  Float       @default(0)
+  actualCost        Float       @default(0)
   chargeToPartner  Boolean      @default(true)
   issuedById       String?
   issuedAt         DateTime     @default(now())

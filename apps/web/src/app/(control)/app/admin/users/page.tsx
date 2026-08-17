@@ -1,6 +1,6 @@
 import { LANGUAGES, ROLE_CODES, USER_STATUSES } from '@gridx/shared';
 
-import { createUserAction, suspendUserAction } from '@/app/actions/control';
+import { createUserAction, suspendUserAction, updateUserAction } from '@/app/actions/control';
 import { ActionDialog } from '@/components/app/action-dialog';
 import { DataTable, type Column } from '@/components/app/data-table';
 import { PageHeader } from '@/components/app/page-header';
@@ -62,20 +62,75 @@ export default async function UsersPage({
     {
       key: 'actions',
       header: '',
-      render: (row) =>
-        row.status === 'SUSPENDED' ? null : (
+      render: (row) => (
+        <span className="flex flex-wrap items-center gap-2">
           <ActionDialog
-            title="Suspend user"
-            description="Users are never deleted. Suspension revokes all active sessions and keeps the audit trail intact."
-            triggerLabel="Suspend"
-            triggerVariant="outline"
+            title="Edit user"
+            description="Only the fields you fill in are changed."
+            triggerLabel="Edit"
+            triggerVariant="ghost"
             triggerSize="sm"
-            submitLabel="Suspend"
-            action={suspendUserAction}
+            action={updateUserAction}
             hidden={{ userId: row.id }}
-            fields={[{ name: 'reason', label: 'Reason', type: 'textarea', required: true, span: 2 }]}
+            fields={[
+              { name: 'name', label: 'Name', defaultValue: row.name, span: 2 },
+              { name: 'email', label: 'Email', defaultValue: row.email ?? undefined },
+              { name: 'phone', label: 'Phone', defaultValue: row.phone ?? undefined },
+              {
+                name: 'roleCode',
+                label: 'Role',
+                type: 'select',
+                options: optionsFrom(ROLE_CODES),
+                defaultValue: row.role.code,
+              },
+              {
+                name: 'status',
+                label: 'Status',
+                type: 'select',
+                options: optionsFrom(USER_STATUSES),
+                defaultValue: row.status,
+              },
+              { name: 'designation', label: 'Designation', defaultValue: row.designation ?? undefined },
+              {
+                name: 'language',
+                label: 'Language',
+                type: 'select',
+                options: optionsFrom(LANGUAGES),
+                defaultValue: row.language,
+              },
+              {
+                name: 'twoFactorEnabled',
+                label: 'Two-factor authentication',
+                type: 'checkbox',
+                defaultValue: row.twoFactorEnabled ? 'on' : undefined,
+                placeholder: 'Require a second factor at sign-in',
+                span: 2,
+              },
+              {
+                name: 'companyIds',
+                label: 'Companies',
+                type: 'multiselect',
+                options: companies,
+                help: 'Leave every box unticked to keep the current company access.',
+                span: 2,
+              },
+            ]}
           />
-        ),
+          {row.status === 'SUSPENDED' ? null : (
+            <ActionDialog
+              title="Suspend user"
+              description="Users are never deleted. Suspension revokes all active sessions and keeps the audit trail intact."
+              triggerLabel="Suspend"
+              triggerVariant="outline"
+              triggerSize="sm"
+              submitLabel="Suspend"
+              action={suspendUserAction}
+              hidden={{ userId: row.id }}
+              fields={[{ name: 'reason', label: 'Reason', type: 'textarea', required: true, span: 2 }]}
+            />
+          )}
+        </span>
+      ),
     },
   ];
 

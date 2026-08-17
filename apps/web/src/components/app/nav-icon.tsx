@@ -2,6 +2,7 @@
 
 import {
   BarChart3,
+  Bell,
   Boxes,
   ClipboardCheck,
   ClipboardList,
@@ -25,6 +26,7 @@ import {
 
 const ICONS: Record<string, LucideIcon> = {
   BarChart3,
+  Bell,
   Boxes,
   ClipboardCheck,
   ClipboardList,

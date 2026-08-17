@@ -3,6 +3,7 @@
 import type { FileCategory } from '@gridx/shared';
 
 import { FileUpload } from '@/components/app/file-upload';
+import { RepeatableRows, type RowColumn } from '@/components/app/repeatable-rows';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -14,6 +15,8 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+
+export type { RowColumn };
 
 export interface FieldOption {
   value: string;
@@ -34,7 +37,8 @@ export interface FieldDefinition {
     | 'checkbox'
     | 'password'
     | 'file'
-    | 'files';
+    | 'files'
+    | 'rows';
   options?: FieldOption[];
   placeholder?: string;
   required?: boolean;
@@ -45,9 +49,23 @@ export interface FieldDefinition {
   /** File fields only: storage category and accepted MIME types. */
   category?: FileCategory;
   accept?: string;
+  /** Row fields only: the columns repeated per line. */
+  columns?: RowColumn[];
+  addLabel?: string;
+  minRows?: number;
 }
 
 export function FieldControl({ field }: { field: FieldDefinition }): React.JSX.Element {
+  if (field.type === 'rows') {
+    return (
+      <RepeatableRows
+        prefix={field.name}
+        columns={field.columns ?? []}
+        addLabel={field.addLabel}
+        minRows={field.minRows}
+      />
+    );
+  }
   if (field.type === 'file' || field.type === 'files') {
     return (
       <FileUpload

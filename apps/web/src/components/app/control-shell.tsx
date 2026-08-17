@@ -151,7 +151,7 @@ export function ControlShell({
             <Menu className="h-4 w-4" />
           </button>
           <div className="flex-1" />
-          <NotificationBell />
+          <NotificationBell inboxHref="/app/notifications" />
           <ThemeToggle />
           <UserMenu user={user} />
         </header>

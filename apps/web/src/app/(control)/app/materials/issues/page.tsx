@@ -91,19 +91,40 @@ export default async function MaterialIssuesPage({
             triggerLabel="Issue material"
             action={createMaterialIssueAction}
             fields={[
-              { name: 'jobId', label: 'Job', type: 'select', required: true, options: jobs, span: 2 },
-              { name: 'partnerId', label: 'Partner', type: 'select', required: true, options: partners, span: 2 },
-              { name: 'itemId', label: 'Item', type: 'select', required: true, options: items, span: 2 },
-              { name: 'quantity', label: 'Quantity', type: 'number', required: true },
-              { name: 'uom', label: 'UOM', defaultValue: 'KG' },
-              { name: 'issueWeightKg', label: 'Issue weight (kg)', type: 'number', step: '0.001' },
-              { name: 'heatNumber', label: 'Heat number' },
-              { name: 'issueDate', label: 'Issue date', type: 'date' },
+              {
+                name: 'jobId',
+                label: 'Job',
+                type: 'select',
+                required: true,
+                options: jobs,
+                help: 'The partner is taken from the job allocation.',
+                span: 2,
+              },
+              {
+                name: 'items',
+                label: 'Material lines',
+                type: 'rows',
+                addLabel: 'Add material line',
+                span: 2,
+                columns: [
+                  { name: 'itemId', label: 'Item', type: 'select', options: items, required: true },
+                  { name: 'quantity', label: 'Quantity', type: 'number', required: true },
+                  { name: 'uom', label: 'UOM', defaultValue: 'KG' },
+                  { name: 'issueWeightKg', label: 'Issue weight (kg)', type: 'number', step: '0.001', required: true },
+                  { name: 'batchNumber', label: 'Batch number' },
+                  { name: 'heatNumber', label: 'Heat number' },
+                ],
+              },
               { name: 'expectedReturnDate', label: 'Expected return', type: 'date' },
-              { name: 'transportMode', label: 'Transport mode' },
               { name: 'vehicleNumber', label: 'Vehicle number' },
               { name: 'driverName', label: 'Driver name' },
-              { name: 'driverPhone', label: 'Driver phone' },
+              {
+                name: 'photographFileIds',
+                label: 'Loading photographs',
+                type: 'files',
+                category: 'PHOTOGRAPH',
+                accept: 'image/*',
+              },
               { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
             ]}
           />

@@ -21,6 +21,7 @@ import {
 import { AppConfig } from '../config/configuration';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 interface DeviceContext {
   ipAddress?: string;
@@ -36,6 +37,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   static hashToken(token: string): string {
@@ -84,8 +86,18 @@ export class AuthService {
         expiresAt: new Date(Date.now() + ttl * 60_000),
       },
     });
-    // Delivery is handled by the WhatsApp/SMS provider; logged in development only.
-    this.logger.log(`OTP for ${input.phone}: ${code}`);
+
+    const delivered = await this.notifications.sendDirectMessage(
+      input.phone,
+      `${code} is your GRID-X sign-in code. It expires in ${ttl} minutes. Never share it with anyone.`,
+    );
+    if (!delivered) {
+      // No messaging provider configured — development and local testing only.
+      // Production sets NOTIFY_WHATSAPP_ENABLED so codes never reach the logs.
+      this.logger.warn(
+        `WhatsApp/SMS channel is not configured; OTP for ${input.phone} is ${code}`,
+      );
+    }
     return { sent: true, expiresInMinutes: ttl };
   }
 

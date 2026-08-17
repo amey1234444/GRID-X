@@ -80,6 +80,28 @@ export class NotificationsService {
     }
   }
 
+  /**
+   * Sends a message straight to a phone without recording a notification — used
+   * for login OTPs, which are credentials rather than something to sit in an inbox.
+   * Returns false when the channel is not configured so callers can fall back.
+   */
+  async sendDirectMessage(phone: string, text: string): Promise<boolean> {
+    const { apiUrl, apiToken } = this.settings.whatsapp;
+    if (!this.settings.whatsappEnabled || !apiUrl || !apiToken) return false;
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${apiToken}` },
+        body: JSON.stringify({ to: phone, text }),
+      });
+      if (!response.ok) throw new Error(`WhatsApp API responded ${response.status}`);
+      return true;
+    } catch (error) {
+      this.logger.warn(`Direct message delivery failed: ${String(error)}`);
+      return false;
+    }
+  }
+
   async markRead(userId: string, notificationId: string): Promise<void> {
     await this.prisma.notification.updateMany({
       where: { id: notificationId, userId },

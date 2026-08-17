@@ -9,7 +9,7 @@ import {
   verifyOtpSchema,
 } from '@gridx/shared';
 import { z } from 'zod';
-import { CurrentUser, Public } from '../common/decorators';
+import { CurrentUser, Public, RateLimit } from '../common/decorators';
 import { AuthedRequest, RequestUser } from '../common/request-user';
 import { zodBody } from '../common/zod-validation.pipe';
 import { AuthService } from './auth.service';
@@ -20,6 +20,7 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Public()
+  @RateLimit(10, 5 * 60_000)
   @Post('login')
   login(
     @Body(zodBody(loginSchema)) body: z.infer<typeof loginSchema>,
@@ -29,12 +30,14 @@ export class AuthController {
   }
 
   @Public()
+  @RateLimit(5, 15 * 60_000)
   @Post('otp/request')
   requestOtp(@Body(zodBody(requestOtpSchema)) body: z.infer<typeof requestOtpSchema>) {
     return this.auth.requestOtp(body);
   }
 
   @Public()
+  @RateLimit(10, 15 * 60_000)
   @Post('otp/verify')
   verifyOtp(
     @Body(zodBody(verifyOtpSchema)) body: z.infer<typeof verifyOtpSchema>,
@@ -44,6 +47,7 @@ export class AuthController {
   }
 
   @Public()
+  @RateLimit(10, 5 * 60_000)
   @Post('partner/login')
   partnerLogin(
     @Body(zodBody(partnerPasswordLoginSchema)) body: z.infer<typeof partnerPasswordLoginSchema>,
@@ -72,6 +76,7 @@ export class AuthController {
     return this.auth.loadAuthUser(user.id);
   }
 
+  @RateLimit(5, 15 * 60_000)
   @Post('change-password')
   async changePassword(
     @CurrentUser() user: RequestUser,
