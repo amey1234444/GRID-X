@@ -402,6 +402,21 @@ export async function saveInspectionResultsAction(
   if (!inspectionId) return { error: 'Missing inspection' };
   const count = number(data, 'resultCount') ?? 0;
   const results: Record<string, unknown>[] = [];
+  if (count === 0) {
+    const characteristicName = text(data, 'characteristicName');
+    if (!characteristicName) return { error: 'Record at least one characteristic' };
+    results.push({
+      characteristicId: text(data, 'characteristicId'),
+      characteristicName,
+      specification: text(data, 'specification'),
+      actualValue: text(data, 'actualValue'),
+      numericValue: number(data, 'numericValue'),
+      measuringInstrument: text(data, 'measuringInstrument'),
+      verdict: text(data, 'verdict') ?? 'PASS',
+      sampleNumber: number(data, 'sampleNumber') ?? 1,
+      remarks: text(data, 'remarks'),
+    });
+  }
   for (let index = 0; index < count; index += 1) {
     const characteristicName = text(data, `results.${index}.characteristicName`);
     if (!characteristicName) continue;
@@ -872,13 +887,12 @@ export async function imsSyncAction(_state: ActionState, data: FormData): Promis
   const direction = text(data, 'direction');
   const entity = text(data, 'entity');
   if (!direction || !entity) return { error: 'Select an entity to sync' };
-  return send(
-    direction === 'pull' ? '/ims/pull' : '/ims/push',
-    direction === 'pull'
-      ? { entity, companyId: text(data, 'companyId') }
-      : { entity, companyId: text(data, 'companyId'), from: text(data, 'from'), to: text(data, 'to') },
-    ['/app/ims'],
-  );
+  if (direction === 'pull') {
+    return send('/ims/pull', { entity }, ['/app/ims']);
+  }
+  const recordRef = text(data, 'recordRef');
+  if (!recordRef) return { error: 'A GRID-X record id is required to push to IMS' };
+  return send('/ims/push', { entity, recordRef }, ['/app/ims']);
 }
 
 export async function createUserAction(_state: ActionState, data: FormData): Promise<ActionState> {
