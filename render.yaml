@@ -25,8 +25,11 @@ services:
     region: singapore
     branch: main
     healthCheckPath: /api/health
+    # We install pnpm with npm instead of `corepack enable`: the corepack
+    # bundled with Node 20.x ships an outdated signing key and dies with
+    # "Cannot find matching keyid" when it resolves a pnpm version.
     buildCommand: >-
-      corepack enable &&
+      npm install -g pnpm@$PNPM_VERSION &&
       pnpm install --frozen-lockfile &&
       pnpm --filter @gridx/shared build &&
       pnpm --filter @gridx/db build:ci &&
@@ -128,8 +131,9 @@ services:
     region: singapore
     branch: main
     healthCheckPath: /
+    # Same corepack workaround as the API service.
     buildCommand: >-
-      corepack enable &&
+      npm install -g pnpm@$PNPM_VERSION &&
       pnpm install --frozen-lockfile &&
       pnpm --filter @gridx/shared build &&
       pnpm --filter @gridx/web build
@@ -144,9 +148,9 @@ services:
         value: production
       - key: NEXT_PUBLIC_APP_NAME
         value: GRID-X
-      # Points at the API service; the /api suffix matches API_GLOBAL_PREFIX.
+      # Points at the API service. This must include the /api suffix to match
+      # API_GLOBAL_PREFIX, and Render cannot concatenate a path onto a
+      # fromService value — so fill it in the dashboard once gridx-api has a
+      # URL, e.g. https://gridx-api.onrender.com/api
       - key: NEXT_PUBLIC_API_URL
-        fromService:
-          type: web
-          name: gridx-api
-          envVarKey: RENDER_EXTERNAL_URL
+        sync: false
