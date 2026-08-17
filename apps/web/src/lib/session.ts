@@ -139,6 +139,53 @@ async function apiFetchWithToken<T>(
   return { status: response.status, data: payload as T, error: null };
 }
 
+/**
+ * Posts multipart form data (file uploads) with the current session. The body is
+ * streamed through untouched, so `content-type` — including the multipart
+ * boundary — must not be overridden here.
+ */
+export async function apiFetchForm<T>(
+  path: string,
+  body: FormData | ArrayBuffer,
+  contentType?: string,
+): Promise<ApiCallResult<T>> {
+  const tokens = readTokens();
+  if (!tokens) return { status: 401, data: null, error: 'Not authenticated' };
+
+  const request = async (accessToken: string) =>
+    fetch(`${API_URL}${path.startsWith('/') ? path : `/${path}`}`, {
+      method: 'POST',
+      headers: {
+        ...(contentType ? { 'content-type': contentType } : {}),
+        authorization: `Bearer ${accessToken}`,
+      },
+      body,
+      cache: 'no-store',
+    });
+
+  let response = await request(tokens.accessToken);
+  if (response.status === 401) {
+    const refreshed = await refreshSession(tokens.refreshToken);
+    if (!refreshed) {
+      clearTokens();
+      return { status: 401, data: null, error: 'Session expired' };
+    }
+    writeTokens(refreshed);
+    response = await request(refreshed.accessToken);
+  }
+
+  const text = await response.text();
+  const payload: unknown = text ? JSON.parse(text) : null;
+  if (!response.ok) {
+    const message =
+      payload && typeof payload === 'object' && 'message' in payload
+        ? String((payload as { message: unknown }).message)
+        : `Upload failed with status ${response.status}`;
+    return { status: response.status, data: null, error: message };
+  }
+  return { status: response.status, data: payload as T, error: null };
+}
+
 /** Fetches a non-JSON response (CSV exports) with the current session. */
 export async function apiFetchText(
   path: string,

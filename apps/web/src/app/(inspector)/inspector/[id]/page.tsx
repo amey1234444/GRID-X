@@ -220,10 +220,15 @@ export default async function InspectorInspectionPage({
                   action={createCorrectiveActionAction}
                   hidden={{ nonConformanceId: nc.id }}
                   fields={[
-                    { name: 'rootCause', label: 'Root cause', type: 'textarea', required: true, span: 2 },
-                    { name: 'action', label: 'Corrective action', type: 'textarea', required: true, span: 2 },
-                    { name: 'targetDate', label: 'Target date', type: 'date' },
-                    { name: 'preventiveAction', label: 'Preventive action', type: 'textarea', span: 2 },
+                    {
+                      name: 'containment',
+                      label: 'Containment action',
+                      type: 'textarea',
+                      required: true,
+                      help: 'Immediate action that stops the defect spreading.',
+                      span: 2,
+                    },
+                    { name: 'dueDate', label: 'Due date', type: 'date' },
                   ]}
                 />
               </div>

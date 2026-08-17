@@ -1,14 +1,18 @@
+import { CAPACITY_PERIOD_TYPES } from '@gridx/shared';
+
 import { declareCapacityAction } from '@/app/actions/control';
 import { ActionDialog } from '@/components/app/action-dialog';
 import { PageHeader } from '@/components/app/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DetailList } from '@/components/app/detail-list';
+import { optionsFrom } from '@/lib/options';
+import { processOptions } from '@/lib/reference';
 import { currentUser } from '@/lib/session';
 
 export const metadata = { title: 'Support · GRID-X Partner' };
 
 export default async function PartnerSupportPage(): Promise<React.JSX.Element> {
-  const user = await currentUser();
+  const [user, processes] = await Promise.all([currentUser(), processOptions()]);
   const hindi = user?.language === 'HI';
 
   return (
@@ -33,16 +37,63 @@ export default async function PartnerSupportPage(): Promise<React.JSX.Element> {
             action={declareCapacityAction}
             hidden={{ partnerId: user?.partnerId ?? undefined }}
             fields={[
-              { name: 'periodMonth', label: hindi ? 'महीना' : 'Month (1-12)', type: 'number', required: true },
-              { name: 'periodYear', label: hindi ? 'साल' : 'Year', type: 'number', required: true },
+              {
+                name: 'processCode',
+                label: hindi ? 'प्रक्रिया' : 'Process',
+                type: 'select',
+                required: true,
+                options: processes,
+                span: 2,
+              },
+              {
+                name: 'periodType',
+                label: hindi ? 'अवधि' : 'Period',
+                type: 'select',
+                options: optionsFrom(CAPACITY_PERIOD_TYPES),
+                defaultValue: 'MONTHLY',
+              },
               {
                 name: 'availableHours',
                 label: hindi ? 'उपलब्ध घंटे' : 'Available hours',
                 type: 'number',
                 required: true,
               },
-              { name: 'committedHours', label: hindi ? 'तय घंटे' : 'Committed hours', type: 'number' },
-              { name: 'remarks', label: hindi ? 'टिप्पणी' : 'Remarks', type: 'textarea', span: 2 },
+              {
+                name: 'periodStart',
+                label: hindi ? 'शुरू' : 'Period start',
+                type: 'date',
+                required: true,
+              },
+              {
+                name: 'periodEnd',
+                label: hindi ? 'अंत' : 'Period end',
+                type: 'date',
+                required: true,
+              },
+              {
+                name: 'availableWorkers',
+                label: hindi ? 'कारीगर' : 'Available workers',
+                type: 'number',
+                defaultValue: '0',
+              },
+              {
+                name: 'availableMachines',
+                label: hindi ? 'मशीनें' : 'Available machines',
+                type: 'number',
+                defaultValue: '0',
+              },
+              {
+                name: 'maintenanceShutdownHours',
+                label: hindi ? 'मेंटेनेंस घंटे' : 'Maintenance shutdown (h)',
+                type: 'number',
+                defaultValue: '0',
+              },
+              {
+                name: 'expectedBottleneck',
+                label: hindi ? 'दिक्कत' : 'Expected bottleneck',
+                type: 'textarea',
+                span: 2,
+              },
             ]}
           />
         }

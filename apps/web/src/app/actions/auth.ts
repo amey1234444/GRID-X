@@ -113,6 +113,32 @@ export async function partnerPasswordLoginAction(
   redirect(landingFor(session.user));
 }
 
+/**
+ * Changing the password revokes every other refresh token server-side, so the
+ * current session is re-issued by signing out and back in rather than silently
+ * breaking on the next request.
+ */
+export async function changePasswordAction(
+  _previous: AuthActionState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  const currentPassword = String(formData.get('currentPassword') ?? '');
+  const newPassword = String(formData.get('newPassword') ?? '');
+  const confirmPassword = String(formData.get('confirmPassword') ?? '');
+
+  if (!currentPassword || !newPassword) return { error: 'Enter your current and new password.' };
+  if (newPassword !== confirmPassword) return { error: 'The new passwords do not match.' };
+
+  const result = await apiFetch<unknown>('/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword, confirmPassword }),
+  });
+  if (result.error) return { error: result.error };
+
+  clearTokens();
+  redirect('/login?passwordChanged=1');
+}
+
 export async function logoutAction(): Promise<void> {
   const tokens = readTokens();
   if (tokens) {

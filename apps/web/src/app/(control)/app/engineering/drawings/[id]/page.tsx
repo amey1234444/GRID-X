@@ -8,8 +8,11 @@ import {
   raiseEngineeringChangeAction,
   releaseRevisionAction,
   revisionStageAction,
+  revokeDrawingAccessAction,
 } from '@/app/actions/control';
 import { ActionDialog } from '@/components/app/action-dialog';
+import { DrawingAccessLog } from '@/components/app/drawing-access-log';
+import { DrawingViewer } from '@/components/app/drawing-viewer';
 import { DetailList } from '@/components/app/detail-list';
 import { EmptyState } from '@/components/app/empty-state';
 import { PageHeader } from '@/components/app/page-header';
@@ -49,6 +52,18 @@ export default async function DrawingDetailPage({
             hidden={{ drawingId: drawing.id }}
             fields={[
               { name: 'revisionCode', label: 'Revision code', required: true, placeholder: 'B' },
+              {
+                name: 'fileId',
+                label: 'Drawing file',
+                type: 'file',
+                category: 'DRAWING',
+                accept: 'application/pdf,image/*',
+                required: true,
+                help: 'PDF or image. Partners only ever see the file attached here.',
+                span: 2,
+              },
+              { name: 'issueDate', label: 'Issue date', type: 'date' },
+              { name: 'expiryDate', label: 'Expiry date', type: 'date' },
               { name: 'changeNote', label: 'Change note', type: 'textarea', span: 2 },
             ]}
           />
@@ -111,6 +126,8 @@ export default async function DrawingDetailPage({
                   <StatusBadge status={revision.status} />
                 </CardTitle>
                 <div className="flex flex-wrap gap-2">
+                  <DrawingViewer revisionId={revision.id} allowDownload />
+                  <DrawingAccessLog revisionId={revision.id} />
                   {revision.status === 'DRAFT' ? (
                     <ActionDialog
                       title="Submit for review"
@@ -183,14 +200,29 @@ export default async function DrawingDetailPage({
                     {revision.access.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No partner has access.</p>
                     ) : (
-                      <div className="flex flex-wrap gap-2">
+                      <ul className="space-y-1.5">
                         {revision.access.map((entry) => (
-                          <Badge key={entry.id} variant={entry.revokedAt ? 'destructive' : 'outline'}>
-                            {entry.partner?.businessName ?? 'Unknown'} · {entry.mode === 'VIEW_ONLY' ? 'View' : 'Download'}
-                            {entry.revokedAt ? ' · revoked' : ''}
-                          </Badge>
+                          <li key={entry.id} className="flex items-center gap-2">
+                            <Badge variant={entry.revokedAt ? 'destructive' : 'outline'}>
+                              {entry.partner?.businessName ?? 'Unknown'} · {entry.mode === 'VIEW_ONLY' ? 'View' : 'Download'}
+                              {entry.revokedAt ? ' · revoked' : ''}
+                            </Badge>
+                            {entry.revokedAt ? null : (
+                              <ActionDialog
+                                title="Revoke drawing access"
+                                description="The partner immediately loses the ability to open this revision."
+                                triggerLabel="Revoke"
+                                triggerSize="sm"
+                                triggerVariant="ghost"
+                                submitLabel="Revoke access"
+                                action={revokeDrawingAccessAction}
+                                hidden={{ accessId: entry.id, drawingId: drawing.id }}
+                                fields={[]}
+                              />
+                            )}
+                          </li>
                         ))}
-                      </div>
+                      </ul>
                     )}
                   </div>
                   <div className="space-y-2">

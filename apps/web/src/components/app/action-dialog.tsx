@@ -5,6 +5,7 @@ import { useFormState, useFormStatus } from 'react-dom';
 import { AlertCircle, Loader2 } from 'lucide-react';
 
 import type { ActionState } from '@/app/actions/control';
+import { FieldRow, type FieldDefinition, type FieldOption } from '@/components/app/field-control';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -15,44 +16,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
 
-export interface FieldOption {
-  value: string;
-  label: string;
-}
-
-export interface FieldDefinition {
-  name: string;
-  label: string;
-  type?:
-    | 'text'
-    | 'number'
-    | 'date'
-    | 'datetime-local'
-    | 'textarea'
-    | 'select'
-    | 'multiselect'
-    | 'checkbox'
-    | 'password';
-  options?: FieldOption[];
-  placeholder?: string;
-  required?: boolean;
-  defaultValue?: string;
-  step?: string;
-  help?: string;
-  span?: 1 | 2;
-}
+export type { FieldDefinition, FieldOption };
 
 export interface ActionDialogProps {
   title: string;
@@ -116,17 +81,7 @@ export function ActionDialog({
           )}
           <div className="grid gap-4 sm:grid-cols-2">
             {fields.map((field) => (
-              <div
-                key={field.name}
-                className={cn('space-y-2', (field.span ?? 1) === 2 && 'sm:col-span-2')}
-              >
-                <Label htmlFor={field.name}>
-                  {field.label}
-                  {field.required ? <span className="ml-1 text-destructive">*</span> : null}
-                </Label>
-                <FieldControl field={field} />
-                {field.help ? <p className="text-xs text-muted-foreground">{field.help}</p> : null}
-              </div>
+              <FieldRow key={field.name} field={field} />
             ))}
           </div>
           {state.error ? (
@@ -144,82 +99,5 @@ export function ActionDialog({
         </form>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function FieldControl({ field }: { field: FieldDefinition }): React.JSX.Element {
-  if (field.type === 'textarea') {
-    return (
-      <Textarea
-        id={field.name}
-        name={field.name}
-        placeholder={field.placeholder}
-        defaultValue={field.defaultValue}
-        required={field.required}
-        rows={3}
-      />
-    );
-  }
-  if (field.type === 'select') {
-    return (
-      <Select name={field.name} defaultValue={field.defaultValue}>
-        <SelectTrigger id={field.name}>
-          <SelectValue placeholder={field.placeholder ?? 'Select…'} />
-        </SelectTrigger>
-        <SelectContent>
-          {(field.options ?? []).map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    );
-  }
-  if (field.type === 'multiselect') {
-    return (
-      <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-3">
-        {(field.options ?? []).length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nothing available to select.</p>
-        ) : (
-          (field.options ?? []).map((option) => (
-            <label key={option.value} className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                name={field.name}
-                value={option.value}
-                className="h-4 w-4 rounded border-input accent-primary"
-              />
-              {option.label}
-            </label>
-          ))
-        )}
-      </div>
-    );
-  }
-  if (field.type === 'checkbox') {
-    return (
-      <label className="flex items-center gap-2 text-sm text-muted-foreground">
-        <input
-          id={field.name}
-          type="checkbox"
-          name={field.name}
-          defaultChecked={field.defaultValue === 'on'}
-          className="h-4 w-4 rounded border-input accent-primary"
-        />
-        {field.placeholder ?? 'Enable'}
-      </label>
-    );
-  }
-  return (
-    <Input
-      id={field.name}
-      name={field.name}
-      type={field.type ?? 'text'}
-      step={field.step}
-      placeholder={field.placeholder}
-      defaultValue={field.defaultValue}
-      required={field.required}
-    />
   );
 }

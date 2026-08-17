@@ -5,7 +5,11 @@ import { LoginForm } from '@/components/auth/login-form';
 
 export const metadata: Metadata = { title: 'Sign in' };
 
-export default function LoginPage(): React.JSX.Element {
+export default function LoginPage({
+  searchParams,
+}: {
+  searchParams?: { passwordChanged?: string };
+}): React.JSX.Element {
   return (
     <div className="space-y-8">
       <div className="space-y-2">
@@ -14,6 +18,11 @@ export default function LoginPage(): React.JSX.Element {
           Use your OSWAR work email. Senior roles will also be asked for a second factor.
         </p>
       </div>
+      {searchParams?.passwordChanged ? (
+        <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">
+          Your password has been changed. Sign in with the new one.
+        </p>
+      ) : null}
       <LoginForm />
       <p className="text-sm text-muted-foreground">
         Partner unit?{' '}

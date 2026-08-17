@@ -1,5 +1,6 @@
 import { acknowledgeRevisionAction } from '@/app/actions/control';
 import { ActionDialog } from '@/components/app/action-dialog';
+import { DrawingViewer } from '@/components/app/drawing-viewer';
 import { EmptyState } from '@/components/app/empty-state';
 import { PageHeader } from '@/components/app/page-header';
 import { PaginationControls } from '@/components/app/pagination-controls';
@@ -70,6 +71,12 @@ export default async function PartnerDrawingsPage({
                   <span className="text-xs text-muted-foreground">
                     {drawing.releasedAt ? formatDate(drawing.releasedAt) : '—'}
                   </span>
+                  {drawing.currentRevisionId ? (
+                    <DrawingViewer
+                      revisionId={drawing.currentRevisionId}
+                      label={hindi ? 'ड्रॉइंग देखें' : 'View drawing'}
+                    />
+                  ) : null}
                   <ActionDialog
                     title={hindi ? 'ड्रॉइंग की पुष्टि' : 'Acknowledge revision'}
                     description={

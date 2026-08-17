@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CORRECTIVE_ACTION_STAGES } from '@gridx/shared';
 
 import { advanceCorrectiveActionAction, createCorrectiveActionAction } from '@/app/actions/control';
 import { ActionDialog } from '@/components/app/action-dialog';
@@ -109,10 +110,15 @@ export default async function InspectorNonConformancesPage({
                         action={createCorrectiveActionAction}
                         hidden={{ nonConformanceId: nc.id }}
                         fields={[
-                          { name: 'rootCause', label: 'Root cause', type: 'textarea', required: true, span: 2 },
-                          { name: 'action', label: 'Corrective action', type: 'textarea', required: true, span: 2 },
-                          { name: 'targetDate', label: 'Target date', type: 'date' },
-                          { name: 'preventiveAction', label: 'Preventive action', type: 'textarea', span: 2 },
+                          {
+                            name: 'containment',
+                            label: 'Containment action',
+                            type: 'textarea',
+                            required: true,
+                            help: 'Immediate action that stops the defect spreading.',
+                            span: 2,
+                          },
+                          { name: 'dueDate', label: 'Due date', type: 'date' },
                         ]}
                       />
                     ) : null}
@@ -131,17 +137,19 @@ export default async function InspectorNonConformancesPage({
                         triggerVariant="outline"
                         submitLabel="Update"
                         action={advanceCorrectiveActionAction}
-                        hidden={{ correctiveActionId: action.id }}
+                        hidden={{ actionId: action.id }}
                         fields={[
                           {
-                            name: 'status',
-                            label: 'Status',
+                            name: 'stage',
+                            label: 'Stage',
                             type: 'select',
                             required: true,
-                            options: optionsFrom(['IN_PROGRESS', 'VERIFICATION_PENDING', 'CLOSED']),
+                            options: optionsFrom(CORRECTIVE_ACTION_STAGES),
                             span: 2,
                           },
-                          { name: 'verificationNote', label: 'Verification note', type: 'textarea', span: 2 },
+                          { name: 'rootCause', label: 'Root cause', type: 'textarea', span: 2 },
+                          { name: 'correctiveAction', label: 'Corrective action', type: 'textarea', span: 2 },
+                          { name: 'verification', label: 'Verification of effectiveness', type: 'textarea', span: 2 },
                         ]}
                       />
                     </div>

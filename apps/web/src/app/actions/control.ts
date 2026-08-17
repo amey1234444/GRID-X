@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 
 import { apiFetch } from '@/lib/session';
 
@@ -121,6 +122,10 @@ export async function createJobAction(_state: ActionState, data: FormData): Prom
   });
   if (result.error) return { error: result.error };
   revalidatePath('/app/production/jobs');
+  // The full-page form opens the new job; the list dialog just closes.
+  if (bool(data, 'openAfterCreate') && result.data?.id) {
+    redirect(`/app/production/jobs/${result.data.id}`);
+  }
   return { error: null, success: result.data?.id ?? 'Created' };
 }
 
@@ -505,6 +510,11 @@ export async function createCorrectiveActionAction(
     ['/app/quality/non-conformances', '/inspector/non-conformances'],
   );
 }
+
+/**
+ * 8D progression. The API keys the record by id and the step by `stage`, so both
+ * are read here under those names rather than the display labels used on screen.
+ */
 
 export async function advanceCorrectiveActionAction(
   _state: ActionState,
@@ -1331,10 +1341,18 @@ export async function decideDeviationAction(
 export async function createRevisionAction(_state: ActionState, data: FormData): Promise<ActionState> {
   const drawingId = text(data, 'drawingId');
   const revisionCode = text(data, 'revisionCode');
+  const fileId = text(data, 'fileId');
   if (!drawingId || !revisionCode) return { error: 'A revision code is required' };
+  if (!fileId) return { error: 'Upload the drawing file for this revision' };
   return send(
     `/drawings/${drawingId}/revisions`,
-    { revisionCode, changeNote: text(data, 'changeNote') },
+    {
+      revisionCode,
+      fileId,
+      changeNote: text(data, 'changeNote'),
+      issueDate: text(data, 'issueDate'),
+      expiryDate: text(data, 'expiryDate'),
+    },
     ['/app/engineering/drawings', `/app/engineering/drawings/${drawingId}`],
   );
 }
