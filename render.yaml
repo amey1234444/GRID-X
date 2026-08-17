@@ -7,11 +7,17 @@
 # ---------------------------------------------------------------------------
 
 databases:
+  # The region MUST match the services below. Render's internal hostnames
+  # (dpg-xxxx-a) only resolve inside a single region's private network, so a
+  # Singapore service cannot reach an Oregon database — Prisma fails with
+  # "P1001: Can't reach database server". Omitting this key defaults to Oregon.
   - name: gridx-postgres
     databaseName: gridx
     user: gridx
     plan: basic-256mb
+    region: singapore
     postgresMajorVersion: "16"
+    # Empty allow list = no external connections; only the private network.
     ipAllowList: []
 
 services:
