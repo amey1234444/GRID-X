@@ -39,8 +39,8 @@ export class QualityController {
 
   @Get('plans')
   @RequirePermissions(PERMISSIONS.INSPECTION_READ)
-  listPlans(@Query('componentId') componentId?: string) {
-    return this.quality.listPlans(componentId);
+  listPlans(@CurrentUser() user: RequestUser, @Query('componentId') componentId?: string) {
+    return this.quality.listPlans(user, componentId);
   }
 
   @Post('plans')

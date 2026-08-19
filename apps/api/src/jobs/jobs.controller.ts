@@ -71,8 +71,8 @@ export class JobsController {
 
   @Get(':id/recommendations')
   @RequirePermissions(PERMISSIONS.JOB_ALLOCATE)
-  recommendations(@Param('id') id: string) {
-    return this.jobs.recommendations(id);
+  recommendations(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.jobs.recommendations(id, user);
   }
 
   @Post(':id/allocate')

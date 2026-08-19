@@ -15,6 +15,11 @@ import { SequenceService } from '../audit/sequence.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
+import {
+  assertCanWriteToCompany,
+  assertCompanyScope,
+  companyWhere,
+} from '../common/company-scope';
 import { JobsService } from '../jobs/jobs.service';
 
 export interface ShipmentFilters extends PaginationInput {
@@ -41,6 +46,7 @@ export class LogisticsService {
         ? { OR: [{ fromPartnerId: filters.partnerId }, { toPartnerId: filters.partnerId }] }
         : {};
     const where: Prisma.ShipmentWhereInput = {
+      ...companyWhere(actor),
       ...partnerScope,
       ...(filters.status ? { status: filters.status as Prisma.EnumShipmentStatusFilter } : {}),
       ...(filters.direction
@@ -86,10 +92,12 @@ export class LogisticsService {
     ) {
       throw new ForbiddenException('This shipment belongs to another partner');
     }
+    assertCompanyScope(actor, shipment.companyId, 'shipment');
     return shipment;
   }
 
   async create(actor: RequestUser, input: z.infer<typeof createShipmentSchema>) {
+    assertCanWriteToCompany(actor, input.companyId);
     const shipmentNumber = await this.sequence.next('SHIPMENT');
     const shipment = await this.prisma.shipment.create({
       data: {
@@ -130,6 +138,7 @@ export class LogisticsService {
     id: string,
     input: z.infer<typeof updateShipmentStatusSchema>,
   ) {
+    await this.findOne(actor, id);
     const shipment = await this.prisma.shipment.update({
       where: { id },
       data: {
@@ -183,6 +192,7 @@ export class LogisticsService {
     id: string,
     input: z.infer<typeof proofOfDeliverySchema>,
   ) {
+    await this.findOne(actor, id);
     const pod = await this.prisma.proofOfDelivery.upsert({
       where: { shipmentId: id },
       create: {

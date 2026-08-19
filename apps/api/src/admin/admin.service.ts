@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@gridx/db';
 import {
   CreateUserInput,
@@ -17,6 +17,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
+import {
+  allowedCompanyIds,
+  assertCanWriteToCompany,
+  assertCompanyScope,
+} from '../common/company-scope';
 
 export interface UserFilters extends PaginationInput {
   roleCode?: string;
@@ -39,8 +44,55 @@ export class AdminService {
     private readonly audit: AuditService,
   ) {}
 
-  async listUsers(filters: UserFilters): Promise<Paginated<unknown>> {
+  /**
+   * Who this actor may see in the user directory. A partner owner administers only their own
+   * unit's users; an internal user sees only users who share one of their companies, plus the
+   * partner users of partners in those companies (Section 4 and Section 18).
+   */
+  private userScope(actor: RequestUser): Prisma.UserWhereInput {
+    if (actor.partnerId) return { partnerId: actor.partnerId };
+    const ids = allowedCompanyIds(actor);
+    if (!ids) return {};
+    return {
+      OR: [
+        { companies: { some: { companyId: { in: ids } } } },
+        { partner: { companyId: { in: ids } } },
+      ],
+    };
+  }
+
+  /**
+   * Guards who an administrator may create or edit. A partner owner may only touch their own
+   * unit's users; an internal administrator may only grant companies they hold themselves, so
+   * company access cannot be widened by creating an account.
+   */
+  private async assertMayAdminister(
+    actor: RequestUser,
+    isPartnerRole: boolean,
+    partnerId: string | null | undefined,
+    companyIds: string[] | undefined,
+  ): Promise<void> {
+    if (actor.partnerId) {
+      if (!isPartnerRole || partnerId !== actor.partnerId) {
+        throw new ForbiddenException('You can only administer users of your own unit');
+      }
+      return;
+    }
+    if (partnerId) {
+      const partner = await this.prisma.partner.findUniqueOrThrow({
+        where: { id: partnerId },
+        select: { companyId: true },
+      });
+      assertCompanyScope(actor, partner.companyId, 'partner');
+    }
+    for (const companyId of companyIds ?? []) {
+      assertCanWriteToCompany(actor, companyId);
+    }
+  }
+
+  async listUsers(actor: RequestUser, filters: UserFilters): Promise<Paginated<unknown>> {
     const where: Prisma.UserWhereInput = {
+      ...this.userScope(actor),
       ...(filters.roleCode ? { role: { code: filters.roleCode as Prisma.EnumRoleCodeFilter } } : {}),
       ...(filters.status ? { status: filters.status as Prisma.EnumUserStatusFilter } : {}),
       ...(filters.partnerId ? { partnerId: filters.partnerId } : {}),
@@ -91,6 +143,7 @@ export class AdminService {
     if (!role.isPartnerRole && input.partnerId) {
       throw new BadRequestException('Internal users cannot be linked to a partner');
     }
+    await this.assertMayAdminister(actor, role.isPartnerRole, input.partnerId, input.companyIds);
 
     const user = await this.prisma.user.create({
       data: {
@@ -133,6 +186,15 @@ export class AdminService {
       ? await this.prisma.role.findUniqueOrThrow({ where: { code: input.roleCode } })
       : null;
 
+    // Checked against who the user is today and who they would become.
+    await this.assertMayAdminister(actor, before.role.isPartnerRole, before.partnerId, undefined);
+    await this.assertMayAdminister(
+      actor,
+      (role ?? before.role).isPartnerRole,
+      before.partnerId,
+      input.companyIds,
+    );
+
     const user = await this.prisma.user.update({
       where: { id },
       data: {
@@ -167,6 +229,11 @@ export class AdminService {
 
   /** Users are never deleted — suspension keeps the audit trail intact (Section 18). */
   async suspendUser(actor: RequestUser, id: string, reason: string) {
+    const before = await this.prisma.user.findUniqueOrThrow({
+      where: { id },
+      include: { role: true },
+    });
+    await this.assertMayAdminister(actor, before.role.isPartnerRole, before.partnerId, undefined);
     const user = await this.prisma.user.update({
       where: { id },
       data: { status: 'SUSPENDED' },
@@ -195,9 +262,10 @@ export class AdminService {
     }));
   }
 
-  async listCompanies() {
+  async listCompanies(actor: RequestUser) {
+    const ids = allowedCompanyIds(actor);
     return this.prisma.company.findMany({
-      where: { isActive: true },
+      where: { isActive: true, ...(ids ? { id: { in: ids } } : {}) },
       orderBy: { name: 'asc' },
     });
   }
@@ -214,8 +282,11 @@ export class AdminService {
     return company;
   }
 
-  async listAuditLogs(filters: AuditFilters): Promise<Paginated<unknown>> {
+  async listAuditLogs(actor: RequestUser, filters: AuditFilters): Promise<Paginated<unknown>> {
+    const ids = allowedCompanyIds(actor);
     const where: Prisma.AuditLogWhereInput = {
+      // Entries with no company are system-level and stay with the Group Admin.
+      ...(ids ? { companyId: { in: ids } } : {}),
       ...(filters.entityType ? { entityType: filters.entityType } : {}),
       ...(filters.entityId ? { entityId: filters.entityId } : {}),
       ...(filters.userId ? { userId: filters.userId } : {}),

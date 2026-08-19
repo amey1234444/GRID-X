@@ -17,6 +17,7 @@ import { FilesService } from '../files/files.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
+import { assertCompanyScope, companyWhere } from '../common/company-scope';
 import { JobsService } from '../jobs/jobs.service';
 
 export interface MaterialIssueFilters extends PaginationInput {
@@ -40,8 +41,21 @@ export class MaterialsService {
     private readonly jobs: JobsService,
   ) {}
 
+  /** Every job-scoped material write is checked for partner and company reach. */
+  private async assertJobScope(actor: RequestUser, jobId: string): Promise<void> {
+    const job = await this.prisma.gridJob.findUniqueOrThrow({
+      where: { id: jobId },
+      select: { companyId: true, partnerId: true },
+    });
+    if (actor.partnerId && job.partnerId !== actor.partnerId) {
+      throw new ForbiddenException('This job is not assigned to you');
+    }
+    assertCompanyScope(actor, job.companyId, 'job');
+  }
+
   async list(actor: RequestUser, filters: MaterialIssueFilters): Promise<Paginated<unknown>> {
     const where: Prisma.MaterialIssueWhereInput = {
+      ...companyWhere(actor),
       ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
       ...(filters.jobId ? { jobId: filters.jobId } : {}),
       ...(filters.partnerId && !actor.partnerId ? { partnerId: filters.partnerId } : {}),
@@ -80,6 +94,7 @@ export class MaterialsService {
     if (actor.partnerId && issue.partnerId !== actor.partnerId) {
       throw new ForbiddenException('This material challan belongs to another partner');
     }
+    assertCompanyScope(actor, issue.companyId, 'material challan');
     const photographs = await this.files.photographsFor('MaterialIssue', id);
     return { ...issue, photographs };
   }
@@ -90,6 +105,7 @@ export class MaterialsService {
       where: { id: input.jobId },
       include: { component: true },
     });
+    assertCompanyScope(actor, job.companyId, 'job');
     if (!job.partnerId) throw new BadRequestException('Allocate the job to a partner first');
     if (job.materialResponsibility !== 'OSWAR_SUPPLIED') {
       throw new BadRequestException('This job is on partner-procured material');
@@ -224,6 +240,7 @@ export class MaterialsService {
     jobId: string,
     input: z.infer<typeof updateConsumptionSchema>,
   ) {
+    await this.assertJobScope(actor, jobId);
     const variancePercent =
       input.theoreticalKg > 0
         ? ((input.actualKg - input.theoreticalKg) / input.theoreticalKg) * 100
@@ -248,6 +265,7 @@ export class MaterialsService {
   }
 
   async recordScrap(actor: RequestUser, jobId: string, input: z.infer<typeof recordScrapSchema>) {
+    await this.assertJobScope(actor, jobId);
     const issued = await this.issuedWeight(jobId, input.itemId);
     const scrapPercent = issued > 0 ? (input.scrapWeightKg / issued) * 100 : 0;
     const scrap = await this.prisma.scrapReturn.create({
@@ -276,6 +294,7 @@ export class MaterialsService {
     jobId: string,
     input: z.infer<typeof completeReconciliationSchema>,
   ) {
+    await this.assertJobScope(actor, jobId);
     const [job, item] = await Promise.all([
       this.prisma.gridJob.findUniqueOrThrow({ where: { id: jobId } }),
       this.prisma.item.findUniqueOrThrow({ where: { id: input.itemId } }),
@@ -352,7 +371,8 @@ export class MaterialsService {
     return reconciliation;
   }
 
-  async reconciliationSummary(jobId: string) {
+  async reconciliationSummary(actor: RequestUser, jobId: string) {
+    await this.assertJobScope(actor, jobId);
     const [issues, consumption, scrap, reconciliations] = await Promise.all([
       this.prisma.materialIssueItem.findMany({
         where: { materialIssue: { jobId } },

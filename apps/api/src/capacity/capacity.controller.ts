@@ -41,7 +41,10 @@ export class CapacityController {
 
   @Get('heatmap')
   @RequirePermissions(PERMISSIONS.CAPACITY_READ)
-  heatmap(@Query(zodBody(windowSchema)) query: z.infer<typeof windowSchema>) {
-    return this.capacity.heatmap(query);
+  heatmap(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(windowSchema)) query: z.infer<typeof windowSchema>,
+  ) {
+    return this.capacity.heatmap(user, query);
   }
 }

@@ -14,6 +14,11 @@ import { AuditService } from '../audit/audit.service';
 import { SequenceService } from '../audit/sequence.service';
 import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
+import {
+  assertCanWriteToCompany,
+  assertCompanyScope,
+  companyWhere,
+} from '../common/company-scope';
 
 export interface ToolFilters extends PaginationInput {
   category?: string;
@@ -33,6 +38,7 @@ export class ToolingService {
   async list(actor: RequestUser, filters: ToolFilters): Promise<Paginated<unknown>> {
     const where: Prisma.ToolWhereInput = {
       isActive: true,
+      ...companyWhere(actor),
       ...(actor.partnerId
         ? { currentPartnerId: actor.partnerId }
         : filters.partnerId
@@ -70,6 +76,7 @@ export class ToolingService {
   }
 
   async create(actor: RequestUser, input: z.infer<typeof createToolSchema>) {
+    assertCanWriteToCompany(actor, input.companyId);
     const toolCode = await this.sequence.next('TOOL');
     const tool = await this.prisma.tool.create({ data: { ...input, toolCode } });
     await this.audit.record(actor, {
@@ -87,6 +94,7 @@ export class ToolingService {
       where: { id },
       include: { issues: { where: { status: 'ISSUED' } } },
     });
+    assertCompanyScope(actor, tool.companyId, 'tool');
     if (tool.issues.length > 0) {
       throw new BadRequestException('This tool is already issued and not yet returned');
     }
@@ -115,6 +123,11 @@ export class ToolingService {
   }
 
   async returnTool(actor: RequestUser, issueId: string, input: z.infer<typeof returnToolSchema>) {
+    const existing = await this.prisma.toolIssue.findUniqueOrThrow({
+      where: { id: issueId },
+      select: { tool: { select: { companyId: true } } },
+    });
+    assertCompanyScope(actor, existing.tool.companyId, 'tool');
     const issue = await this.prisma.toolIssue.update({
       where: { id: issueId },
       data: {
@@ -147,6 +160,7 @@ export class ToolingService {
     input: z.infer<typeof calibrationSchema>,
   ) {
     const tool = await this.prisma.tool.findUniqueOrThrow({ where: { id } });
+    assertCompanyScope(actor, tool.companyId, 'tool');
     const calibratedAt = input.calibratedAt ?? new Date();
     const nextDueAt =
       input.nextDueAt ??

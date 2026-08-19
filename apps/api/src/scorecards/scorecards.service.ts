@@ -3,6 +3,7 @@ import { KpiCode } from '@gridx/db';
 import {
   KPI_WEIGHTS,
   KpiInput,
+  categoryDropped,
   categoryForScore,
   computeScorecard,
   recommendationForCategory,
@@ -11,11 +12,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RequestUser } from '../common/request-user';
+import { allowedCompanyIds, assertCompanyScope } from '../common/company-scope';
 
 interface Period {
   periodMonth: number;
   periodYear: number;
 }
+
+/** Scorecards are also produced by the monthly scheduler, which has no signed-in user. */
+export type ScorecardActor = RequestUser | null;
 
 /**
  * Module 12 — monthly partner scorecards. Every KPI is derived from transactional data
@@ -29,9 +34,16 @@ export class ScorecardsService {
     private readonly notifications: NotificationsService,
   ) {}
 
+  /** Scores hang off a partner, so company scope is applied one relation deep. */
+  private partnerScope(actor: RequestUser): { partner?: { companyId: { in: string[] } } } {
+    const ids = allowedCompanyIds(actor);
+    return ids ? { partner: { companyId: { in: ids } } } : {};
+  }
+
   async list(actor: RequestUser, period?: Partial<Period>) {
     return this.prisma.partnerScore.findMany({
       where: {
+        ...this.partnerScope(actor),
         ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
         ...(period?.periodMonth ? { periodMonth: period.periodMonth } : {}),
         ...(period?.periodYear ? { periodYear: period.periodYear } : {}),
@@ -48,6 +60,13 @@ export class ScorecardsService {
     if (actor.partnerId && actor.partnerId !== partnerId) {
       throw new ForbiddenException('Partners can only view their own scorecard');
     }
+    if (!actor.partnerId) {
+      const partner = await this.prisma.partner.findUniqueOrThrow({
+        where: { id: partnerId },
+        select: { companyId: true },
+      });
+      assertCompanyScope(actor, partner.companyId, 'partner');
+    }
     return this.prisma.partnerScore.findMany({
       where: { partnerId },
       orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
@@ -56,11 +75,18 @@ export class ScorecardsService {
     });
   }
 
-  /** Recomputes and stores the scorecard for one partner, or every active partner. */
-  async compute(actor: RequestUser, input: Period & { partnerId?: string }) {
+  /**
+   * Recomputes and stores the scorecard for one partner, or every active partner.
+   *
+   * `actor` is null when the monthly scheduler runs this, which the audit log records as SYSTEM.
+   * A null actor is also unscoped by company — the scheduler scores the whole network.
+   */
+  async compute(actor: ScorecardActor, input: Period & { partnerId?: string }) {
+    const companyIds = actor ? allowedCompanyIds(actor) : null;
     const partners = await this.prisma.partner.findMany({
       where: {
         ...(input.partnerId ? { id: input.partnerId } : {}),
+        ...(companyIds ? { companyId: { in: companyIds } } : {}),
         approvalStatus: { in: ['TRIAL_APPROVED', 'APPROVED', 'CERTIFIED', 'STRATEGIC'] },
       },
       select: { id: true, businessName: true },
@@ -72,7 +98,7 @@ export class ScorecardsService {
     return results;
   }
 
-  private async computeForPartner(actor: RequestUser, partnerId: string, period: Period) {
+  private async computeForPartner(actor: ScorecardActor, partnerId: string, period: Period) {
     const periodStart = new Date(Date.UTC(period.periodYear, period.periodMonth - 1, 1));
     const periodEnd = new Date(Date.UTC(period.periodYear, period.periodMonth, 1));
 
@@ -164,6 +190,19 @@ export class ScorecardsService {
 
     const result = computeScorecard(kpiInputs, openCriticalNcs > 2);
 
+    // The category this partner held going into this period, so a fall can be flagged (Section 13).
+    const previous = await this.prisma.partnerScore.findFirst({
+      where: {
+        partnerId,
+        OR: [
+          { periodYear: { lt: period.periodYear } },
+          { periodYear: period.periodYear, periodMonth: { lt: period.periodMonth } },
+        ],
+      },
+      orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
+      select: { category: true, totalScore: true },
+    });
+
     const score = await this.prisma.$transaction(async (tx) => {
       const saved = await tx.partnerScore.upsert({
         where: {
@@ -225,6 +264,32 @@ export class ScorecardsService {
       entityId: score.id,
       partnerId,
     });
+
+    if (previous && categoryDropped(previous.category, result.category)) {
+      const detail =
+        `Category ${previous.category} (${previous.totalScore}) → ` +
+        `${result.category} (${result.totalScore}) for ${period.periodMonth}/${period.periodYear}. ` +
+        `Recommendation: ${result.recommendation}.`;
+      await this.notifications.notify({
+        event: 'PARTNER_RATING_REDUCED',
+        title: `Your GRID-X rating has fallen to category ${result.category}`,
+        body: detail,
+        link: '/partner/scorecard',
+        entityType: 'PartnerScore',
+        entityId: score.id,
+        partnerId,
+        channels: ['IN_APP', 'WHATSAPP'],
+      });
+      await this.notifications.notify({
+        event: 'PARTNER_RATING_REDUCED',
+        title: `Partner rating reduced — category ${result.category}`,
+        body: detail,
+        link: `/app/partners/${partnerId}`,
+        entityType: 'PartnerScore',
+        entityId: score.id,
+        roleCodes: ['GRIDX_HEAD', 'OPERATIONS_HEAD', 'QUALITY_INSPECTOR'],
+      });
+    }
     await this.audit.record(actor, {
       action: 'SCORECARD_COMPUTED',
       entityType: 'PartnerScore',
@@ -240,9 +305,13 @@ export class ScorecardsService {
   }
 
   /** Network view used by the management dashboard: category mix and ranking. */
-  async leaderboard(period: Period) {
+  async leaderboard(actor: RequestUser, period: Period) {
     const scores = await this.prisma.partnerScore.findMany({
-      where: { periodMonth: period.periodMonth, periodYear: period.periodYear },
+      where: {
+        ...this.partnerScope(actor),
+        periodMonth: period.periodMonth,
+        periodYear: period.periodYear,
+      },
       orderBy: { totalScore: 'desc' },
       include: { partner: { select: { id: true, businessName: true, city: true } } },
     });

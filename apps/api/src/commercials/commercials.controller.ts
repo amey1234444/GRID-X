@@ -32,8 +32,12 @@ export class CommercialsController {
 
   @Get('rates')
   @RequirePermissions(PERMISSIONS.RATE_READ)
-  listRates(@Query('partnerId') partnerId?: string, @Query('componentId') componentId?: string) {
-    return this.commercials.listRates(partnerId, componentId);
+  listRates(
+    @CurrentUser() user: RequestUser,
+    @Query('partnerId') partnerId?: string,
+    @Query('componentId') componentId?: string,
+  ) {
+    return this.commercials.listRates(user, partnerId, componentId);
   }
 
   @Post('rates')

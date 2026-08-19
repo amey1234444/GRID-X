@@ -152,7 +152,7 @@ export default async function DrawingDetailPage({
                   {revision.status === 'APPROVED' ? (
                     <ActionDialog
                       title="Release revision"
-                      description="Releasing supersedes the previous revision and notifies every partner holding access."
+                      description="Releasing supersedes the previous revision, moves every open job onto this one, carries the partners’ access across and notifies them to acknowledge it."
                       triggerLabel="Release"
                       triggerSize="sm"
                       action={releaseRevisionAction}

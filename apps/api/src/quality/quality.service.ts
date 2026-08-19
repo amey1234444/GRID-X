@@ -23,6 +23,13 @@ import { FilesService } from '../files/files.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
+import {
+  allowedCompanyIds,
+  assertCanWriteToCompany,
+  assertCompanyScope,
+  companyWhere,
+  nestedCompanyWhere,
+} from '../common/company-scope';
 import { JobsService } from '../jobs/jobs.service';
 
 export interface InspectionFilters extends PaginationInput {
@@ -48,13 +55,37 @@ export class QualityService {
     private readonly jobs: JobsService,
   ) {}
 
+  /** Guards a job reached by id: partner isolation first, then company reach (Section 4 and 18). */
+  private async assertJobScope(actor: RequestUser, jobId: string): Promise<void> {
+    const job = await this.prisma.gridJob.findUniqueOrThrow({
+      where: { id: jobId },
+      select: { companyId: true, partnerId: true },
+    });
+    if (actor.partnerId && job.partnerId !== actor.partnerId) {
+      throw new ForbiddenException('This job belongs to another partner');
+    }
+    assertCompanyScope(actor, job.companyId, 'job');
+  }
+
+  /** Same guard, reached through an inspection. */
+  private async assertInspectionScope(actor: RequestUser, inspectionId: string): Promise<void> {
+    const inspection = await this.prisma.inspection.findUniqueOrThrow({
+      where: { id: inspectionId },
+      select: { partnerId: true, job: { select: { companyId: true } } },
+    });
+    if (actor.partnerId && inspection.partnerId !== actor.partnerId) {
+      throw new ForbiddenException('This inspection belongs to another partner');
+    }
+    assertCompanyScope(actor, inspection.job.companyId, 'inspection');
+  }
+
   // -------------------------------------------------------------------------
   // Inspection plans
   // -------------------------------------------------------------------------
 
-  async listPlans(componentId?: string) {
+  async listPlans(actor: RequestUser, componentId?: string) {
     return this.prisma.inspectionPlan.findMany({
-      where: { ...(componentId ? { componentId } : {}), isActive: true },
+      where: { ...companyWhere(actor), ...(componentId ? { componentId } : {}), isActive: true },
       include: {
         characteristics: { orderBy: { sequence: 'asc' } },
         component: { select: { id: true, componentCode: true, name: true } },
@@ -64,6 +95,7 @@ export class QualityService {
   }
 
   async createPlan(actor: RequestUser, input: z.infer<typeof createInspectionPlanSchema>) {
+    assertCanWriteToCompany(actor, input.companyId);
     const plan = await this.prisma.inspectionPlan.create({
       data: {
         companyId: input.companyId,
@@ -92,6 +124,7 @@ export class QualityService {
     input: z.infer<typeof inspectionCharacteristicSchema>,
   ) {
     const plan = await this.prisma.inspectionPlan.findUniqueOrThrow({ where: { id: planId } });
+    assertCompanyScope(actor, plan.companyId, 'inspection plan');
     const last = await this.prisma.inspectionCharacteristic.findFirst({
       where: { inspectionPlanId: planId },
       orderBy: { sequence: 'desc' },
@@ -117,7 +150,9 @@ export class QualityService {
   async removePlanCharacteristic(actor: RequestUser, characteristicId: string) {
     const characteristic = await this.prisma.inspectionCharacteristic.findUniqueOrThrow({
       where: { id: characteristicId },
+      include: { inspectionPlan: { select: { companyId: true } } },
     });
+    assertCompanyScope(actor, characteristic.inspectionPlan.companyId, 'inspection plan');
     const remaining = await this.prisma.inspectionCharacteristic.count({
       where: { inspectionPlanId: characteristic.inspectionPlanId },
     });
@@ -140,6 +175,7 @@ export class QualityService {
 
   async list(actor: RequestUser, filters: InspectionFilters): Promise<Paginated<unknown>> {
     const where: Prisma.InspectionWhereInput = {
+      ...nestedCompanyWhere(actor, 'job'),
       ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
       ...(filters.partnerId && !actor.partnerId ? { partnerId: filters.partnerId } : {}),
       ...(filters.status ? { status: filters.status as Prisma.EnumInspectionStatusFilter } : {}),
@@ -189,6 +225,7 @@ export class QualityService {
     if (actor.partnerId && inspection.partnerId !== actor.partnerId) {
       throw new ForbiddenException('This inspection belongs to another partner');
     }
+    assertCompanyScope(actor, inspection.job.companyId, 'inspection');
     const photographs = await this.files.photographsFor('Inspection', id);
     return { ...inspection, photographs };
   }
@@ -202,6 +239,7 @@ export class QualityService {
     if (actor.partnerId && job.partnerId !== actor.partnerId) {
       throw new ForbiddenException('This job belongs to another partner');
     }
+    assertCompanyScope(actor, job.companyId, 'job');
     if (input.offeredQuantity > job.quantity) {
       throw new BadRequestException('Offered quantity cannot exceed the job quantity');
     }
@@ -256,6 +294,7 @@ export class QualityService {
   }
 
   async assign(actor: RequestUser, id: string, input: z.infer<typeof assignInspectionSchema>) {
+    await this.assertInspectionScope(actor, id);
     const inspection = await this.prisma.inspection.update({
       where: { id },
       data: { inspectorId: input.inspectorId, dueAt: input.dueAt, status: 'ASSIGNED' },
@@ -280,6 +319,7 @@ export class QualityService {
   }
 
   async start(actor: RequestUser, id: string) {
+    await this.assertInspectionScope(actor, id);
     return this.prisma.inspection.update({
       where: { id },
       data: {
@@ -296,6 +336,7 @@ export class QualityService {
     id: string,
     input: z.infer<typeof saveInspectionResultsSchema>,
   ) {
+    await this.assertInspectionScope(actor, id);
     const inspection = await this.prisma.inspection.findUniqueOrThrow({ where: { id } });
     if (inspection.status === 'COMPLETED' || inspection.status === 'CANCELLED') {
       throw new BadRequestException('This inspection is already closed');
@@ -336,6 +377,7 @@ export class QualityService {
       where: { id },
       include: { job: { include: { component: true } } },
     });
+    assertCompanyScope(actor, inspection.job.companyId, 'inspection');
     if (inspection.status === 'COMPLETED') {
       throw new BadRequestException('This inspection is already completed');
     }
@@ -476,6 +518,7 @@ export class QualityService {
 
   async listNonConformances(actor: RequestUser, filters: PaginationInput & { jobId?: string }) {
     const where: Prisma.NonConformanceWhereInput = {
+      ...nestedCompanyWhere(actor, 'job'),
       ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
       ...(filters.jobId ? { jobId: filters.jobId } : {}),
     };
@@ -497,6 +540,7 @@ export class QualityService {
   }
 
   async createRework(actor: RequestUser, input: z.infer<typeof createReworkSchema>) {
+    await this.assertJobScope(actor, input.jobId);
     const reworkNumber = await this.sequence.next('REWORK');
     const rework = await this.prisma.reworkOrder.create({
       data: {
@@ -533,8 +577,17 @@ export class QualityService {
   }
 
   async listRework(actor: RequestUser, filters: PaginationInput & { status?: string }) {
+    const companyIds = allowedCompanyIds(actor);
     const where: Prisma.ReworkOrderWhereInput = {
-      ...(actor.partnerId ? { job: { partnerId: actor.partnerId } } : {}),
+      // Both clauses narrow the same relation, so they are merged rather than spread separately.
+      ...(companyIds || actor.partnerId
+        ? {
+            job: {
+              ...(companyIds ? { companyId: { in: companyIds } } : {}),
+              ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
+            },
+          }
+        : {}),
       ...(filters.status ? { status: filters.status as Prisma.EnumReworkStatusFilter } : {}),
     };
     const [data, total] = await Promise.all([
@@ -556,6 +609,11 @@ export class QualityService {
     id: string,
     input: z.infer<typeof updateReworkStatusSchema>,
   ) {
+    const existing = await this.prisma.reworkOrder.findUniqueOrThrow({
+      where: { id },
+      select: { jobId: true },
+    });
+    await this.assertJobScope(actor, existing.jobId);
     const rework = await this.prisma.reworkOrder.update({
       where: { id },
       data: {
@@ -609,6 +667,11 @@ export class QualityService {
     actor: RequestUser,
     input: z.infer<typeof createCorrectiveActionSchema>,
   ) {
+    const nc = await this.prisma.nonConformance.findUniqueOrThrow({
+      where: { id: input.nonConformanceId },
+      select: { jobId: true },
+    });
+    await this.assertJobScope(actor, nc.jobId);
     const caNumber = await this.sequence.next('CA');
     const action = await this.prisma.correctiveAction.create({
       data: {
@@ -635,7 +698,11 @@ export class QualityService {
     id: string,
     input: z.infer<typeof advanceCorrectiveActionSchema>,
   ) {
-    const current = await this.prisma.correctiveAction.findUniqueOrThrow({ where: { id } });
+    const current = await this.prisma.correctiveAction.findUniqueOrThrow({
+      where: { id },
+      include: { nonConformance: { select: { jobId: true } } },
+    });
+    await this.assertJobScope(actor, current.nonConformance.jobId);
     if (input.stage === 'CLOSED' && !(input.verification ?? current.verification)) {
       throw new BadRequestException('Verification evidence is required before closing');
     }
@@ -671,6 +738,11 @@ export class QualityService {
     id: string,
     input: z.infer<typeof decideDeviationSchema>,
   ) {
+    const existing = await this.prisma.deviationApproval.findUniqueOrThrow({
+      where: { id },
+      select: { inspectionId: true },
+    });
+    await this.assertInspectionScope(actor, existing.inspectionId);
     const deviation = await this.prisma.deviationApproval.update({
       where: { id },
       data: {

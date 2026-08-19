@@ -92,7 +92,7 @@ export class MaterialsController {
 
   @Get('jobs/:jobId/reconciliation')
   @RequirePermissions(PERMISSIONS.MATERIAL_READ)
-  reconciliation(@Param('jobId') jobId: string) {
-    return this.materials.reconciliationSummary(jobId);
+  reconciliation(@CurrentUser() user: RequestUser, @Param('jobId') jobId: string) {
+    return this.materials.reconciliationSummary(user, jobId);
   }
 }

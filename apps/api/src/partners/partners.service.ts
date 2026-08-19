@@ -21,6 +21,12 @@ import { SequenceService } from '../audit/sequence.service';
 import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
 import { assertTransition } from '../common/workflow';
+import {
+  assertCanWriteToCompany,
+  assertCompanyScope,
+  companyWhere,
+  isCompanyScoped,
+} from '../common/company-scope';
 
 export interface PartnerListFilters extends PaginationInput {
   approvalStatus?: PartnerApprovalStatus;
@@ -38,17 +44,29 @@ export class PartnersService {
     private readonly sequence: SequenceService,
   ) {}
 
-  /** Partner users may only ever read their own partner record (Section 18 isolation). */
-  private assertScope(actor: RequestUser, partnerId: string): void {
-    if (actor.userType === 'PARTNER' && actor.partnerId !== partnerId) {
-      throw new ForbiddenException('You can only access your own partner data');
+  /**
+   * Partner users may only ever read their own partner record (Section 18 isolation); internal
+   * users only ever see partners belonging to a company they are linked to (Section 4).
+   */
+  private async assertScope(actor: RequestUser, partnerId: string): Promise<void> {
+    if (actor.userType === 'PARTNER') {
+      if (actor.partnerId !== partnerId) {
+        throw new ForbiddenException('You can only access your own partner data');
+      }
+      return;
     }
+    if (!isCompanyScoped(actor)) return;
+    const partner = await this.prisma.partner.findUniqueOrThrow({
+      where: { id: partnerId },
+      select: { companyId: true },
+    });
+    assertCompanyScope(actor, partner.companyId, 'partner');
   }
 
   async list(actor: RequestUser, filters: PartnerListFilters): Promise<Paginated<Partner>> {
     const where: Prisma.PartnerWhereInput = {
+      ...companyWhere(actor, filters.companyId),
       ...(actor.userType === 'PARTNER' ? { id: actor.partnerId ?? '' } : {}),
-      ...(filters.companyId ? { companyId: filters.companyId } : {}),
       ...(filters.approvalStatus ? { approvalStatus: filters.approvalStatus } : {}),
       ...(filters.category ? { category: filters.category as Partner['category'] } : {}),
       ...(filters.city ? { city: { contains: filters.city, mode: 'insensitive' } } : {}),
@@ -84,7 +102,7 @@ export class PartnersService {
   }
 
   async findOne(actor: RequestUser, id: string) {
-    this.assertScope(actor, id);
+    await this.assertScope(actor, id);
     const partner = await this.prisma.partner.findUniqueOrThrow({
       where: { id },
       include: {
@@ -119,6 +137,7 @@ export class PartnersService {
   }
 
   async create(actor: RequestUser, input: CreatePartnerInput): Promise<Partner> {
+    assertCanWriteToCompany(actor, input.companyId);
     const partnerCode = await this.sequence.next('PARTNER');
     const partner = await this.prisma.partner.create({
       data: {
@@ -168,6 +187,7 @@ export class PartnersService {
     id: string,
     input: z.infer<typeof updatePartnerSchema>,
   ): Promise<Partner> {
+    await this.assertScope(actor, id);
     const before = await this.prisma.partner.findUniqueOrThrow({ where: { id } });
     const partner = await this.prisma.partner.update({ where: { id }, data: input });
     await this.audit.record(actor, {
@@ -188,6 +208,7 @@ export class PartnersService {
     toStatus: PartnerApprovalStatus,
     reason?: string,
   ): Promise<Partner> {
+    await this.assertScope(actor, id);
     const partner = await this.prisma.partner.findUniqueOrThrow({
       where: { id },
       include: { documents: true, capabilities: true, audits: true },
@@ -240,6 +261,7 @@ export class PartnersService {
   }
 
   async upsertCapability(actor: RequestUser, id: string, input: PartnerCapabilityInput) {
+    await this.assertScope(actor, id);
     const capability = await this.prisma.partnerCapability.upsert({
       where: { partnerId_process: { partnerId: id, process: input.process } },
       create: { partnerId: id, ...input },
@@ -256,6 +278,7 @@ export class PartnersService {
   }
 
   async removeCapability(actor: RequestUser, id: string, capabilityId: string) {
+    await this.assertScope(actor, id);
     await this.prisma.partnerCapability.delete({ where: { id: capabilityId } });
     await this.refreshCapacityCeiling(id);
     await this.audit.record(actor, {
@@ -267,6 +290,7 @@ export class PartnersService {
   }
 
   async addMachine(actor: RequestUser, id: string, input: z.infer<typeof partnerMachineSchema>) {
+    await this.assertScope(actor, id);
     const machine = await this.prisma.partnerMachine.create({ data: { partnerId: id, ...input } });
     await this.audit.record(actor, {
       action: 'PARTNER_MACHINE_ADDED',
@@ -278,6 +302,11 @@ export class PartnersService {
   }
 
   async removeMachine(actor: RequestUser, machineId: string) {
+    const machine = await this.prisma.partnerMachine.findUniqueOrThrow({
+      where: { id: machineId },
+      select: { partnerId: true },
+    });
+    await this.assertScope(actor, machine.partnerId);
     await this.prisma.partnerMachine.delete({ where: { id: machineId } });
     await this.audit.record(actor, {
       action: 'PARTNER_MACHINE_REMOVED',
@@ -288,6 +317,7 @@ export class PartnersService {
   }
 
   async saveDocument(actor: RequestUser, id: string, input: z.infer<typeof partnerDocumentSchema>) {
+    await this.assertScope(actor, id);
     const document = await this.prisma.partnerDocument.create({
       data: { partnerId: id, ...input },
     });
@@ -301,6 +331,11 @@ export class PartnersService {
   }
 
   async verifyDocument(actor: RequestUser, documentId: string) {
+    const existing = await this.prisma.partnerDocument.findUniqueOrThrow({
+      where: { id: documentId },
+      select: { partnerId: true },
+    });
+    await this.assertScope(actor, existing.partnerId);
     const document = await this.prisma.partnerDocument.update({
       where: { id: documentId },
       data: { verified: true, verifiedAt: new Date() },
@@ -314,16 +349,22 @@ export class PartnersService {
   }
 
   async addEmployee(actor: RequestUser, id: string, input: z.infer<typeof partnerEmployeeSchema>) {
-    this.assertScope(actor, id);
+    await this.assertScope(actor, id);
     return this.prisma.partnerEmployee.create({ data: { partnerId: id, ...input } });
   }
 
   async removeEmployee(actor: RequestUser, employeeId: string) {
+    const employee = await this.prisma.partnerEmployee.findUniqueOrThrow({
+      where: { id: employeeId },
+      select: { partnerId: true },
+    });
+    await this.assertScope(actor, employee.partnerId);
     await this.prisma.partnerEmployee.delete({ where: { id: employeeId } });
     return { success: true };
   }
 
   async recordAudit(actor: RequestUser, id: string, input: z.infer<typeof partnerAuditSchema>) {
+    await this.assertScope(actor, id);
     const audit = await this.prisma.partnerAudit.create({
       data: { partnerId: id, auditorId: actor.id, ...input },
     });

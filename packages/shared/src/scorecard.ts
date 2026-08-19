@@ -73,6 +73,22 @@ export function computeScorecard(inputs: KpiInput[], criticalViolation = false):
   return { totalScore, category, recommendation: recommendationForCategory(category), kpis };
 }
 
+/**
+ * Categories ranked best to worst, so a month-on-month move can be judged as a rise or a fall.
+ * Used to decide when the `PARTNER_RATING_REDUCED` alert of Section 13 should fire.
+ */
+const CATEGORY_RANK: Record<PartnerCategory, number> = {
+  A: 4,
+  B: 3,
+  C: 2,
+  D: 1,
+  SUSPENDED: 0,
+};
+
+export function categoryDropped(previous: PartnerCategory, next: PartnerCategory): boolean {
+  return CATEGORY_RANK[next] < CATEGORY_RANK[previous];
+}
+
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }

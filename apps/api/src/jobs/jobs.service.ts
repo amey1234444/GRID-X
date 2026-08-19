@@ -1,20 +1,23 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { GridJob, JobStatus, Prisma } from '@gridx/db';
+import { GridJob, JobStatus, MilestoneType, Prisma } from '@gridx/db';
 import {
   ALLOCATABLE_PARTNER_STATUSES,
   AllocationInput,
   CreateJobInput,
   JOB_STATUS_TRANSITIONS,
   JobSummary,
+  MILESTONES_REQUIRING_FIRST_ARTICLE,
   Paginated,
   PaginationInput,
   PartnerRecommendation,
+  PERMISSIONS,
   UpdateMilestoneInput,
   allocateJobSchema,
   answerClarificationSchema,
   clarificationSchema,
   closeJobSchema,
   reportDelaySchema,
+  requiresFirstArticle,
   respondToJobSchema,
   scorePartnerForJob,
   updateJobSchema,
@@ -26,6 +29,12 @@ import { SequenceService } from '../audit/sequence.service';
 import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
 import { assertTransition } from '../common/workflow';
+import {
+  assertCanWriteToCompany,
+  assertCompanyScope,
+  companyWhere,
+} from '../common/company-scope';
+import { CapacityService } from '../capacity/capacity.service';
 import { FilesService } from '../files/files.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -46,11 +55,18 @@ export class JobsService {
     private readonly sequence: SequenceService,
     private readonly files: FilesService,
     private readonly notifications: NotificationsService,
+    private readonly capacity: CapacityService,
   ) {}
 
-  /** Partner users only ever see jobs assigned to their own partner. */
-  private scopeWhere(actor: RequestUser): Prisma.GridJobWhereInput {
-    return actor.userType === 'PARTNER' ? { partnerId: actor.partnerId ?? '' } : {};
+  /**
+   * Partner users only ever see jobs assigned to their own partner; internal users only ever see
+   * jobs belonging to a company they are linked to (Section 4).
+   */
+  private scopeWhere(actor: RequestUser, companyId?: string): Prisma.GridJobWhereInput {
+    return {
+      ...companyWhere(actor, companyId),
+      ...(actor.userType === 'PARTNER' ? { partnerId: actor.partnerId ?? '' } : {}),
+    };
   }
 
   private async assertJobScope(actor: RequestUser, jobId: string): Promise<GridJob> {
@@ -58,13 +74,13 @@ export class JobsService {
     if (actor.userType === 'PARTNER' && job.partnerId !== actor.partnerId) {
       throw new ForbiddenException('This job is not assigned to you');
     }
+    assertCompanyScope(actor, job.companyId, 'job');
     return job;
   }
 
   async list(actor: RequestUser, filters: JobFilters): Promise<Paginated<JobSummary>> {
     const where: Prisma.GridJobWhereInput = {
-      ...this.scopeWhere(actor),
-      ...(filters.companyId ? { companyId: filters.companyId } : {}),
+      ...this.scopeWhere(actor, filters.companyId),
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.partnerId ? { partnerId: filters.partnerId } : {}),
       ...(filters.componentId ? { componentId: filters.componentId } : {}),
@@ -170,15 +186,49 @@ export class JobsService {
     return { ...job, photographs };
   }
 
+  /**
+   * Module 2 — "the system should prevent Class A components from being allocated externally
+   * unless authorised by senior management". A reason alone is not authorisation: the actor must
+   * also hold `job:class_a_override`, which only the Group Admin and GRID-X Head roles carry.
+   */
+  private assertClassAAuthorised(
+    actor: RequestUser,
+    criticality: string,
+    reason: string | undefined,
+    action: string,
+    existingAuthorisationBy?: string | null,
+  ): void {
+    if (criticality !== 'CLASS_A') return;
+
+    // An authorisation already granted on this job stands: whoever recorded it had to hold the
+    // permission at the time, so a planner may act on it without holding it themselves.
+    if (!reason && existingAuthorisationBy) return;
+
+    if (!reason) {
+      throw new BadRequestException(
+        `${action} a Class A component requires a documented authorisation reason`,
+      );
+    }
+    if (!actor.permissions.includes(PERMISSIONS.JOB_CLASS_A_OVERRIDE)) {
+      throw new ForbiddenException(
+        'Class A components may only be outsourced with senior management authorisation. ' +
+          'Ask the GRID-X Head or a Group Admin to authorise this job.',
+      );
+    }
+  }
+
   async create(actor: RequestUser, input: CreateJobInput): Promise<GridJob> {
+    assertCanWriteToCompany(actor, input.companyId);
     const component = await this.prisma.component.findUniqueOrThrow({
       where: { id: input.componentId },
     });
-    if (component.criticality === 'CLASS_A' && !input.classAOverrideReason) {
-      throw new BadRequestException(
-        'Class A components require a documented authorisation reason before outsourcing',
-      );
-    }
+    assertCompanyScope(actor, component.companyId, 'component');
+    this.assertClassAAuthorised(
+      actor,
+      component.criticality,
+      input.classAOverrideReason,
+      'Outsourcing',
+    );
 
     const jobNumber = await this.sequence.next('JOB');
     const job = await this.prisma.gridJob.create({
@@ -218,7 +268,7 @@ export class JobsService {
   }
 
   async update(actor: RequestUser, id: string, input: z.infer<typeof updateJobSchema>) {
-    const before = await this.prisma.gridJob.findUniqueOrThrow({ where: { id } });
+    const before = await this.assertJobScope(actor, id);
     if (['CLOSED', 'CANCELLED'].includes(before.status)) {
       throw new BadRequestException('Closed jobs cannot be edited');
     }
@@ -235,11 +285,12 @@ export class JobsService {
   }
 
   /** Module 4 — partner recommendation engine. Ranks approved partners, never auto-allocates. */
-  async recommendations(jobId: string): Promise<PartnerRecommendation[]> {
+  async recommendations(jobId: string, actor?: RequestUser): Promise<PartnerRecommendation[]> {
     const job = await this.prisma.gridJob.findUniqueOrThrow({
       where: { id: jobId },
       include: { component: true },
     });
+    if (actor) assertCompanyScope(actor, job.companyId, 'job');
     const approved = await this.prisma.approvedPartnerComponent.findMany({
       where: { componentId: job.componentId, isActive: true },
       include: {
@@ -256,7 +307,7 @@ export class JobsService {
       },
     });
 
-    const componentHours = await this.estimatedHours(job.componentId, job.quantity);
+    const componentHours = await this.capacity.estimatedHours(job.componentId, job.quantity);
     const candidateRates = approved.map(
       (link) => link.partner.rates[0]?.conversionRate ?? job.rate,
     );
@@ -340,17 +391,8 @@ export class JobsService {
     return recommendations.sort((a, b) => b.score - a.score);
   }
 
-  /** Rough job hours from the component routing, used for capacity-aware recommendations. */
-  private async estimatedHours(componentId: string, quantity: number): Promise<number> {
-    const processes = await this.prisma.componentProcess.findMany({ where: { componentId } });
-    const minutes = processes.reduce(
-      (sum, process) => sum + (process.cycleTimeMinutes ?? 0) * quantity,
-      0,
-    );
-    return Math.round((minutes / 60) * 100) / 100;
-  }
-
   async allocate(actor: RequestUser, id: string, input: z.infer<typeof allocateJobSchema>) {
+    await this.assertJobScope(actor, id);
     const job = await this.prisma.gridJob.findUniqueOrThrow({
       where: { id },
       include: { component: true },
@@ -359,6 +401,7 @@ export class JobsService {
       where: { id: input.partnerId },
       include: { capabilities: true },
     });
+    assertCompanyScope(actor, partner.companyId, 'partner');
 
     if (
       !partner.isActive ||
@@ -374,9 +417,13 @@ export class JobsService {
         `${partner.businessName} is not on the approved partner list for ${job.component.componentCode}`,
       );
     }
-    if (job.component.criticality === 'CLASS_A' && !input.classAOverrideReason) {
-      throw new BadRequestException('Class A allocation requires a documented authorisation');
-    }
+    this.assertClassAAuthorised(
+      actor,
+      job.component.criticality,
+      input.classAOverrideReason,
+      'Allocating',
+      job.classAOverrideById,
+    );
     const openJobs = await this.prisma.gridJob.count({
       where: { partnerId: partner.id, status: { notIn: ['CLOSED', 'CANCELLED'] } },
     });
@@ -389,6 +436,13 @@ export class JobsService {
     const recommendation = (await this.recommendations(id)).find(
       (item) => item.partnerId === partner.id,
     );
+
+    // Module 5 — the hours this job will consume, and the process it consumes them from, so the
+    // reservation below lands on the right capacity declaration.
+    const [reservedHours, processId] = await Promise.all([
+      this.capacity.estimatedHours(job.componentId, job.quantity),
+      this.capacity.processForComponent(job.componentId),
+    ]);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       await tx.jobAssignment.updateMany({ where: { jobId: id }, data: { isActive: false } });
@@ -448,6 +502,22 @@ export class JobsService {
           },
         });
       }
+
+      // Hold the partner's hours for the job window. Re-allocating replaces the previous hold,
+      // so a job moved between partners never counts against both.
+      if (processId && reservedHours > 0) {
+        await this.capacity.reserve(
+          {
+            partnerId: partner.id,
+            processId,
+            jobId: id,
+            hours: reservedHours,
+            periodStart: job.plannedStartDate ?? new Date(),
+            periodEnd: job.dueDate,
+          },
+          tx,
+        );
+      }
       return result;
     });
 
@@ -492,6 +562,9 @@ export class JobsService {
           isActive: input.accepted,
         },
       });
+      // A declined job goes back on the board and gives its reserved hours back to the partner.
+      if (!input.accepted) await this.capacity.release(id, tx);
+
       return tx.gridJob.update({
         where: { id },
         data: {
@@ -533,6 +606,48 @@ export class JobsService {
     return updated;
   }
 
+  /**
+   * Section 2 — production started → first article approved → batch completed. Batch progress may
+   * not be reported until a first-article inspection on this job has been accepted, so nobody can
+   * run a batch on an unproven setup.
+   *
+   * Idempotent replays from the offline queue are handled before this runs: a milestone that was
+   * legitimately accepted while online is never re-judged when its retry arrives.
+   */
+  private async assertFirstArticleCleared(
+    jobId: string,
+    milestoneType: MilestoneType,
+  ): Promise<void> {
+    if (!MILESTONES_REQUIRING_FIRST_ARTICLE.includes(milestoneType)) return;
+
+    const job = await this.prisma.gridJob.findUniqueOrThrow({
+      where: { id: jobId },
+      include: { component: { select: { inspectionLevel: true, criticality: true } } },
+    });
+    if (!requiresFirstArticle(job.component.inspectionLevel, job.component.criticality)) return;
+
+    const accepted = await this.prisma.inspection.findFirst({
+      where: {
+        jobId,
+        type: 'FIRST_ARTICLE',
+        status: 'COMPLETED',
+        decision: { in: ['ACCEPTED', 'ACCEPTED_WITH_DEVIATION'] },
+      },
+      select: { id: true },
+    });
+    if (accepted) return;
+
+    const pending = await this.prisma.inspection.findFirst({
+      where: { jobId, type: 'FIRST_ARTICLE', status: { notIn: ['COMPLETED', 'CANCELLED'] } },
+      select: { id: true },
+    });
+    throw new BadRequestException(
+      pending
+        ? 'The first article for this job is still under inspection. Batch progress can be reported once it is accepted.'
+        : 'Request a first-article inspection and have it accepted before reporting batch progress.',
+    );
+  }
+
   /** Milestone updates come from the partner PWA and may arrive from the offline queue. */
   async updateMilestone(actor: RequestUser, id: string, input: UpdateMilestoneInput) {
     const job = await this.assertJobScope(actor, id);
@@ -543,6 +658,8 @@ export class JobsService {
       });
       if (existing) return existing;
     }
+
+    await this.assertFirstArticleCleared(id, input.type);
 
     const milestone = await this.prisma.jobMilestone.create({
       data: {
@@ -660,6 +777,7 @@ export class JobsService {
   }
 
   async close(actor: RequestUser, id: string, input: z.infer<typeof closeJobSchema>) {
+    await this.assertJobScope(actor, id);
     const job = await this.prisma.gridJob.findUniqueOrThrow({
       where: { id },
       include: { reconciliations: true, invoiceItems: true },
@@ -674,6 +792,17 @@ export class JobsService {
       receivedQuantity: input.receivedQuantity ?? job.receivedQuantity,
       closedAt: new Date(),
     });
+    // The work is done: hand the hours back so the partner shows as available again.
+    await this.capacity.release(id);
+    await this.notifications.notify({
+      event: 'JOB_CLOSED',
+      title: `Job ${job.jobNumber} closed`,
+      body: `${updated.receivedQuantity} nos received. Invoicing can proceed.`,
+      link: `/partner/jobs/${id}`,
+      entityType: 'GridJob',
+      entityId: id,
+      partnerId: job.partnerId ?? undefined,
+    });
     await this.audit.record(actor, {
       action: 'JOB_CLOSED',
       entityType: 'GridJob',
@@ -685,7 +814,10 @@ export class JobsService {
   }
 
   async cancel(actor: RequestUser, id: string, reason: string) {
-    return this.transition(actor, id, 'CANCELLED', reason);
+    await this.assertJobScope(actor, id);
+    const cancelled = await this.transition(actor, id, 'CANCELLED', reason);
+    await this.capacity.release(id);
+    return cancelled;
   }
 
   /** Single guarded status change used by every module that advances a job. */

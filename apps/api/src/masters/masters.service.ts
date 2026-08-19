@@ -16,6 +16,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
+import {
+  assertCanWriteToCompany,
+  assertCompanyScope,
+  companyWhere,
+} from '../common/company-scope';
 
 export interface ComponentFilters extends PaginationInput {
   companyId?: string;
@@ -32,9 +37,21 @@ export class MastersService {
     private readonly audit: AuditService,
   ) {}
 
-  async listComponents(filters: ComponentFilters): Promise<Paginated<unknown>> {
+  /** Every component write is checked against the actor's companies (Section 4). */
+  private async assertComponentScope(actor: RequestUser, componentId: string): Promise<void> {
+    const component = await this.prisma.component.findUniqueOrThrow({
+      where: { id: componentId },
+      select: { companyId: true },
+    });
+    assertCompanyScope(actor, component.companyId, 'component');
+  }
+
+  async listComponents(
+    actor: RequestUser,
+    filters: ComponentFilters,
+  ): Promise<Paginated<unknown>> {
     const where: Prisma.ComponentWhereInput = {
-      ...(filters.companyId ? { companyId: filters.companyId } : {}),
+      ...companyWhere(actor, filters.companyId),
       ...(filters.criticality ? { criticality: filters.criticality as never } : {}),
       ...(filters.primaryProcess ? { primaryProcess: filters.primaryProcess as never } : {}),
       ...(filters.productId ? { productId: filters.productId } : {}),
@@ -63,8 +80,8 @@ export class MastersService {
     return paginate(data, total, filters);
   }
 
-  async getComponent(id: string) {
-    return this.prisma.component.findUniqueOrThrow({
+  async getComponent(actor: RequestUser, id: string) {
+    const component = await this.prisma.component.findUniqueOrThrow({
       where: { id },
       include: {
         product: true,
@@ -93,9 +110,12 @@ export class MastersService {
         rates: { where: { isActive: true }, include: { partner: true } },
       },
     });
+    assertCompanyScope(actor, component.companyId, 'component');
+    return component;
   }
 
   async createComponent(actor: RequestUser, input: CreateComponentInput) {
+    assertCanWriteToCompany(actor, input.companyId);
     const component = await this.prisma.component.create({
       data: {
         ...input,
@@ -119,6 +139,7 @@ export class MastersService {
     id: string,
     input: z.infer<typeof updateComponentSchema>,
   ) {
+    await this.assertComponentScope(actor, id);
     const before = await this.prisma.component.findUniqueOrThrow({ where: { id } });
     const component = await this.prisma.component.update({ where: { id }, data: input });
     if (input.criticality && input.criticality !== before.criticality) {
@@ -147,6 +168,7 @@ export class MastersService {
     componentId: string,
     input: z.infer<typeof componentProcessSchema>,
   ) {
+    await this.assertComponentScope(actor, componentId);
     const process = await this.prisma.process.findUniqueOrThrow({
       where: { code: input.processCode },
     });
@@ -181,6 +203,11 @@ export class MastersService {
   }
 
   async removeComponentProcess(actor: RequestUser, id: string) {
+    const row = await this.prisma.componentProcess.findUniqueOrThrow({
+      where: { id },
+      select: { componentId: true },
+    });
+    await this.assertComponentScope(actor, row.componentId);
     await this.prisma.componentProcess.delete({ where: { id } });
     await this.audit.record(actor, {
       action: 'COMPONENT_PROCESS_REMOVED',
@@ -195,6 +222,7 @@ export class MastersService {
     componentId: string,
     input: z.infer<typeof componentItemSchema>,
   ) {
+    await this.assertComponentScope(actor, componentId);
     const record = await this.prisma.componentItem.upsert({
       where: { componentId_itemId: { componentId, itemId: input.itemId } },
       create: { componentId, ...input },
@@ -209,6 +237,11 @@ export class MastersService {
   }
 
   async removeComponentItem(actor: RequestUser, id: string) {
+    const row = await this.prisma.componentItem.findUniqueOrThrow({
+      where: { id },
+      select: { componentId: true },
+    });
+    await this.assertComponentScope(actor, row.componentId);
     await this.prisma.componentItem.delete({ where: { id } });
     return { success: true };
   }
@@ -224,6 +257,8 @@ export class MastersService {
       include: { capabilities: true },
     });
     const component = await this.prisma.component.findUniqueOrThrow({ where: { id: componentId } });
+    assertCompanyScope(actor, component.companyId, 'component');
+    assertCompanyScope(actor, partner.companyId, 'partner');
     const capable = partner.capabilities.some(
       (capability) => capability.process === component.primaryProcess && capability.isApproved,
     );
@@ -260,6 +295,11 @@ export class MastersService {
   }
 
   async revokePartnerForComponent(actor: RequestUser, id: string) {
+    const existing = await this.prisma.approvedPartnerComponent.findUniqueOrThrow({
+      where: { id },
+      select: { componentId: true },
+    });
+    await this.assertComponentScope(actor, existing.componentId);
     const record = await this.prisma.approvedPartnerComponent.update({
       where: { id },
       data: { isActive: false },
@@ -303,15 +343,16 @@ export class MastersService {
 
   // ---- Products and processes -------------------------------------------
 
-  async listProducts(companyId?: string) {
+  async listProducts(actor: RequestUser, companyId?: string) {
     return this.prisma.product.findMany({
-      where: { ...(companyId ? { companyId } : {}), isActive: true },
+      where: { ...companyWhere(actor, companyId), isActive: true },
       orderBy: { code: 'asc' },
       include: { _count: { select: { components: true } } },
     });
   }
 
   async createProduct(actor: RequestUser, input: z.infer<typeof createProductSchema>) {
+    assertCanWriteToCompany(actor, input.companyId);
     const product = await this.prisma.product.create({ data: input });
     await this.audit.record(actor, {
       action: 'PRODUCT_CREATED',

@@ -10,6 +10,7 @@ import {
 } from '@gridx/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { RequestUser } from '../common/request-user';
+import { allowedCompanyIds, assertCompanyScope } from '../common/company-scope';
 import { JOB_SUMMARY_INCLUDE, toJobSummary } from './job-summary';
 
 const OPEN_JOB_STATUSES: Prisma.EnumJobStatusFilter = {
@@ -22,12 +23,40 @@ const OPEN_REWORK_STATUSES: Prisma.EnumReworkStatusFilter = {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Company clauses for one dashboard request, resolved once and spread into every query. Each
+ * field is the fragment for a different shape of model, so a caller never has to think about
+ * how far the company sits from the record being counted (Section 4).
+ */
+interface DashboardScope {
+  /** Models carrying companyId themselves: GridJob, MaterialIssue, PartnerInvoice, Shipment, Tool. */
+  own: { companyId?: { in: string[] } };
+  /** Partner, which carries companyId, used where the model *is* a partner. */
+  partner: { companyId?: { in: string[] } };
+  /** Records reached through a job — inspections, rework orders, reconciliations. */
+  viaJob: { job?: { companyId: { in: string[] } } };
+  /** Records reached through a partner — capacity declarations, scores, KPIs. */
+  viaPartner: { partner?: { companyId: { in: string[] } } };
+}
+
 /** Module 14 — role-specific dashboards. All numbers come from live transactional data. */
 @Injectable()
 export class DashboardsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async management(): Promise<ManagementDashboard> {
+  private scopeFor(actor: RequestUser): DashboardScope {
+    const ids = allowedCompanyIds(actor);
+    if (!ids) return { own: {}, partner: {}, viaJob: {}, viaPartner: {} };
+    return {
+      own: { companyId: { in: ids } },
+      partner: { companyId: { in: ids } },
+      viaJob: { job: { companyId: { in: ids } } },
+      viaPartner: { partner: { companyId: { in: ids } } },
+    };
+  }
+
+  async management(actor: RequestUser): Promise<ManagementDashboard> {
+    const scope = this.scopeFor(actor);
     const now = new Date();
     const [
       activePartners,
@@ -42,39 +71,44 @@ export class DashboardsService {
       completedJobs,
     ] = await Promise.all([
       this.prisma.partner.count({
-        where: { approvalStatus: { in: ['TRIAL_APPROVED', 'APPROVED', 'CERTIFIED', 'STRATEGIC'] } },
+        where: {
+          ...scope.partner,
+          approvalStatus: { in: ['TRIAL_APPROVED', 'APPROVED', 'CERTIFIED', 'STRATEGIC'] },
+        },
       }),
-      this.prisma.gridJob.count({ where: { status: OPEN_JOB_STATUSES } }),
+      this.prisma.gridJob.count({ where: { ...scope.own, status: OPEN_JOB_STATUSES } }),
       this.prisma.gridJob.findMany({
-        where: { status: OPEN_JOB_STATUSES },
+        where: { ...scope.own, status: OPEN_JOB_STATUSES },
         select: { id: true, quantity: true, rate: true, dueDate: true },
       }),
-      this.prisma.gridJob.groupBy({ by: ['status'], _count: { _all: true } }),
+      this.prisma.gridJob.groupBy({ by: ['status'], where: scope.own, _count: { _all: true } }),
       this.prisma.partnerScore.findMany({
+        where: scope.viaPartner,
         orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
         take: 100,
         include: { partner: { select: { partnerCode: true, businessName: true, city: true } } },
       }),
       this.prisma.capacityDeclaration.aggregate({
-        where: { periodEnd: { gte: now } },
+        where: { ...scope.viaPartner, periodEnd: { gte: now } },
         _sum: { availableHours: true, committedHours: true },
       }),
       this.prisma.capacityAllocation.aggregate({
-        where: { periodEnd: { gte: now } },
+        where: { ...scope.viaPartner, periodEnd: { gte: now } },
         _sum: { allocatedHours: true },
       }),
       this.prisma.materialReconciliation.aggregate({
-        where: { status: 'PENDING' },
+        where: { ...scope.viaJob, status: 'PENDING' },
         _sum: { issuedKg: true, consumedKg: true },
       }),
       this.prisma.partnerInvoice.count({
         where: {
+          ...scope.own,
           status: { in: ['FINANCE_APPROVED', 'PAYMENT_SCHEDULED'] },
           paymentScheduledFor: { lt: now },
         },
       }),
       this.prisma.gridJob.findMany({
-        where: { completedAt: { not: null } },
+        where: { ...scope.own, completedAt: { not: null } },
         select: {
           completedAt: true,
           dueDate: true,
@@ -114,14 +148,14 @@ export class DashboardsService {
 
     const custodyKg =
       (reconciliations._sum.issuedKg ?? 0) - (reconciliations._sum.consumedKg ?? 0);
-    const custodyValue = await this.materialCustodyValue();
+    const custodyValue = await this.materialCustodyValue(scope);
 
     return {
       activePartners,
       jobsInProgress,
       jobsAtRisk,
       totalOutsourcedValue: round2(totalOutsourcedValue),
-      costSavings: await this.costSavings(),
+      costSavings: await this.costSavings(scope),
       avoidedCapex: round2(availableHours * 1200),
       qualityAcceptanceRate,
       onTimeDeliveryRate,
@@ -135,41 +169,47 @@ export class DashboardsService {
       overduePayments,
       estimatedAdditionalCapacityHours: round2(Math.max(0, availableHours - committedHours)),
       jobsByStatus: jobsByStatusRaw.map((row) => ({ status: row.status, count: row._count._all })),
-      monthlyTrend: await this.monthlyTrend(),
+      monthlyTrend: await this.monthlyTrend(scope),
     };
   }
 
-  async operations(): Promise<OperationsDashboard> {
+  async operations(actor: RequestUser): Promise<OperationsDashboard> {
+    const scope = this.scopeFor(actor);
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const endOfDay = new Date(startOfDay.getTime() + DAY_MS);
 
     const [dueToday, delayed, awaitingInspection, materialPending, escalations] = await Promise.all([
       this.prisma.gridJob.findMany({
-        where: { dueDate: { gte: startOfDay, lt: endOfDay }, status: OPEN_JOB_STATUSES },
+        where: {
+          ...scope.own,
+          dueDate: { gte: startOfDay, lt: endOfDay },
+          status: OPEN_JOB_STATUSES,
+        },
         include: JOB_SUMMARY_INCLUDE,
         orderBy: { priority: 'desc' },
       }),
       this.prisma.gridJob.findMany({
-        where: { dueDate: { lt: startOfDay }, status: OPEN_JOB_STATUSES },
+        where: { ...scope.own, dueDate: { lt: startOfDay }, status: OPEN_JOB_STATUSES },
         include: JOB_SUMMARY_INCLUDE,
         orderBy: { dueDate: 'asc' },
         take: 50,
       }),
       this.prisma.gridJob.findMany({
-        where: { status: { in: ['INSPECTION_REQUESTED', 'UNDER_INSPECTION'] } },
+        where: { ...scope.own, status: { in: ['INSPECTION_REQUESTED', 'UNDER_INSPECTION'] } },
         include: JOB_SUMMARY_INCLUDE,
         orderBy: { dueDate: 'asc' },
         take: 50,
       }),
       this.prisma.gridJob.findMany({
-        where: { status: { in: ['MATERIAL_PENDING', 'MATERIAL_ISSUED'] } },
+        where: { ...scope.own, status: { in: ['MATERIAL_PENDING', 'MATERIAL_ISSUED'] } },
         include: JOB_SUMMARY_INCLUDE,
         orderBy: { dueDate: 'asc' },
         take: 50,
       }),
       this.prisma.gridJob.findMany({
         where: {
+          ...scope.own,
           status: OPEN_JOB_STATUSES,
           OR: [
             { priority: 'CRITICAL' },
@@ -184,7 +224,10 @@ export class DashboardsService {
     ]);
 
     const partners = await this.prisma.partner.findMany({
-      where: { approvalStatus: { in: ['TRIAL_APPROVED', 'APPROVED', 'CERTIFIED', 'STRATEGIC'] } },
+      where: {
+        ...scope.partner,
+        approvalStatus: { in: ['TRIAL_APPROVED', 'APPROVED', 'CERTIFIED', 'STRATEGIC'] },
+      },
       select: {
         id: true,
         businessName: true,
@@ -197,7 +240,7 @@ export class DashboardsService {
     });
 
     const declarations = await this.prisma.capacityDeclaration.findMany({
-      where: { periodEnd: { gte: now } },
+      where: { ...scope.viaPartner, periodEnd: { gte: now } },
       include: { process: { select: { code: true } } },
     });
 
@@ -239,7 +282,8 @@ export class DashboardsService {
     };
   }
 
-  async quality(): Promise<QualityDashboard> {
+  async quality(actor: RequestUser): Promise<QualityDashboard> {
+    const scope = this.scopeFor(actor);
     const now = new Date();
     const [
       firstArticlesPending,
@@ -250,23 +294,30 @@ export class DashboardsService {
       inspectors,
     ] = await Promise.all([
       this.prisma.inspection.count({
-        where: { type: 'FIRST_ARTICLE', status: { in: ['REQUESTED', 'ASSIGNED', 'IN_PROGRESS'] } },
+        where: {
+          ...scope.viaJob,
+          type: 'FIRST_ARTICLE',
+          status: { in: ['REQUESTED', 'ASSIGNED', 'IN_PROGRESS'] },
+        },
       }),
       this.prisma.inspection.aggregate({
-        where: { status: 'COMPLETED' },
+        where: { ...scope.viaJob, status: 'COMPLETED' },
         _sum: { acceptedQuantity: true, rejectedQuantity: true, reworkQuantity: true },
       }),
       this.prisma.reworkOrder.findMany({
-        where: { status: OPEN_REWORK_STATUSES },
+        where: { ...scope.viaJob, status: OPEN_REWORK_STATUSES },
         select: { issuedAt: true },
       }),
       this.prisma.nonConformance.groupBy({
         by: ['defectType'],
+        where: scope.viaJob,
         _count: { _all: true },
         orderBy: { _count: { defectType: 'desc' } },
         take: 8,
       }),
-      this.prisma.correctiveAction.count({ where: { stage: { not: 'CLOSED' } } }),
+      this.prisma.correctiveAction.count({
+        where: { nonConformance: scope.viaJob, stage: { not: 'CLOSED' } },
+      }),
       this.prisma.user.findMany({
         where: { role: { code: 'QUALITY_INSPECTOR' } },
         select: {
@@ -310,14 +361,14 @@ export class DashboardsService {
         partners: (
           await this.prisma.nonConformance.groupBy({
             by: ['partnerId'],
-            where: { defectType: defect.defectType },
+            where: { ...scope.viaJob, defectType: defect.defectType },
           })
         ).length,
       })),
     );
 
     const partnerScores = await this.prisma.partnerKPI.findMany({
-      where: { code: 'FIRST_PASS_QUALITY' },
+      where: { ...scope.viaPartner, code: 'FIRST_PASS_QUALITY' },
       orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
       take: 50,
       include: { partner: { select: { id: true, businessName: true } } },
@@ -346,29 +397,36 @@ export class DashboardsService {
     };
   }
 
-  async finance(): Promise<FinanceDashboard> {
+  async finance(actor: RequestUser): Promise<FinanceDashboard> {
+    const scope = this.scopeFor(actor);
     const now = new Date();
     const [pending, accepted, paymentsDue, deductions, reconciliationPending, invoices] =
       await Promise.all([
         this.prisma.partnerInvoice.aggregate({
-          where: { status: { notIn: ['PAID', 'REJECTED', 'DRAFT'] } },
+          where: { ...scope.own, status: { notIn: ['PAID', 'REJECTED', 'DRAFT'] } },
           _count: { _all: true },
           _sum: { netAmount: true },
         }),
         this.prisma.gridJob.findMany({
-          where: { acceptedQuantity: { gt: 0 } },
+          where: { ...scope.own, acceptedQuantity: { gt: 0 } },
           select: { acceptedQuantity: true, rate: true },
         }),
         this.prisma.partnerInvoice.count({
           where: {
+            ...scope.own,
             status: { in: ['FINANCE_APPROVED', 'PAYMENT_SCHEDULED'] },
             OR: [{ paymentScheduledFor: { lte: now } }, { paymentScheduledFor: null }],
           },
         }),
-        this.prisma.partnerDeduction.aggregate({ _sum: { amount: true } }),
-        this.prisma.materialReconciliation.count({ where: { status: 'PENDING' } }),
+        this.prisma.partnerDeduction.aggregate({
+          where: scope.viaPartner,
+          _sum: { amount: true },
+        }),
+        this.prisma.materialReconciliation.count({
+          where: { ...scope.viaJob, status: 'PENDING' },
+        }),
         this.prisma.partnerInvoice.findMany({
-          where: { status: { notIn: ['PAID', 'REJECTED'] } },
+          where: { ...scope.own, status: { notIn: ['PAID', 'REJECTED'] } },
           select: {
             netAmount: true,
             invoiceDate: true,
@@ -422,7 +480,7 @@ export class DashboardsService {
         }))
         .sort((a, b) => b.outstanding - a.outstanding)
         .slice(0, 10),
-      costSavingsByCategory: await this.costSavingsByCategory(),
+      costSavingsByCategory: await this.costSavingsByCategory(scope),
       invoiceAgeing,
     };
   }
@@ -433,8 +491,10 @@ export class DashboardsService {
 
     const partner = await this.prisma.partner.findUniqueOrThrow({
       where: { id: partnerId },
-      select: { id: true, businessName: true, category: true, currentScore: true },
+      select: { id: true, businessName: true, category: true, currentScore: true, companyId: true },
     });
+    // A planner may open any partner's board, but only inside their own companies.
+    if (!actor.partnerId) assertCompanyScope(actor, partner.companyId, 'partner');
 
     const [newJobs, activeJobs, awaitingMaterialAck, pendingInspections, reworkOpen, invoices, jobs] =
       await Promise.all([
@@ -487,9 +547,11 @@ export class DashboardsService {
   // Helpers
   // -------------------------------------------------------------------------
 
-  private async materialCustodyValue(): Promise<number> {
+  private async materialCustodyValue(scope: DashboardScope): Promise<number> {
     const issues = await this.prisma.materialIssueItem.findMany({
-      where: { materialIssue: { job: { status: OPEN_JOB_STATUSES } } },
+      where: {
+        materialIssue: { ...scope.own, job: { status: OPEN_JOB_STATUSES } },
+      },
       select: { issueWeightKg: true, item: { select: { standardRate: true } } },
     });
     return round2(
@@ -501,9 +563,9 @@ export class DashboardsService {
    * Saving = (component standard conversion rate − partner rate) × accepted quantity.
    * Components without a standard rate contribute nothing rather than a guessed number.
    */
-  private async costSavings(): Promise<number> {
+  private async costSavings(scope: DashboardScope): Promise<number> {
     const jobs = await this.prisma.gridJob.findMany({
-      where: { acceptedQuantity: { gt: 0 } },
+      where: { ...scope.own, acceptedQuantity: { gt: 0 } },
       select: {
         acceptedQuantity: true,
         rate: true,
@@ -519,9 +581,11 @@ export class DashboardsService {
     );
   }
 
-  private async costSavingsByCategory(): Promise<Array<{ category: string; savings: number }>> {
+  private async costSavingsByCategory(
+    scope: DashboardScope,
+  ): Promise<Array<{ category: string; savings: number }>> {
     const jobs = await this.prisma.gridJob.findMany({
-      where: { acceptedQuantity: { gt: 0 } },
+      where: { ...scope.own, acceptedQuantity: { gt: 0 } },
       select: {
         acceptedQuantity: true,
         rate: true,
@@ -541,13 +605,13 @@ export class DashboardsService {
     }));
   }
 
-  private async monthlyTrend(): Promise<ManagementDashboard['monthlyTrend']> {
+  private async monthlyTrend(scope: DashboardScope): Promise<ManagementDashboard['monthlyTrend']> {
     const since = new Date();
     since.setMonth(since.getMonth() - 5, 1);
     since.setHours(0, 0, 0, 0);
 
     const jobs = await this.prisma.gridJob.findMany({
-      where: { createdAt: { gte: since } },
+      where: { ...scope.own, createdAt: { gte: since } },
       select: {
         createdAt: true,
         completedAt: true,

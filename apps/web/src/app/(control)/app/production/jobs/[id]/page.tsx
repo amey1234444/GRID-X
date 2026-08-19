@@ -5,6 +5,7 @@ import {
   JOB_PRIORITIES,
   MATERIAL_RESPONSIBILITIES,
   MILESTONE_TYPES,
+  PERMISSIONS,
   RESPONSIBLE_PARTIES,
 } from '@gridx/shared';
 
@@ -33,7 +34,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatDate, formatDateTime, formatNumber, humanise } from '@/lib/format';
 import { optionsFrom } from '@/lib/options';
 import { inspectorOptions, itemOptions, partnerOptions } from '@/lib/reference';
-import { apiFetch } from '@/lib/session';
+import { apiFetch, currentUser } from '@/lib/session';
 import type { PartnerRecommendation } from '@gridx/shared';
 
 import type { JobDetail } from '@/lib/types';
@@ -43,14 +44,20 @@ export default async function JobDetailPage({
 }: {
   params: { id: string };
 }): Promise<React.JSX.Element> {
-  const [result, partners, items, inspectors] = await Promise.all([
+  const [result, partners, items, inspectors, user] = await Promise.all([
     apiFetch<JobDetail>(`/jobs/${params.id}`),
     partnerOptions(),
     itemOptions(),
     inspectorOptions(),
+    currentUser(),
   ]);
   const job = result.data;
   if (!job) notFound();
+
+  // Module 2: Class A work may only be outsourced on senior management authorisation, so the
+  // reason field is offered only when it applies and only to someone who can actually give it.
+  const isClassA = job.component.criticality === 'CLASS_A';
+  const mayAuthoriseClassA = user?.permissions.includes(PERMISSIONS.JOB_CLASS_A_OVERRIDE) ?? false;
 
   const recommendations =
     job.partner === null
@@ -123,7 +130,11 @@ export default async function JobDetailPage({
             {job.partner === null ? (
               <ActionDialog
                 title="Allocate job"
-                description="Allocation validates partner approval, component approval, capability, capacity and Class A authorisation."
+                description={
+                  isClassA && !mayAuthoriseClassA
+                    ? 'This is a Class A component. Only the GRID-X Head or a Group Admin can authorise outsourcing it.'
+                    : 'Allocation validates partner approval, component approval, capability, capacity and Class A authorisation, and reserves the partner’s declared hours.'
+                }
                 triggerLabel="Allocate"
                 action={allocateJobAction}
                 hidden={{ jobId: job.id }}
@@ -143,7 +154,20 @@ export default async function JobDetailPage({
                     defaultValue: 'on',
                     placeholder: 'Grant access to the released revision',
                   },
-                  { name: 'classAOverrideReason', label: 'Class A authorisation reason', type: 'textarea', span: 2 },
+                  ...(isClassA && mayAuthoriseClassA
+                    ? [
+                        {
+                          name: 'classAOverrideReason',
+                          label: 'Class A authorisation reason',
+                          type: 'textarea' as const,
+                          required: !job.classAOverrideReason,
+                          help: job.classAOverrideReason
+                            ? 'This job already carries an authorisation. Leave blank to keep it.'
+                            : 'Class A components stay in-house unless senior management authorises otherwise.',
+                          span: 2 as const,
+                        },
+                      ]
+                    : []),
                 ]}
               />
             ) : (

@@ -47,8 +47,11 @@ export class AdminController {
 
   @Get('users')
   @RequirePermissions(PERMISSIONS.USER_READ)
-  listUsers(@Query(zodBody(userQuerySchema)) query: z.infer<typeof userQuerySchema>) {
-    return this.admin.listUsers(query);
+  listUsers(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(userQuerySchema)) query: z.infer<typeof userQuerySchema>,
+  ) {
+    return this.admin.listUsers(user, query);
   }
 
   @Post('users')
@@ -87,8 +90,8 @@ export class AdminController {
   }
 
   @Get('companies')
-  listCompanies() {
-    return this.admin.listCompanies();
+  listCompanies(@CurrentUser() user: RequestUser) {
+    return this.admin.listCompanies(user);
   }
 
   @Post('companies')
@@ -102,8 +105,11 @@ export class AdminController {
 
   @Get('audit-logs')
   @RequirePermissions(PERMISSIONS.AUDIT_LOG_READ)
-  listAuditLogs(@Query(zodBody(auditQuerySchema)) query: z.infer<typeof auditQuerySchema>) {
-    return this.admin.listAuditLogs(query);
+  listAuditLogs(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(auditQuerySchema)) query: z.infer<typeof auditQuerySchema>,
+  ) {
+    return this.admin.listAuditLogs(user, query);
   }
 
   @Get('settings')

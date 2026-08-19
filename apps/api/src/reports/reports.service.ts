@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@gridx/db';
 import { PrismaService } from '../prisma/prisma.service';
 import { RequestUser } from '../common/request-user';
+import { allowedCompanyIds } from '../common/company-scope';
 
 export type ReportRowValue = string | number | boolean | null;
 export type ReportRow = Record<string, ReportRowValue>;
@@ -25,6 +26,12 @@ export interface ReportFilters {
   to?: Date;
   partnerId?: string;
   componentId?: string;
+  /**
+   * Companies the caller may see (Section 4). Resolved once in `run()` and threaded through every
+   * builder; `undefined` means unrestricted, which is Group Admin and partner users — the latter
+   * are already narrowed to their own partnerId.
+   */
+  companyIds?: string[];
 }
 
 /** Section 21 — the full catalogue of reports GRID-X must provide. */
@@ -82,10 +89,13 @@ export class ReportsService {
     if (!definition) {
       throw new BadRequestException(`Unknown report: ${key}`);
     }
-    // Partner users may only ever see their own slice of any report.
-    const scoped: ReportFilters = actor.partnerId
-      ? { ...filters, partnerId: actor.partnerId }
-      : filters;
+    // Partner users may only ever see their own slice of any report; internal users only ever see
+    // the companies they are linked to.
+    const scoped: ReportFilters = {
+      ...filters,
+      ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
+      companyIds: allowedCompanyIds(actor) ?? undefined,
+    };
 
     const { columns, rows } = await this.build(definition.key, scoped);
     return {
@@ -112,8 +122,27 @@ export class ReportsService {
     return [header, ...lines].join('\n');
   }
 
+  /** Company clause for a model that carries companyId itself. */
+  private company(filters: ReportFilters): { companyId?: { in: string[] } } {
+    return filters.companyIds ? { companyId: { in: filters.companyIds } } : {};
+  }
+
+  /** Company clause reached through a named relation, e.g. `job` or `partner`. */
+  private companyVia<K extends string>(
+    filters: ReportFilters,
+    relation: K,
+  ): Record<K, { companyId: { in: string[] } }> | Record<string, never> {
+    return filters.companyIds
+      ? ({ [relation]: { companyId: { in: filters.companyIds } } } as Record<
+          K,
+          { companyId: { in: string[] } }
+        >)
+      : {};
+  }
+
   private jobWhere(filters: ReportFilters): Prisma.GridJobWhereInput {
     return {
+      ...this.company(filters),
       ...(filters.partnerId ? { partnerId: filters.partnerId } : {}),
       ...(filters.componentId ? { componentId: filters.componentId } : {}),
       ...(filters.from || filters.to
@@ -365,6 +394,7 @@ export class ReportsService {
   private async materialReconciliation(filters: ReportFilters) {
     const rows = await this.prisma.materialReconciliation.findMany({
       where: {
+        ...this.companyVia(filters, 'job'),
         ...(filters.partnerId ? { job: { partnerId: filters.partnerId } } : {}),
         ...(filters.from || filters.to
           ? {
@@ -422,6 +452,7 @@ export class ReportsService {
   private async partnerCapacity(filters: ReportFilters) {
     const declarations = await this.prisma.capacityDeclaration.findMany({
       where: {
+        ...this.companyVia(filters, 'partner'),
         ...(filters.partnerId ? { partnerId: filters.partnerId } : {}),
         ...(filters.from || filters.to
           ? {
@@ -444,6 +475,12 @@ export class ReportsService {
         expectedBottleneck: true,
         partner: { select: { businessName: true } },
         process: { select: { code: true, name: true } },
+        // GRID-X jobs hold capacity through reservations, so the report has to add them to the
+        // hours the partner declared as already committed — same arithmetic as the heatmap.
+        allocations: {
+          where: { OR: [{ jobId: null }, { job: { status: { notIn: ['CLOSED', 'CANCELLED'] } } }] },
+          select: { allocatedHours: true },
+        },
       },
     });
     return {
@@ -461,16 +498,22 @@ export class ReportsService {
         { key: 'bottleneck', label: 'Expected bottleneck', type: 'text' as const },
       ],
       rows: declarations.map((row) => {
-        const net = Math.max(0, row.availableHours - row.maintenanceShutdownHours);
+        // `availableHours` is already net of the maintenance shutdown — CapacityService.declare
+        // subtracts it before storing — so it must not be subtracted a second time here.
+        const net = Math.max(0, row.availableHours);
+        const committed = row.allocations.reduce(
+          (sum, allocation) => sum + allocation.allocatedHours,
+          row.committedHours,
+        );
         return {
           partnerName: row.partner.businessName,
           process: `${row.process.code} — ${row.process.name}`,
           periodStart: row.periodStart.toISOString(),
           periodEnd: row.periodEnd.toISOString(),
           availableHours: round(net),
-          committedHours: round(row.committedHours),
-          freeHours: round(Math.max(0, net - row.committedHours)),
-          utilisationPercent: net > 0 ? round((row.committedHours / net) * 100, 1) : 0,
+          committedHours: round(committed),
+          freeHours: round(Math.max(0, net - committed)),
+          utilisationPercent: net > 0 ? round((committed / net) * 100, 1) : 0,
           workers: row.availableWorkers,
           machines: row.availableMachines,
           bottleneck: row.expectedBottleneck ?? null,
@@ -481,7 +524,10 @@ export class ReportsService {
 
   private async partnerScorecard(filters: ReportFilters) {
     const scores = await this.prisma.partnerScore.findMany({
-      where: filters.partnerId ? { partnerId: filters.partnerId } : {},
+      where: {
+        ...this.companyVia(filters, 'partner'),
+        ...(filters.partnerId ? { partnerId: filters.partnerId } : {}),
+      },
       orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }, { totalScore: 'desc' }],
       take: 500,
       include: { partner: { select: { businessName: true } }, kpis: true },
@@ -529,6 +575,7 @@ export class ReportsService {
   private async invoiceAgeing(filters: ReportFilters) {
     const invoices = await this.prisma.partnerInvoice.findMany({
       where: {
+        ...this.company(filters),
         ...(filters.partnerId ? { partnerId: filters.partnerId } : {}),
         status: { notIn: ['DRAFT', 'PAID', 'REJECTED'] },
       },
@@ -565,6 +612,7 @@ export class ReportsService {
   private async paymentAgeing(filters: ReportFilters) {
     const invoices = await this.prisma.partnerInvoice.findMany({
       where: {
+        ...this.company(filters),
         ...(filters.partnerId ? { partnerId: filters.partnerId } : {}),
         status: 'PAID',
         paidAt: { not: null },
@@ -656,6 +704,7 @@ export class ReportsService {
   private async logisticsCost(filters: ReportFilters) {
     const shipments = await this.prisma.shipment.findMany({
       where: {
+        ...this.company(filters),
         ...(filters.partnerId
           ? { OR: [{ fromPartnerId: filters.partnerId }, { toPartnerId: filters.partnerId }] }
           : {}),
@@ -703,6 +752,7 @@ export class ReportsService {
   private async reworkCost(filters: ReportFilters) {
     const reworks = await this.prisma.reworkOrder.findMany({
       where: {
+        ...this.companyVia(filters, 'job'),
         ...(filters.partnerId ? { job: { partnerId: filters.partnerId } } : {}),
         ...(filters.from || filters.to
           ? {
@@ -763,6 +813,7 @@ export class ReportsService {
     const declarations = await this.prisma.capacityDeclaration.groupBy({
       by: ['processId'],
       where: {
+        ...this.companyVia(filters, 'partner'),
         ...(filters.partnerId ? { partnerId: filters.partnerId } : {}),
         ...(filters.from || filters.to
           ? {
@@ -808,7 +859,10 @@ export class ReportsService {
 
   private async capacityAdded(filters: ReportFilters) {
     const machines = await this.prisma.partnerMachine.findMany({
-      where: filters.partnerId ? { partnerId: filters.partnerId } : {},
+      where: {
+        ...this.companyVia(filters, 'partner'),
+        ...(filters.partnerId ? { partnerId: filters.partnerId } : {}),
+      },
       select: {
         machineType: true,
         make: true,
@@ -896,6 +950,10 @@ export class ReportsService {
   private async drawingAccessAudit(filters: ReportFilters) {
     const logs = await this.prisma.drawingAccessLog.findMany({
       where: {
+        // Access logs reach their company two relations up, through the revision's drawing.
+        ...(filters.companyIds
+          ? { revision: { drawing: { companyId: { in: filters.companyIds } } } }
+          : {}),
         ...(filters.partnerId ? { partnerId: filters.partnerId } : {}),
         ...(filters.from || filters.to
           ? {

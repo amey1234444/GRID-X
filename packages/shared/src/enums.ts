@@ -382,6 +382,33 @@ export const MILESTONES_REQUIRING_PHOTO: MilestoneType[] = [
   'DISPATCHED',
 ];
 
+/**
+ * Section 2 core operating principle: production started → first article approved → batch
+ * completed. These milestones sit after the first article in that chain, so they may not be
+ * reported until a first-article inspection has been accepted.
+ */
+export const MILESTONES_REQUIRING_FIRST_ARTICLE: MilestoneType[] = [
+  'BATCH_25_PERCENT',
+  'BATCH_50_PERCENT',
+  'BATCH_READY_FOR_INSPECTION',
+  'DISPATCHED',
+];
+
+/**
+ * Whether a job must clear a first article before the batch may proceed.
+ *
+ * Level 1 visual work is waved through — a first article on a visual-only characteristic tells
+ * nobody anything. Everything measured, and every controlled-outsourcing component regardless of
+ * level, is gated.
+ */
+export function requiresFirstArticle(
+  inspectionLevel: InspectionLevel,
+  criticality: CriticalityClass,
+): boolean {
+  if (criticality === 'CLASS_A' || criticality === 'CLASS_B') return true;
+  return inspectionLevel !== 'LEVEL_1_VISUAL';
+}
+
 export const DELAY_REASONS = [
   'MATERIAL_SHORTAGE',
   'DRAWING_CLARIFICATION',

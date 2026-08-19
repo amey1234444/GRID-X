@@ -23,6 +23,11 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
 import { assertTransition } from '../common/workflow';
+import {
+  assertCanWriteToCompany,
+  assertCompanyScope,
+  companyWhere,
+} from '../common/company-scope';
 
 export interface InvoiceFilters extends PaginationInput {
   status?: string;
@@ -46,9 +51,11 @@ export class CommercialsService {
   // Rates
   // -------------------------------------------------------------------------
 
-  async listRates(partnerId?: string, componentId?: string) {
+  async listRates(actor: RequestUser, partnerId?: string, componentId?: string) {
     return this.prisma.partnerRate.findMany({
       where: {
+        ...companyWhere(actor),
+        ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
         ...(partnerId ? { partnerId } : {}),
         ...(componentId ? { componentId } : {}),
         isActive: true,
@@ -63,6 +70,7 @@ export class CommercialsService {
 
   /** Rate revisions keep history: the previous rate is stored on the new record. */
   async createRate(actor: RequestUser, input: z.infer<typeof createRateSchema>) {
+    assertCanWriteToCompany(actor, input.companyId);
     const current = await this.prisma.partnerRate.findFirst({
       where: { partnerId: input.partnerId, componentId: input.componentId, isActive: true },
       orderBy: { effectiveFrom: 'desc' },
@@ -147,6 +155,7 @@ export class CommercialsService {
     if (actor.partnerId && invoice.partnerId !== actor.partnerId) {
       throw new ForbiddenException('This invoice belongs to another partner');
     }
+    assertCompanyScope(actor, invoice.companyId, 'invoice');
     return invoice;
   }
 
@@ -156,6 +165,7 @@ export class CommercialsService {
     if (!scopedPartnerId) throw new BadRequestException('partnerId is required');
     const jobs = await this.prisma.gridJob.findMany({
       where: {
+        ...companyWhere(actor),
         partnerId: scopedPartnerId,
         status: { in: ['QUALITY_ACCEPTED', 'DISPATCHED', 'RECEIVED', 'CLOSED'] },
         acceptedQuantity: { gt: 0 },
@@ -180,7 +190,7 @@ export class CommercialsService {
     if (!partnerId) throw new BadRequestException('partnerId is required');
 
     const jobs = await this.prisma.gridJob.findMany({
-      where: { id: { in: input.jobIds }, partnerId },
+      where: { ...companyWhere(actor), id: { in: input.jobIds }, partnerId },
       include: { reworkOrders: true },
     });
     if (jobs.length !== input.jobIds.length) {
@@ -271,6 +281,7 @@ export class CommercialsService {
     stage: 'QUANTITY' | 'QUALITY' | 'MATERIAL' | 'FINANCE',
     input: z.infer<typeof invoiceActionSchema>,
   ) {
+    await this.findInvoice(actor, id);
     const invoice = await this.prisma.partnerInvoice.findUniqueOrThrow({
       where: { id },
       include: { items: true },
@@ -342,6 +353,7 @@ export class CommercialsService {
   }
 
   async hold(actor: RequestUser, id: string, input: z.infer<typeof holdInvoiceSchema>) {
+    await this.findInvoice(actor, id);
     const invoice = await this.prisma.partnerInvoice.findUniqueOrThrow({ where: { id } });
     assertTransition('Invoice', invoice.status, 'HELD', INVOICE_STATUS_TRANSITIONS);
     const updated = await this.prisma.partnerInvoice.update({
@@ -367,6 +379,7 @@ export class CommercialsService {
   }
 
   async schedule(actor: RequestUser, id: string, input: z.infer<typeof scheduleInvoiceSchema>) {
+    await this.findInvoice(actor, id);
     const invoice = await this.prisma.partnerInvoice.findUniqueOrThrow({ where: { id } });
     assertTransition('Invoice', invoice.status, 'PAYMENT_SCHEDULED', INVOICE_STATUS_TRANSITIONS);
     const updated = await this.prisma.partnerInvoice.update({
@@ -383,6 +396,7 @@ export class CommercialsService {
   }
 
   async recordPayment(actor: RequestUser, id: string, input: z.infer<typeof recordPaymentSchema>) {
+    await this.findInvoice(actor, id);
     const invoice = await this.prisma.partnerInvoice.findUniqueOrThrow({
       where: { id },
       include: { payments: true },
@@ -437,6 +451,11 @@ export class CommercialsService {
   // -------------------------------------------------------------------------
 
   async createDeduction(actor: RequestUser, input: z.infer<typeof deductionSchema>) {
+    const partner = await this.prisma.partner.findUniqueOrThrow({
+      where: { id: input.partnerId },
+      select: { companyId: true },
+    });
+    assertCompanyScope(actor, partner.companyId, 'partner');
     const deduction = await this.prisma.partnerDeduction.create({
       data: {
         partnerId: input.partnerId,
