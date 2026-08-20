@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@gridx/db';
 import { z } from 'zod';
@@ -63,6 +63,29 @@ const imsProductSchema = z.object({
   imsRef: z.string().trim().optional(),
 });
 
+/**
+ * The shape GRID-X needs from an IMS order to reference it on a job. Everything else about the
+ * order stays in IMS.
+ */
+const imsOrderSchema = z.object({
+  reference: z.string().trim().min(1),
+  description: z.string().trim().optional(),
+  customer: z.string().trim().optional(),
+  itemCode: z.string().trim().optional(),
+  quantity: z.coerce.number().optional(),
+  dueDate: z.string().trim().optional(),
+});
+export type ImsOrderOption = z.infer<typeof imsOrderSchema>;
+
+/** After this many failed attempts an outbound fact is abandoned and raised to an operator. */
+export const MAX_PUSH_ATTEMPTS = 8;
+
+/** Exponential backoff, 1 minute doubling to a 6-hour ceiling. */
+export function backoffFrom(attempts: number, now: Date = new Date()): Date {
+  const minutes = Math.min(6 * 60, 2 ** Math.max(0, attempts - 1));
+  return new Date(now.getTime() + minutes * 60_000);
+}
+
 export interface SyncSummary {
   entity: string;
   received: number;
@@ -121,19 +144,157 @@ export class ImsService {
         success: input.success,
         message: input.message,
         companyId: input.companyId ?? null,
+        nextAttemptAt:
+          input.direction === 'OUTBOUND' && !input.success ? backoffFrom(1) : null,
       },
     });
   }
 
-  private async fetchFromIms(entity: ImsInboundEntity): Promise<unknown[]> {
+  /** One HTTP attempt at delivering a payload. Returns why it failed, or null on success. */
+  private async deliver(
+    entity: string,
+    payload: Prisma.InputJsonValue,
+  ): Promise<string | null> {
     const ims = this.imsConfig();
     if (!ims.enabled || !ims.baseUrl) {
-      throw new Error('IMS integration is not configured');
+      return 'IMS integration is not configured; payload queued in the sync log';
     }
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), ims.timeoutMs);
     try {
       const response = await fetch(`${ims.baseUrl.replace(/\/$/, '')}/${entity}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(ims.apiKey ? { Authorization: `Bearer ${ims.apiKey}` } : {}),
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      return response.ok ? null : `IMS responded ${response.status}`;
+    } catch (error) {
+      return error instanceof Error ? error.message : 'IMS push failed';
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * Section 10 — replays outbound facts IMS has not accepted yet. Without this the sync log says
+   * "queued" and means "dropped": a job closed while IMS was down would never reach it.
+   *
+   * Delivery is at-least-once with exponential backoff. IMS is expected to treat a repeated
+   * `recordRef` for the same entity as an update, which it must anyway because a job can be
+   * reopened and re-closed.
+   */
+  async retryFailedPushes(limit = 50): Promise<{ attempted: number; delivered: number }> {
+    const now = new Date();
+    const pending = await this.prisma.imsSyncLog.findMany({
+      where: {
+        direction: 'OUTBOUND',
+        success: false,
+        abandonedAt: null,
+        attempts: { lt: MAX_PUSH_ATTEMPTS },
+        OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: now } }],
+      },
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+    });
+
+    let delivered = 0;
+    for (const row of pending) {
+      const payload = (row.payload ?? {}) as Prisma.InputJsonValue;
+      const failure = await this.deliver(row.entity, payload);
+      const attempts = row.attempts + 1;
+
+      if (!failure) {
+        delivered += 1;
+        await this.prisma.imsSyncLog.update({
+          where: { id: row.id },
+          data: {
+            success: true,
+            attempts,
+            message: `Delivered on attempt ${attempts}`,
+            nextAttemptAt: null,
+          },
+        });
+        continue;
+      }
+
+      const exhausted = attempts >= MAX_PUSH_ATTEMPTS;
+      await this.prisma.imsSyncLog.update({
+        where: { id: row.id },
+        data: {
+          attempts,
+          message: failure,
+          nextAttemptAt: exhausted ? null : backoffFrom(attempts),
+          abandonedAt: exhausted ? new Date() : null,
+        },
+      });
+      if (exhausted) {
+        this.logger.error(
+          `Giving up on IMS ${row.entity} for ${row.recordRef} after ${attempts} attempts: ${failure}`,
+        );
+      }
+    }
+
+    if (pending.length > 0) {
+      this.logger.log(`IMS retry: ${delivered}/${pending.length} pending pushes delivered`);
+    }
+    return { attempted: pending.length, delivered };
+  }
+
+  /**
+   * Fire-and-forget push used by the modules that produce outbound facts. Failures are queued for
+   * the retry worker rather than thrown, so a closing job is never blocked by the IMS being down.
+   */
+  async pushInBackground(entity: ImsOutboundEntity, recordRef: string): Promise<void> {
+    try {
+      await this.push(null, entity, recordRef);
+    } catch (error) {
+      this.logger.warn(`Could not queue IMS ${entity} for ${recordRef}: ${String(error)}`);
+    }
+  }
+
+  /**
+   * Module 4 — "a GRID-X job should be generated from a sales order, a work order …".
+   *
+   * These are read live rather than copied in: §10 is explicit that GRID-X must not duplicate
+   * inventory, purchase-order or customer data. The planner picks an order here and only its
+   * reference is stored on the job, so IMS stays the system of record for the order itself.
+   */
+  async lookupOrders(
+    entity: Extract<ImsInboundEntity, 'sales-orders' | 'work-orders'>,
+    search?: string,
+  ): Promise<ImsOrderOption[]> {
+    const ims = this.imsConfig();
+    if (!ims.enabled || !ims.baseUrl) {
+      throw new BadRequestException(
+        'IMS integration is not configured, so orders cannot be looked up. Raise the job manually.',
+      );
+    }
+
+    const records = await this.fetchFromIms(entity, search ? { search } : undefined);
+    return records
+      .map((record) => imsOrderSchema.safeParse(record))
+      .filter((parsed): parsed is { success: true; data: ImsOrderOption } => parsed.success)
+      .map((parsed) => parsed.data);
+  }
+
+  private async fetchFromIms(
+    entity: ImsInboundEntity,
+    query?: Record<string, string>,
+  ): Promise<unknown[]> {
+    const ims = this.imsConfig();
+    if (!ims.enabled || !ims.baseUrl) {
+      throw new Error('IMS integration is not configured');
+    }
+    const search = query ? `?${new URLSearchParams(query).toString()}` : '';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ims.timeoutMs);
+    try {
+      const response = await fetch(`${ims.baseUrl.replace(/\/$/, '')}/${entity}${search}`, {
         headers: ims.apiKey ? { Authorization: `Bearer ${ims.apiKey}` } : {},
         signal: controller.signal,
       });
@@ -284,40 +445,17 @@ export class ImsService {
   }
 
   /** Builds and pushes the outbound payload for a job or invoice. */
+  /** `actor` is null when a module pushes automatically rather than an operator clicking push. */
   async push(
-    actor: RequestUser,
+    actor: RequestUser | null,
     entity: ImsOutboundEntity,
     recordRef: string,
   ): Promise<{ entity: string; delivered: boolean; payload: Prisma.InputJsonValue }> {
     const payload = await this.buildOutboundPayload(entity, recordRef);
-    const ims = this.imsConfig();
-    let delivered = false;
-    let message: string | undefined;
-
-    if (ims.enabled && ims.baseUrl) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), ims.timeoutMs);
-      try {
-        const response = await fetch(`${ims.baseUrl.replace(/\/$/, '')}/${entity}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(ims.apiKey ? { Authorization: `Bearer ${ims.apiKey}` } : {}),
-          },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
-        });
-        delivered = response.ok;
-        if (!response.ok) message = `IMS responded ${response.status}`;
-      } catch (error) {
-        message = error instanceof Error ? error.message : 'IMS push failed';
-        this.logger.warn(`IMS push failed for ${entity}: ${message}`);
-      } finally {
-        clearTimeout(timer);
-      }
-    } else {
-      message = 'IMS integration is not configured; payload queued in the sync log';
-    }
+    const failure = await this.deliver(entity, payload);
+    const delivered = failure === null;
+    const message = failure ?? undefined;
+    if (failure) this.logger.warn(`IMS push failed for ${entity}: ${failure}`);
 
     await this.log({
       direction: 'OUTBOUND',

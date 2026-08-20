@@ -32,6 +32,11 @@ export class AlertsService {
       this.alertOverdueMilestones(),
       this.alertExpiringDocuments(),
       this.alertCalibrationDue(),
+      this.alertPendingReconciliation(),
+      this.alertToolsNotReturned(),
+      this.alertDamagedTools(),
+      this.alertUnauthorisedToolCustody(),
+      this.alertCorrectiveActionsDue(),
     ]);
   }
 
@@ -181,5 +186,180 @@ export class AlertsService {
       });
     }
     return tools.length;
+  }
+
+  /**
+   * Module 6 — "pending reconciliation alerts". Material stays OSWAR's asset while it sits with a
+   * partner, so an unreconciled line on a finished job is unaccounted stock.
+   */
+  async alertPendingReconciliation(): Promise<number> {
+    const cutoff = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+    const rows = await this.prisma.materialReconciliation.findMany({
+      where: {
+        status: { not: 'BALANCED' },
+        job: {
+          status: { in: ['QUALITY_ACCEPTED', 'DISPATCHED', 'RECEIVED'] },
+          updatedAt: { lt: cutoff },
+        },
+      },
+      include: {
+        job: { select: { id: true, jobNumber: true, partnerId: true } },
+        item: { select: { code: true, name: true } },
+      },
+    });
+    for (const row of rows) {
+      await this.notifications.notify({
+        event: 'MATERIAL_RECEIPT_NOT_ACKNOWLEDGED',
+        title: `Material not reconciled on ${row.job.jobNumber}`,
+        body: `${row.item.code} is still open: ${row.issuedKg} kg issued, ${row.consumedKg} kg consumed. The job cannot be closed until it balances.`,
+        link: `/app/materials/reconciliation?jobId=${row.jobId}`,
+        entityType: 'MaterialReconciliation',
+        entityId: row.id,
+        roleCodes: ['STORES_USER', 'FINANCE_USER', 'OPERATIONS_HEAD'],
+      });
+    }
+    return rows.length;
+  }
+
+  /** Module 9 — "the system should notify management when a fixture is not returned". */
+  async alertToolsNotReturned(): Promise<number> {
+    const issues = await this.prisma.toolIssue.findMany({
+      where: {
+        status: 'ISSUED',
+        actualReturnDate: null,
+        expectedReturnDate: { not: null, lt: new Date() },
+      },
+      include: {
+        tool: { select: { toolCode: true, description: true, replacementValue: true } },
+        partner: { select: { id: true, businessName: true } },
+      },
+    });
+    for (const issue of issues) {
+      const overdueDays = Math.floor(
+        (Date.now() - (issue.expectedReturnDate?.getTime() ?? Date.now())) / (24 * 3600 * 1000),
+      );
+      await this.notifications.notify({
+        event: 'FIXTURE_CALIBRATION_DUE',
+        title: `${issue.tool.toolCode} is ${overdueDays} day(s) overdue for return`,
+        body: `${issue.tool.description} is still with ${issue.partner.businessName}. Replacement value ${issue.tool.replacementValue}.`,
+        link: `/app/tooling`,
+        entityType: 'ToolIssue',
+        entityId: issue.id,
+        roleCodes: ['STORES_USER', 'GRIDX_HEAD'],
+      });
+      await this.notifications.notify({
+        event: 'FIXTURE_CALIBRATION_DUE',
+        title: `Please return ${issue.tool.toolCode}`,
+        body: `${issue.tool.description} was due back on ${issue.expectedReturnDate?.toDateString()}.`,
+        link: '/partner',
+        entityType: 'ToolIssue',
+        entityId: issue.id,
+        partnerId: issue.partnerId,
+        channels: ['IN_APP', 'WHATSAPP'],
+      });
+    }
+    return issues.length;
+  }
+
+  /**
+   * Module 9 — "the system should notify management when a tool is damaged". Runs on a schedule
+   * rather than at the moment of return so a damaged tool keeps surfacing until someone acts.
+   */
+  async alertDamagedTools(): Promise<number> {
+    const tools = await this.prisma.tool.findMany({
+      where: { isActive: true, condition: { in: ['DAMAGED', 'SCRAPPED'] } },
+      select: {
+        id: true,
+        toolCode: true,
+        description: true,
+        condition: true,
+        currentPartnerId: true,
+      },
+    });
+    for (const tool of tools) {
+      await this.notifications.notify({
+        event: 'FIXTURE_CALIBRATION_DUE',
+        title: `${tool.toolCode} is recorded as ${tool.condition.toLowerCase()}`,
+        body: `${tool.description} needs repair or replacement before it is issued again.`,
+        link: '/app/tooling',
+        entityType: 'Tool',
+        entityId: tool.id,
+        roleCodes: ['STORES_USER', 'QUALITY_INSPECTOR', 'GRIDX_HEAD'],
+      });
+    }
+    return tools.length;
+  }
+
+  /**
+   * Module 9 — "the system should notify management when the tool is used by an unauthorised
+   * partner". A tool whose recorded custody does not match an open issue is unaccounted for:
+   * either it moved between partners informally, or the issue was never closed.
+   */
+  async alertUnauthorisedToolCustody(): Promise<number> {
+    const tools = await this.prisma.tool.findMany({
+      where: { isActive: true, currentPartnerId: { not: null } },
+      select: {
+        id: true,
+        toolCode: true,
+        description: true,
+        currentPartnerId: true,
+        issues: {
+          where: { status: 'ISSUED' },
+          select: { partnerId: true, partner: { select: { businessName: true } } },
+        },
+      },
+    });
+
+    const mismatched = tools.filter(
+      (tool) => !tool.issues.some((issue) => issue.partnerId === tool.currentPartnerId),
+    );
+    if (mismatched.length === 0) return 0;
+
+    // `currentPartnerId` is a bare column with no relation, so the names are resolved in one go.
+    const holders = await this.prisma.partner.findMany({
+      where: { id: { in: mismatched.map((tool) => tool.currentPartnerId ?? '') } },
+      select: { id: true, businessName: true },
+    });
+    const nameFor = new Map(holders.map((partner) => [partner.id, partner.businessName]));
+
+    for (const tool of mismatched) {
+      const heldBy = nameFor.get(tool.currentPartnerId ?? '') ?? 'an unknown partner';
+      const issuedTo = tool.issues[0]?.partner.businessName;
+      await this.notifications.notify({
+        event: 'FIXTURE_CALIBRATION_DUE',
+        title: `${tool.toolCode} is held by a partner it was not issued to`,
+        body: issuedTo
+          ? `${tool.description} is recorded with ${heldBy} but is issued to ${issuedTo}.`
+          : `${tool.description} is recorded with ${heldBy} with no open tool issue against it.`,
+        link: '/app/tooling',
+        entityType: 'Tool',
+        entityId: tool.id,
+        roleCodes: ['STORES_USER', 'QUALITY_INSPECTOR', 'GRIDX_HEAD'],
+      });
+    }
+    return mismatched.length;
+  }
+
+  /** Module 8 — corrective actions have owners and due dates; both are worth nothing unheeded. */
+  async alertCorrectiveActionsDue(): Promise<number> {
+    const soon = new Date(Date.now() + 3 * 24 * 3600 * 1000);
+    const actions = await this.prisma.correctiveAction.findMany({
+      where: { stage: { not: 'CLOSED' }, dueDate: { not: null, lte: soon } },
+      include: { nonConformance: { select: { ncNumber: true, jobId: true } } },
+    });
+    for (const action of actions) {
+      const overdue = (action.dueDate?.getTime() ?? 0) < Date.now();
+      await this.notifications.notify({
+        event: 'CORRECTIVE_ACTION_DUE',
+        title: `${action.caNumber} is ${overdue ? 'overdue' : 'due soon'}`,
+        body: `Corrective action for ${action.nonConformance.ncNumber} is at stage ${action.stage} and was due ${action.dueDate?.toDateString()}.`,
+        link: '/app/quality/non-conformances',
+        entityType: 'CorrectiveAction',
+        entityId: action.id,
+        userIds: action.ownerId ? [action.ownerId] : undefined,
+        roleCodes: action.ownerId ? undefined : ['QUALITY_INSPECTOR', 'GRIDX_HEAD'],
+      });
+    }
+    return actions.length;
   }
 }

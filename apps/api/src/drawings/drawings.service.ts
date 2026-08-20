@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@gridx/db';
 import {
@@ -26,6 +27,7 @@ import {
   companyWhere,
 } from '../common/company-scope';
 import { StorageService } from '../files/storage.service';
+import { WatermarkContext, WatermarkService } from '../files/watermark.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
 export interface DrawingAccessContext {
@@ -45,6 +47,7 @@ export class DrawingsService {
     private readonly sequence: SequenceService,
     private readonly storage: StorageService,
     private readonly notifications: NotificationsService,
+    private readonly watermarks: WatermarkService,
   ) {}
 
   async list(
@@ -457,6 +460,22 @@ export class DrawingsService {
         event: 'GRANTED',
       },
     });
+    const drawing = await this.prisma.drawing.findFirstOrThrow({
+      where: { revisions: { some: { id: revisionId } } },
+      select: { drawingNumber: true, title: true },
+    });
+    await this.notifications.notify({
+      event: 'DRAWING_ACCESS_GRANTED',
+      title: `${drawing.drawingNumber} has been shared with you`,
+      body: `${drawing.title} — revision ${revision.revisionCode}, ${
+        input.mode === 'VIEW_ONLY' ? 'view only' : 'view and download'
+      }. Acknowledge it before starting production.`,
+      link: '/partner/drawings',
+      entityType: 'DrawingAccess',
+      entityId: access.id,
+      partnerId: input.partnerId,
+      channels: ['IN_APP', 'WHATSAPP'],
+    });
     await this.audit.record(actor, {
       action: 'DRAWING_ACCESS_GRANTED',
       entityType: 'DrawingAccess',
@@ -494,21 +513,23 @@ export class DrawingsService {
     revisionId: string,
     action: 'VIEWED' | 'DOWNLOADED',
     context: DrawingAccessContext,
-  ): Promise<{ url: string; revisionCode: string; watermark: string }> {
+  ): Promise<{ url: string; revisionCode: string; watermark: string; watermarked: boolean }> {
     const revision = await this.prisma.drawingRevision.findUniqueOrThrow({
       where: { id: revisionId },
       include: { drawing: true, file: true },
     });
     if (!revision.file) throw new BadRequestException('This revision has no drawing file');
 
+    let access: { mode: string; jobId: string | null } | null = null;
     if (actor.userType === 'PARTNER') {
-      const access = await this.prisma.drawingAccess.findFirst({
+      access = await this.prisma.drawingAccess.findFirst({
         where: {
           revisionId,
           partnerId: actor.partnerId ?? '',
           revokedAt: null,
           OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
         },
+        select: { mode: true, jobId: true },
       });
       if (!access) throw new ForbiddenException('This drawing revision is not shared with you');
       if (revision.status !== 'RELEASED') {
@@ -524,20 +545,87 @@ export class DrawingsService {
         revisionId,
         userId: actor.id,
         partnerId: actor.partnerId,
+        jobId: access?.jobId ?? null,
         event: action,
         ipAddress: context.ipAddress ?? null,
         userAgent: context.userAgent ?? null,
       },
     });
 
+    const watermarkContext = await this.watermarkContextFor(actor, revision, access?.jobId);
+    const caption = WatermarkService.caption(watermarkContext);
+
+    // Internal users read the controlled original; a partner is only ever handed a copy stamped
+    // with their own name and job number, so a saved or printed sheet stays traceable (Module 3).
+    if (actor.userType !== 'PARTNER') {
+      return {
+        url: await this.storage.signedUrl(revision.file.key),
+        revisionCode: revision.revisionCode,
+        watermark: caption,
+        watermarked: false,
+      };
+    }
+
+    const url = await this.watermarkedUrl(revision.file, watermarkContext);
+    return { url, revisionCode: revision.revisionCode, watermark: caption, watermarked: true };
+  }
+
+  /** Who the copy is for, and what it is being made against. */
+  private async watermarkContextFor(
+    actor: RequestUser,
+    revision: { status: string; revisionCode: string; drawing: { drawingNumber: string } },
+    jobId: string | null | undefined,
+  ): Promise<WatermarkContext> {
+    const [partner, job] = await Promise.all([
+      actor.partnerId
+        ? this.prisma.partner.findUnique({
+            where: { id: actor.partnerId },
+            select: { businessName: true },
+          })
+        : null,
+      jobId
+        ? this.prisma.gridJob.findUnique({ where: { id: jobId }, select: { jobNumber: true } })
+        : null,
+    ]);
+
     return {
-      url: await this.storage.signedUrl(revision.file.key),
+      partnerName: partner?.businessName ?? actor.name,
+      jobNumber: job?.jobNumber ?? null,
+      drawingNumber: revision.drawing.drawingNumber,
       revisionCode: revision.revisionCode,
-      watermark:
-        revision.status === 'RELEASED'
-          ? `${revision.drawing.drawingNumber} Rev ${revision.revisionCode} — ${actor.name}`
-          : `OBSOLETE — DO NOT USE`,
+      obsolete: revision.status !== 'RELEASED',
     };
+  }
+
+  /**
+   * Builds — and caches — the stamped copy. The key is derived from the original checksum and the
+   * watermark text, so the same partner and job reuse one object while a different partner gets
+   * their own, and re-uploading the drawing invalidates both.
+   */
+  private async watermarkedUrl(
+    file: { key: string; mimeType: string; checksum: string | null },
+    context: WatermarkContext,
+  ): Promise<string> {
+    const fingerprint = createHash('sha256')
+      .update(`${file.checksum ?? file.key}|${WatermarkService.caption(context)}`)
+      .digest('hex')
+      .slice(0, 16);
+    const extension = file.mimeType === 'application/pdf' ? 'pdf' : 'jpg';
+    const key = `watermarked/${file.key}.${fingerprint}.${extension}`;
+
+    if (await this.storage.exists(key)) return this.storage.signedUrl(key);
+
+    const original = await this.storage.read(file.key);
+    const stamped = await this.watermarks.apply(original, file.mimeType, context);
+    if (!stamped) {
+      // Never fall back to the clean original: an unstampable format is a controlled-document
+      // failure, not a reason to hand out an unmarked drawing.
+      throw new BadRequestException(
+        'This drawing cannot be watermarked for partner viewing. Ask engineering to re-upload it as a PDF.',
+      );
+    }
+    await this.storage.put(key, stamped.buffer, stamped.mimeType);
+    return this.storage.signedUrl(key);
   }
 
   async acknowledge(

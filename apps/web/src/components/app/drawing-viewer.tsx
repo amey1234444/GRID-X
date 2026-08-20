@@ -17,12 +17,14 @@ interface RevisionView {
   url: string;
   revisionCode: string;
   watermark: string;
+  /** True when the served copy has the watermark composited into the file itself. */
+  watermarked: boolean;
 }
 
 /**
  * Opens a released revision through the API so the access log records who looked
- * at which drawing. View-only revisions are rendered inline; download is a
- * separate call the API authorises against the partner's access mode.
+ * at which drawing. Partners are served a copy stamped with their own name and job
+ * number; download is a separate call the API authorises against their access mode.
  */
 export function DrawingViewer({
   revisionId,
@@ -85,7 +87,11 @@ export function DrawingViewer({
               {view ? `Revision ${view.revisionCode}` : 'Opening drawing…'}
             </DialogTitle>
             <DialogDescription>
-              {view?.watermark ?? 'Every view is recorded in the drawing access log.'}
+              {view
+                ? view.watermarked
+                  ? `${view.watermark} — this copy is watermarked and every view is logged.`
+                  : `${view.watermark} — every view is recorded in the drawing access log.`
+                : 'Every view is recorded in the drawing access log.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -102,7 +108,8 @@ export function DrawingViewer({
               />
               {allowDownload ? (
                 <Button variant="outline" size="sm" onClick={() => void onDownload()} disabled={pending}>
-                  <Download className="h-4 w-4" /> Download original
+                  <Download className="h-4 w-4" />
+                  {view.watermarked ? 'Download watermarked copy' : 'Download original'}
                 </Button>
               ) : null}
             </div>

@@ -25,6 +25,11 @@ const logQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).default(100),
 });
 
+const orderQuerySchema = z.object({
+  entity: z.enum(['sales-orders', 'work-orders']).default('work-orders'),
+  search: z.string().trim().min(1).optional(),
+});
+
 @ApiTags('IMS integration')
 @Controller('ims')
 export class ImsController {
@@ -64,5 +69,22 @@ export class ImsController {
     @Body(zodBody(pushSchema)) body: z.infer<typeof pushSchema>,
   ) {
     return this.ims.push(user, body.entity, body.recordRef);
+  }
+
+  /** Replays outbound facts IMS has not accepted yet, without waiting for the scheduler. */
+  @Post('retry')
+  @RequirePermissions(PERMISSIONS.IMS_SYNC)
+  retry() {
+    return this.ims.retryFailedPushes();
+  }
+
+  /**
+   * Module 4 — orders a planner can raise a job against. Read live from IMS; only the reference
+   * is ever stored on the GRID-X job.
+   */
+  @Get('orders')
+  @RequirePermissions(PERMISSIONS.JOB_CREATE)
+  orders(@Query(zodBody(orderQuerySchema)) query: z.infer<typeof orderQuerySchema>) {
+    return this.ims.lookupOrders(query.entity, query.search);
   }
 }

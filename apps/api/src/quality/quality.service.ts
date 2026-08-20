@@ -31,6 +31,7 @@ import {
   nestedCompanyWhere,
 } from '../common/company-scope';
 import { JobsService } from '../jobs/jobs.service';
+import { ImsService } from '../ims/ims.service';
 
 export interface InspectionFilters extends PaginationInput {
   status?: string;
@@ -53,6 +54,7 @@ export class QualityService {
     private readonly files: FilesService,
     private readonly notifications: NotificationsService,
     private readonly jobs: JobsService,
+    private readonly ims: ImsService,
   ) {}
 
   /** Guards a job reached by id: partner isolation first, then company reach (Section 4 and 18). */
@@ -497,6 +499,13 @@ export class QualityService {
       roleCodes: ['OPERATIONS_HEAD', 'QUALITY_INSPECTOR'],
       channels: ['IN_APP', 'WHATSAPP'],
     });
+
+    // §10 — rejected quantities and finished components received are facts IMS needs to keep its
+    // own stock and work-order picture straight.
+    if (rejectedQuantity > 0) await this.ims.pushInBackground('rejected-quantities', job.id);
+    if (nextStatus === 'QUALITY_ACCEPTED') {
+      await this.ims.pushInBackground('finished-components-received', job.id);
+    }
     await this.audit.record(actor, {
       action: 'INSPECTION_COMPLETED',
       entityType: 'Inspection',

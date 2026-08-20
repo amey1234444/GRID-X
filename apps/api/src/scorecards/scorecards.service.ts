@@ -188,20 +188,27 @@ export class ScorecardsService {
       { code: 'SAFETY_AND_COMPLIANCE', value: safetyAndCompliance },
     ];
 
-    const result = computeScorecard(kpiInputs, openCriticalNcs > 2);
+    const result = computeScorecard(kpiInputs, openCriticalNcs > 2, {
+      jobsCompleted,
+      quantityOffered: offered,
+    });
 
     // The category this partner held going into this period, so a fall can be flagged (Section 13).
-    const previous = await this.prisma.partnerScore.findFirst({
-      where: {
-        partnerId,
-        OR: [
-          { periodYear: { lt: period.periodYear } },
-          { periodYear: period.periodYear, periodMonth: { lt: period.periodMonth } },
-        ],
-      },
-      orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
-      select: { category: true, totalScore: true },
-    });
+    // A period with too little work behind it is not a fall, so it is skipped here.
+    const previous = result.hasSufficientData
+      ? await this.prisma.partnerScore.findFirst({
+          where: {
+            partnerId,
+            hasSufficientData: true,
+            OR: [
+              { periodYear: { lt: period.periodYear } },
+              { periodYear: period.periodYear, periodMonth: { lt: period.periodMonth } },
+            ],
+          },
+          orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
+          select: { category: true, totalScore: true },
+        })
+      : null;
 
     const score = await this.prisma.$transaction(async (tx) => {
       const saved = await tx.partnerScore.upsert({
@@ -223,6 +230,8 @@ export class ScorecardsService {
           jobsOnTime,
           quantityAccepted,
           quantityRejected,
+          hasSufficientData: result.hasSufficientData,
+          insufficientDataReason: result.insufficientDataReason,
         },
         update: {
           totalScore: result.totalScore,
@@ -232,6 +241,8 @@ export class ScorecardsService {
           jobsOnTime,
           quantityAccepted,
           quantityRejected,
+          hasSufficientData: result.hasSufficientData,
+          insufficientDataReason: result.insufficientDataReason,
           computedAt: new Date(),
         },
       });
@@ -248,17 +259,25 @@ export class ScorecardsService {
           periodYear: period.periodYear,
         })),
       });
-      await tx.partner.update({
-        where: { id: partnerId },
-        data: { category: result.category, currentScore: result.totalScore },
-      });
+      // The partner's standing category only moves on a period that can actually judge them.
+      // Allocation reads currentScore, so a 100 earned by doing nothing must not reach it.
+      if (result.hasSufficientData) {
+        await tx.partner.update({
+          where: { id: partnerId },
+          data: { category: result.category, currentScore: result.totalScore },
+        });
+      }
       return saved;
     });
 
     await this.notifications.notify({
       event: 'SCORECARD_PUBLISHED',
-      title: `Scorecard published — ${result.totalScore}/100 (Category ${result.category})`,
-      body: `Period ${period.periodMonth}/${period.periodYear}. Recommendation: ${result.recommendation}.`,
+      title: result.hasSufficientData
+        ? `Scorecard published — ${result.totalScore}/100 (Category ${result.category})`
+        : `Scorecard published — not yet rated`,
+      body: result.hasSufficientData
+        ? `Period ${period.periodMonth}/${period.periodYear}. Recommendation: ${result.recommendation}.`
+        : `Period ${period.periodMonth}/${period.periodYear}. ${result.insufficientDataReason}`,
       link: '/partner/scorecard',
       entityType: 'PartnerScore',
       entityId: score.id,
@@ -315,16 +334,20 @@ export class ScorecardsService {
       orderBy: { totalScore: 'desc' },
       include: { partner: { select: { id: true, businessName: true, city: true } } },
     });
-    const mix = scores.reduce<Record<string, number>>((acc, score) => {
+    // Partners without enough work behind them would otherwise pad the network average with a
+    // default 100 and inflate the category A count.
+    const rated = scores.filter((score) => score.hasSufficientData);
+    const mix = rated.reduce<Record<string, number>>((acc, score) => {
       acc[score.category] = (acc[score.category] ?? 0) + 1;
       return acc;
     }, {});
     return {
       weights: KPI_WEIGHTS,
       categoryMix: mix,
+      notYetRated: scores.length - rated.length,
       averageScore:
-        scores.length > 0
-          ? Math.round((scores.reduce((sum, s) => sum + s.totalScore, 0) / scores.length) * 100) / 100
+        rated.length > 0
+          ? Math.round((rated.reduce((sum, s) => sum + s.totalScore, 0) / rated.length) * 100) / 100
           : 0,
       rows: scores.map((score, index) => ({
         rank: index + 1,
@@ -336,6 +359,8 @@ export class ScorecardsService {
         recommendation: score.recommendation,
         jobsCompleted: score.jobsCompleted,
         jobsOnTime: score.jobsOnTime,
+        hasSufficientData: score.hasSufficientData,
+        insufficientDataReason: score.insufficientDataReason,
       })),
     };
   }

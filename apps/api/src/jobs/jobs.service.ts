@@ -18,6 +18,7 @@ import {
   closeJobSchema,
   reportDelaySchema,
   requiresFirstArticle,
+  responsibilityForDelay,
   respondToJobSchema,
   scorePartnerForJob,
   updateJobSchema,
@@ -29,12 +30,14 @@ import { SequenceService } from '../audit/sequence.service';
 import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
 import { assertTransition } from '../common/workflow';
+import { assertMilestoneEvidence } from '../common/evidence';
 import {
   assertCanWriteToCompany,
   assertCompanyScope,
   companyWhere,
 } from '../common/company-scope';
 import { CapacityService } from '../capacity/capacity.service';
+import { ImsService } from '../ims/ims.service';
 import { FilesService } from '../files/files.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -56,6 +59,7 @@ export class JobsService {
     private readonly files: FilesService,
     private readonly notifications: NotificationsService,
     private readonly capacity: CapacityService,
+    private readonly ims: ImsService,
   ) {}
 
   /**
@@ -660,6 +664,7 @@ export class JobsService {
     }
 
     await this.assertFirstArticleCleared(id, input.type);
+    assertMilestoneEvidence(input.type, input.photographFileIds);
 
     const milestone = await this.prisma.jobMilestone.create({
       data: {
@@ -681,7 +686,8 @@ export class JobsService {
         data: {
           jobId: id,
           reason: input.delayReason,
-          responsibility: 'PARTNER',
+          // Module 7: the reason decides who owns the delay, not who reported it.
+          responsibility: responsibilityForDelay(input.delayReason, job.materialResponsibility),
           detail: input.remarks,
           expectedCompletionDate: input.expectedCompletionDate,
           reportedById: actor.id,
@@ -691,6 +697,22 @@ export class JobsService {
 
     if (input.type === 'PRODUCTION_STARTED' && job.status !== 'IN_PRODUCTION') {
       await this.transition(actor, id, 'IN_PRODUCTION', 'Production started by partner');
+    }
+
+    // §15 partner journey step 10 — a partner who sends the accepted quantity themselves moves the
+    // job on. Without this the board only advances when OSWAR raises a shipment, so a partner drop
+    // or their own courier leaves the job sitting in QUALITY_ACCEPTED with nobody looking at it.
+    if (input.type === 'DISPATCHED' && job.status === 'QUALITY_ACCEPTED') {
+      await this.transition(actor, id, 'DISPATCHED', 'Dispatched by partner');
+      await this.notifications.notify({
+        event: 'SHIPMENT_DISPATCHED',
+        title: `${job.jobNumber} dispatched by the partner`,
+        body: `${input.quantityCompleted ?? job.acceptedQuantity} nos on the way. Record receipt when it arrives.`,
+        link: `/app/production/jobs/${id}`,
+        entityType: 'GridJob',
+        entityId: id,
+        roleCodes: ['STORES_USER', 'LOGISTICS_COORDINATOR', 'OPERATIONS_HEAD'],
+      });
     }
 
     await this.audit.record(actor, {
@@ -705,11 +727,19 @@ export class JobsService {
 
   async reportDelay(actor: RequestUser, id: string, input: z.infer<typeof reportDelaySchema>) {
     const job = await this.assertJobScope(actor, id);
+    // A partner cannot assign responsibility — only an internal reviewer may override the default
+    // the reason implies, otherwise the attribution the scorecard depends on is self-reported.
+    const responsibility =
+      actor.userType === 'PARTNER'
+        ? responsibilityForDelay(input.reason, job.materialResponsibility)
+        : (input.responsibility ??
+          responsibilityForDelay(input.reason, job.materialResponsibility));
+
     const delay = await this.prisma.jobDelay.create({
       data: {
         jobId: id,
         reason: input.reason,
-        responsibility: input.responsibility ?? 'PARTNER',
+        responsibility,
         delayDays: input.delayDays,
         detail: input.detail,
         expectedCompletionDate: input.expectedCompletionDate,
@@ -794,6 +824,10 @@ export class JobsService {
     });
     // The work is done: hand the hours back so the partner shows as available again.
     await this.capacity.release(id);
+    // §10 — the outsourced work-order status and actual completion date go back to IMS. Queued,
+    // not awaited on success, so an IMS outage never blocks closing a job.
+    await this.ims.pushInBackground('outsourced-work-order-status', id);
+    await this.ims.pushInBackground('actual-completion-dates', id);
     await this.notifications.notify({
       event: 'JOB_CLOSED',
       title: `Job ${job.jobNumber} closed`,

@@ -86,6 +86,19 @@ export const changePasswordSchema = z
     path: ['confirmPassword'],
   });
 
+/**
+ * A second factor: either a 6-digit TOTP code from an authenticator app, or one of the recovery
+ * codes issued at enrolment (`XXXX-XXXX`, dashes and case optional).
+ */
+export const twoFactorCodeSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .min(6, 'Enter the 6-digit code from your authenticator app, or a recovery code')
+    .max(20),
+});
+export type TwoFactorCodeInput = z.infer<typeof twoFactorCodeSchema>;
+
 // ---------------------------------------------------------------------------
 // Users, roles, companies
 // ---------------------------------------------------------------------------

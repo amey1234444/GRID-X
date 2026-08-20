@@ -591,8 +591,13 @@ model User {
   partnerId          String?
   designation        String?
   language           Language   @default(EN)
+  // RFC 6238 TOTP. The secret is base32 so any authenticator app can enrol from a QR code, and
+  // is only trusted once the user has proved they can read a code from it (twoFactorConfirmedAt).
   twoFactorEnabled   Boolean    @default(false)
   twoFactorSecret    String?
+  twoFactorConfirmedAt DateTime?
+  // Argon2 hashes of single-use recovery codes, so a lost device is not a lost account.
+  twoFactorRecoveryCodes String[] @default([])
   lastLoginAt        DateTime?
   passwordUpdatedAt  DateTime?
   createdAt          DateTime   @default(now())
@@ -2024,6 +2029,10 @@ model PartnerScore {
   jobsOnTime      Int                      @default(0)
   quantityAccepted Float                   @default(0)
   quantityRejected Float                   @default(0)
+  // False when the period carried too little work to rate the partner on. Every KPI defaults to
+  // 100 with no data, so without this a new partner reads as a category A performer.
+  hasSufficientData Boolean                @default(true)
+  insufficientDataReason String?
   computedAt      DateTime                 @default(now())
   remarks         String?
 
@@ -2205,11 +2214,18 @@ model ImsSyncLog {
   payload    Json?
   success    Boolean  @default(true)
   message    String?
+  // An OUTBOUND row that failed is a delivery still owed to IMS. The retry worker replays it with
+  // backoff until it lands or gives up, so "queued in the sync log" is true rather than aspirational.
+  attempts     Int       @default(1)
+  nextAttemptAt DateTime?
+  abandonedAt  DateTime?
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
 
   company Company? @relation(fields: [companyId], references: [id])
 
   @@index([entity, createdAt])
+  @@index([direction, success, nextAttemptAt])
 }
 
 model SystemSetting {

@@ -27,6 +27,7 @@ import { ScorecardsModule } from './scorecards/scorecards.module';
 import { DashboardsModule } from './dashboards/dashboards.module';
 import { ReportsModule } from './reports/reports.module';
 import { ImsModule } from './ims/ims.module';
+import { ImportsModule } from './imports/imports.module';
 import { AdminModule } from './admin/admin.module';
 import { HealthModule } from './health/health.module';
 
@@ -54,6 +55,7 @@ import { HealthModule } from './health/health.module';
     DashboardsModule,
     ReportsModule,
     ImsModule,
+    ImportsModule,
     AdminModule,
     HealthModule,
   ],

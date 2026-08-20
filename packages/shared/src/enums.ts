@@ -450,6 +450,24 @@ export const DELAY_RESPONSIBILITY: Record<DelayReason, ResponsibleParty> = {
 export const RESPONSIBLE_PARTIES = ['PARTNER', 'OSWAR', 'SHARED', 'EXTERNAL'] as const;
 export type ResponsibleParty = (typeof RESPONSIBLE_PARTIES)[number];
 
+/**
+ * Module 7 — "this will allow management to identify whether delays are caused by the partner or
+ * by OSWAR". The reason decides the owner, not who happened to report it.
+ *
+ * `MATERIAL_SHORTAGE` is resolved against the job's material responsibility rather than defaulting
+ * to OSWAR: material OSWAR undertook to supply is OSWAR's problem, material the partner procures
+ * is theirs.
+ */
+export function responsibilityForDelay(
+  reason: DelayReason,
+  materialResponsibility?: MaterialResponsibility,
+): ResponsibleParty {
+  if (reason === 'MATERIAL_SHORTAGE' && materialResponsibility) {
+    return materialResponsibility === 'OSWAR_SUPPLIED' ? 'OSWAR' : 'PARTNER';
+  }
+  return DELAY_RESPONSIBILITY[reason];
+}
+
 export const CLARIFICATION_STATUSES = ['OPEN', 'ANSWERED', 'CLOSED'] as const;
 export type ClarificationStatus = (typeof CLARIFICATION_STATUSES)[number];
 

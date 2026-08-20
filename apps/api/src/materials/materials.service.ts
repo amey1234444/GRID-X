@@ -19,6 +19,7 @@ import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
 import { assertCompanyScope, companyWhere } from '../common/company-scope';
 import { JobsService } from '../jobs/jobs.service';
+import { ImsService } from '../ims/ims.service';
 
 export interface MaterialIssueFilters extends PaginationInput {
   jobId?: string;
@@ -39,6 +40,7 @@ export class MaterialsService {
     private readonly files: FilesService,
     private readonly notifications: NotificationsService,
     private readonly jobs: JobsService,
+    private readonly ims: ImsService,
   ) {}
 
   /** Every job-scoped material write is checked for partner and company reach. */
@@ -159,6 +161,19 @@ export class MaterialsService {
       partnerId: job.partnerId,
       channels: ['IN_APP', 'WHATSAPP'],
     });
+    // The internal side of the same event: material has left OSWAR's custody and is now the
+    // partner's responsibility until it is reconciled (Module 6).
+    await this.notifications.notify({
+      event: 'MATERIAL_ISSUED',
+      title: `Challan ${challanNumber} issued for ${job.jobNumber}`,
+      body: `${totalIssueWeightKg} kg issued against ${job.jobNumber}. Material stays on the books until reconciliation.`,
+      link: `/app/materials/issues/${issue.id}`,
+      entityType: 'MaterialIssue',
+      entityId: issue.id,
+      roleCodes: ['STORES_USER', 'FINANCE_USER'],
+    });
+    // §10 — material issued to partners is one of the facts GRID-X owes IMS.
+    await this.ims.pushInBackground('material-issued', issue.id);
     await this.audit.record(actor, {
       action: 'MATERIAL_ISSUED',
       entityType: 'MaterialIssue',

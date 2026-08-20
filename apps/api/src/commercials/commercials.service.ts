@@ -20,6 +20,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { SequenceService } from '../audit/sequence.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ImsService } from '../ims/ims.service';
 import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
 import { assertTransition } from '../common/workflow';
@@ -45,6 +46,7 @@ export class CommercialsService {
     private readonly audit: AuditService,
     private readonly sequence: SequenceService,
     private readonly notifications: NotificationsService,
+    private readonly ims: ImsService,
   ) {}
 
   // -------------------------------------------------------------------------
@@ -342,6 +344,12 @@ export class CommercialsService {
       entityId: id,
       partnerId: invoice.partnerId,
     });
+
+    // §10 — the approved invoice and the conversion cost behind it belong in IMS.
+    if (input.approved && stage === 'FINANCE') {
+      await this.ims.pushInBackground('partner-invoices', id);
+      await this.ims.pushInBackground('conversion-cost', id);
+    }
     await this.audit.record(actor, {
       action: `INVOICE_${stage}_${input.approved ? 'APPROVED' : 'HELD'}`,
       entityType: 'PartnerInvoice',

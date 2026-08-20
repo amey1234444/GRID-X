@@ -57,6 +57,7 @@ function build(overrides: PrismaMock = {}): { service: JobsService } & Mocks {
   const notifications = { notify: jest.fn() };
   const audit = { record: jest.fn() };
   const sequence = { next: jest.fn().mockResolvedValue('JOB-00001') };
+  const ims = { pushInBackground: jest.fn() };
 
   const service = new JobsService(
     prisma as never,
@@ -65,6 +66,7 @@ function build(overrides: PrismaMock = {}): { service: JobsService } & Mocks {
     files as never,
     notifications as never,
     capacity as never,
+    ims as never,
   );
   return { service, prisma, capacity, files, notifications };
 }

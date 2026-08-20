@@ -5,7 +5,12 @@ import { dirname, join, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  GetObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import sharp from 'sharp';
 import { AppConfig } from '../config/configuration';
@@ -84,6 +89,24 @@ export class StorageService {
       .jpeg({ quality: 70, mozjpeg: true })
       .toBuffer();
     return this.put(`${key}.preview.jpg`, preview, 'image/jpeg');
+  }
+
+  /**
+   * Whether an object is already stored. Used to reuse derived files — watermarked drawing copies,
+   * previews — instead of regenerating them on every view.
+   */
+  async exists(key: string): Promise<boolean> {
+    if (this.s3) {
+      try {
+        await this.s3.send(
+          new HeadObjectCommand({ Bucket: this.settings.s3.bucket, Key: key }),
+        );
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    return existsSync(this.localPath(key));
   }
 
   async signedUrl(key: string): Promise<string> {

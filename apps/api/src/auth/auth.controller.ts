@@ -6,6 +6,7 @@ import {
   partnerPasswordLoginSchema,
   refreshSchema,
   requestOtpSchema,
+  twoFactorCodeSchema,
   verifyOtpSchema,
 } from '@gridx/shared';
 import { z } from 'zod';
@@ -84,6 +85,34 @@ export class AuthController {
   ) {
     await this.auth.changePassword(user.id, body.currentPassword, body.newPassword);
     return { success: true };
+  }
+
+  /**
+   * Section 18 two-factor enrolment. Rate limited like the other credential routes: a code is a
+   * six-digit secret and must not be brute-forceable.
+   */
+  @RateLimit(5, 15 * 60_000)
+  @Post('2fa/enrol')
+  beginTwoFactor(@CurrentUser() user: RequestUser) {
+    return this.auth.beginTwoFactorEnrolment(user.id);
+  }
+
+  @RateLimit(10, 15 * 60_000)
+  @Post('2fa/confirm')
+  confirmTwoFactor(
+    @CurrentUser() user: RequestUser,
+    @Body(zodBody(twoFactorCodeSchema)) body: z.infer<typeof twoFactorCodeSchema>,
+  ) {
+    return this.auth.confirmTwoFactorEnrolment(user.id, body.code);
+  }
+
+  @RateLimit(10, 15 * 60_000)
+  @Post('2fa/disable')
+  disableTwoFactor(
+    @CurrentUser() user: RequestUser,
+    @Body(zodBody(twoFactorCodeSchema)) body: z.infer<typeof twoFactorCodeSchema>,
+  ) {
+    return this.auth.disableTwoFactor(user.id, body.code);
   }
 
   private device(request: AuthedRequest) {

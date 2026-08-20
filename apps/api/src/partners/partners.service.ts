@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { SequenceService } from '../audit/sequence.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
 import { assertTransition } from '../common/workflow';
@@ -27,6 +28,12 @@ import {
   companyWhere,
   isCompanyScoped,
 } from '../common/company-scope';
+
+/** `DOCUMENT_REVIEW` reads badly in a message; "Document review" does not. */
+function humaniseStatus(status: string): string {
+  const words = status.toLowerCase().replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 export interface PartnerListFilters extends PaginationInput {
   approvalStatus?: PartnerApprovalStatus;
@@ -42,6 +49,7 @@ export class PartnersService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly sequence: SequenceService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -244,6 +252,34 @@ export class PartnersService {
           },
         },
       },
+    });
+    // Section 13 — the partner learns where they stand, and the network owners learn that the
+    // pool of allocatable partners has changed.
+    await this.notifications.notify({
+      event: 'PARTNER_STATUS_CHANGED',
+      title:
+        toStatus === 'SUSPENDED'
+          ? 'Your GRID-X account has been suspended'
+          : `Your GRID-X status is now ${humaniseStatus(toStatus)}`,
+      body:
+        reason ??
+        (toStatus === 'SUSPENDED'
+          ? 'No new jobs can be allocated to you until this is resolved.'
+          : 'Your partner record has moved to the next stage of approval.'),
+      link: '/partner',
+      entityType: 'Partner',
+      entityId: id,
+      partnerId: id,
+      channels: ['IN_APP', 'WHATSAPP'],
+    });
+    await this.notifications.notify({
+      event: 'PARTNER_STATUS_CHANGED',
+      title: `${partner.businessName} is now ${humaniseStatus(toStatus)}`,
+      body: `Moved from ${humaniseStatus(partner.approvalStatus)}.${reason ? ` ${reason}` : ''}`,
+      link: `/app/partners/${id}`,
+      entityType: 'Partner',
+      entityId: id,
+      roleCodes: ['GRIDX_HEAD', 'PROCUREMENT_USER', 'OPERATIONS_HEAD'],
     });
     await this.audit.record(actor, {
       action: 'PARTNER_STATUS_CHANGED',
