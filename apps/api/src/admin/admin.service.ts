@@ -262,6 +262,41 @@ export class AdminService {
     }));
   }
 
+  /**
+   * Renames a role or rewrites its description.
+   *
+   * The permission matrix itself stays in code on purpose: RoleCode is a fixed enum, every
+   * environment must enforce the same grants, and a matrix editable at runtime is a matrix that can
+   * be quietly widened. What an administrator can legitimately change is how the role reads to the
+   * people assigning it, which is what this covers.
+   */
+  async updateRole(
+    actor: RequestUser,
+    code: string,
+    input: { name?: string; description?: string },
+  ) {
+    const role = await this.prisma.role.findUniqueOrThrow({ where: { code: code as RoleCode } });
+    const updated = await this.prisma.role.update({
+      where: { id: role.id },
+      data: {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.description !== undefined ? { description: input.description } : {}),
+      },
+    });
+    await this.audit.record(actor, {
+      action: 'ROLE_UPDATED',
+      entityType: 'Role',
+      entityId: role.id,
+      before: { name: role.name, description: role.description },
+      after: { name: updated.name, description: updated.description },
+    });
+    return {
+      ...updated,
+      label: ROLE_LABELS[updated.code as RoleCode],
+      permissions: ROLE_PERMISSIONS[updated.code as RoleCode] ?? [],
+    };
+  }
+
   async listCompanies(actor: RequestUser) {
     const ids = allowedCompanyIds(actor);
     return this.prisma.company.findMany({

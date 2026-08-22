@@ -21,6 +21,11 @@ const issueQuerySchema = paginationSchema.extend({
   status: z.string().optional(),
 });
 
+const scrapQuerySchema = paginationSchema.extend({
+  partnerId: z.string().optional(),
+  jobId: z.string().optional(),
+});
+
 @ApiTags('Materials')
 @Controller('materials')
 export class MaterialsController {
@@ -33,6 +38,25 @@ export class MaterialsController {
     @Query(zodBody(issueQuerySchema)) query: z.infer<typeof issueQuerySchema>,
   ) {
     return this.materials.list(user, query);
+  }
+
+  @Get('partner-stock')
+  @RequirePermissions(PERMISSIONS.MATERIAL_READ)
+  partnerStock(
+    @CurrentUser() user: RequestUser,
+    @Query('partnerId') partnerId?: string,
+    @Query('companyId') companyId?: string,
+  ) {
+    return this.materials.partnerStock(user, { partnerId, companyId });
+  }
+
+  @Get('scrap')
+  @RequirePermissions(PERMISSIONS.MATERIAL_READ)
+  listScrap(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(scrapQuerySchema)) query: z.infer<typeof scrapQuerySchema>,
+  ) {
+    return this.materials.listScrap(user, query);
   }
 
   @Get('issues/:id')

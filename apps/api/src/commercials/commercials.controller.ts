@@ -25,6 +25,12 @@ const invoiceQuerySchema = paginationSchema.extend({
 
 const submitInvoiceBodySchema = submitInvoiceSchema.extend({ partnerId: z.string().optional() });
 
+const approvalQuerySchema = paginationSchema.extend({
+  stage: z.string().optional(),
+  partnerId: z.string().optional(),
+  approved: z.coerce.boolean().optional(),
+});
+
 @ApiTags('Commercials')
 @Controller('commercials')
 export class CommercialsController {
@@ -156,6 +162,15 @@ export class CommercialsController {
     @Body(zodBody(deductionSchema)) body: z.infer<typeof deductionSchema>,
   ) {
     return this.commercials.createDeduction(user, body);
+  }
+
+  @Get('approvals')
+  @RequirePermissions(PERMISSIONS.INVOICE_READ)
+  listApprovals(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(approvalQuerySchema)) query: z.infer<typeof approvalQuerySchema>,
+  ) {
+    return this.commercials.listApprovals(user, query);
   }
 
   @Get('incentive-rules')

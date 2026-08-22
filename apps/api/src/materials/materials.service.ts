@@ -4,6 +4,7 @@ import {
   CreateMaterialIssueInput,
   Paginated,
   PaginationInput,
+  round2,
   acknowledgeMaterialSchema,
   completeReconciliationSchema,
   recordScrapSchema,
@@ -80,6 +81,197 @@ export class MaterialsService {
       }),
       this.prisma.materialIssue.count({ where }),
     ]);
+    return paginate(data, total, filters);
+  }
+
+  /**
+   * Materials - Partner stock (Section 24). What OSWAR material is sitting in partner workshops
+   * right now, and against which job.
+   *
+   * The chairman dashboard already reports one total for material under partner custody, but a
+   * total is not actionable: recovering it means knowing which partner holds what. Balance is
+   * issued weight less what has been consumed and what has come back as scrap, per job and item.
+   */
+  async partnerStock(
+    actor: RequestUser,
+    filters: { partnerId?: string; companyId?: string },
+  ): Promise<{
+    rows: {
+      partnerId: string;
+      partnerName: string;
+      jobId: string;
+      jobNumber: string;
+      jobStatus: string;
+      itemId: string;
+      itemCode: string;
+      itemName: string;
+      issuedKg: number;
+      consumedKg: number;
+      scrapReturnedKg: number;
+      balanceKg: number;
+      oldestIssueDate: Date | null;
+      daysHeld: number | null;
+    }[];
+    totals: { issuedKg: number; balanceKg: number; partners: number };
+  }> {
+    const issueWhere: Prisma.MaterialIssueWhereInput = {
+      ...companyWhere(actor, filters.companyId),
+      ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
+      ...(filters.partnerId && !actor.partnerId ? { partnerId: filters.partnerId } : {}),
+      // Nothing is at the partner until it has actually gone out.
+      status: { in: ['ISSUED', 'ACKNOWLEDGED'] },
+    };
+
+    const issues = await this.prisma.materialIssue.findMany({
+      where: issueWhere,
+      select: {
+        issueDate: true,
+        createdAt: true,
+        partner: { select: { id: true, businessName: true } },
+        job: { select: { id: true, jobNumber: true, status: true } },
+        items: {
+          select: {
+            issueWeightKg: true,
+            item: { select: { id: true, code: true, name: true } },
+          },
+        },
+      },
+    });
+
+    type Row = Awaited<ReturnType<MaterialsService['partnerStock']>>['rows'][number];
+    const byKey = new Map<string, Row>();
+
+    for (const issue of issues) {
+      const issuedOn = issue.issueDate ?? issue.createdAt;
+      for (const line of issue.items) {
+        const key = `${issue.job.id}|${line.item.id}`;
+        const existing = byKey.get(key);
+        if (existing) {
+          existing.issuedKg += line.issueWeightKg;
+          if (existing.oldestIssueDate && issuedOn < existing.oldestIssueDate) {
+            existing.oldestIssueDate = issuedOn;
+          }
+          continue;
+        }
+        byKey.set(key, {
+          partnerId: issue.partner.id,
+          partnerName: issue.partner.businessName,
+          jobId: issue.job.id,
+          jobNumber: issue.job.jobNumber,
+          jobStatus: issue.job.status,
+          itemId: line.item.id,
+          itemCode: line.item.code,
+          itemName: line.item.name,
+          issuedKg: line.issueWeightKg,
+          consumedKg: 0,
+          scrapReturnedKg: 0,
+          balanceKg: 0,
+          oldestIssueDate: issuedOn,
+          daysHeld: null,
+        });
+      }
+    }
+
+    const jobIds = [...new Set([...byKey.values()].map((row) => row.jobId))];
+    if (jobIds.length > 0) {
+      const [consumption, scrap] = await Promise.all([
+        this.prisma.materialConsumption.groupBy({
+          by: ['jobId', 'itemId'],
+          where: { jobId: { in: jobIds } },
+          _sum: { actualKg: true },
+        }),
+        this.prisma.scrapReturn.groupBy({
+          by: ['jobId', 'itemId'],
+          where: { jobId: { in: jobIds } },
+          _sum: { returnedWeightKg: true },
+        }),
+      ]);
+
+      for (const row of consumption) {
+        const target = byKey.get(`${row.jobId}|${row.itemId}`);
+        if (target) target.consumedKg = row._sum.actualKg ?? 0;
+      }
+      for (const row of scrap) {
+        const target = byKey.get(`${row.jobId}|${row.itemId}`);
+        if (target) target.scrapReturnedKg = row._sum.returnedWeightKg ?? 0;
+      }
+    }
+
+    const now = Date.now();
+    const rows = [...byKey.values()]
+      .map((row) => ({
+        ...row,
+        balanceKg: round2(row.issuedKg - row.consumedKg - row.scrapReturnedKg),
+        issuedKg: round2(row.issuedKg),
+        consumedKg: round2(row.consumedKg),
+        scrapReturnedKg: round2(row.scrapReturnedKg),
+        daysHeld: row.oldestIssueDate
+          ? Math.floor((now - row.oldestIssueDate.getTime()) / 86_400_000)
+          : null,
+      }))
+      // Anything still out, heaviest first — that is what is worth chasing.
+      .filter((row) => row.balanceKg > 0.01)
+      .sort((a, b) => b.balanceKg - a.balanceKg);
+
+    return {
+      rows,
+      totals: {
+        issuedKg: round2(rows.reduce((sum, row) => sum + row.issuedKg, 0)),
+        balanceKg: round2(rows.reduce((sum, row) => sum + row.balanceKg, 0)),
+        partners: new Set(rows.map((row) => row.partnerId)).size,
+      },
+    };
+  }
+
+  /** Materials - Scrap (Section 24). The scrap register, which had no read path at all. */
+  async listScrap(
+    actor: RequestUser,
+    filters: PaginationInput & { partnerId?: string; jobId?: string },
+  ) {
+    const where: Prisma.ScrapReturnWhereInput = {
+      job: {
+        ...companyWhere(actor),
+        ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
+        ...(filters.partnerId && !actor.partnerId ? { partnerId: filters.partnerId } : {}),
+      },
+      ...(filters.jobId ? { jobId: filters.jobId } : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.scrapReturn.findMany({
+        where,
+        ...paginationArgs(filters),
+        orderBy: { returnedAt: 'desc' },
+        include: {
+          item: { select: { code: true, name: true } },
+          job: {
+            select: {
+              id: true,
+              jobNumber: true,
+              partner: { select: { id: true, businessName: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.scrapReturn.count({ where }),
+    ]);
+
+    const data = rows.map((row) => ({
+      id: row.id,
+      jobId: row.job.id,
+      jobNumber: row.job.jobNumber,
+      partnerName: row.job.partner?.businessName ?? null,
+      itemCode: row.item.code,
+      itemName: row.item.name,
+      scrapWeightKg: row.scrapWeightKg,
+      returnedWeightKg: row.returnedWeightKg,
+      // What was generated but never came back is the figure that costs money.
+      outstandingKg: round2(row.scrapWeightKg - row.returnedWeightKg),
+      scrapPercent: row.scrapPercent,
+      challanNumber: row.challanNumber,
+      returnedAt: row.returnedAt,
+    }));
+
     return paginate(data, total, filters);
   }
 

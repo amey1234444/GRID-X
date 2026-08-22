@@ -758,6 +758,15 @@ export const deductionSchema = z.object({
   amount: positive,
 });
 
+/**
+ * Section 18 - role administration. Only the human-readable side of a role is editable; the
+ * permission matrix stays in code so every environment enforces the same grants.
+ */
+export const updateRoleSchema = z.object({
+  name: z.string().trim().min(2).max(80).optional(),
+  description: z.string().trim().max(400).optional(),
+});
+
 export const incentiveRuleSchema = z.object({
   partnerId: id.optional(),
   type: z.enum(ADJUSTMENT_TYPES),
@@ -765,6 +774,8 @@ export const incentiveRuleSchema = z.object({
   percentage: z.coerce.number().min(0).max(100).optional(),
   fixedAmount: nonNegative.optional(),
   condition: optionalString,
+  /** The performance level that earns this rule. Leave unset to award it by hand. */
+  thresholdPercent: z.coerce.number().min(0).max(100).optional(),
 });
 
 // ---------------------------------------------------------------------------

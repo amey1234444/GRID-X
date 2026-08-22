@@ -6,7 +6,8 @@
  * BOM — which is what Excel produces on a Windows machine, so it matters here.
  */
 export function parseCsv(input: string): string[][] {
-  const text = input.replace(/^﻿/, '');
+  // U+FEFF: Excel on Windows writes a BOM, and it would otherwise become part of the first header.
+  const text = input.replace(/^\uFEFF/, '');
   const rows: string[][] = [];
   let row: string[] = [];
   let field = '';

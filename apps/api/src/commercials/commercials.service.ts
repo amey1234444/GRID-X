@@ -7,6 +7,9 @@ import {
   PaymentAdjustment,
   SubmitInvoiceInput,
   calculatePayment,
+  earnedIncentives,
+  performanceForJobs,
+  type EarnedIncentive,
   createRateSchema,
   deductionSchema,
   holdInvoiceSchema,
@@ -209,18 +212,21 @@ export class CommercialsService {
     });
     if (alreadyInvoiced) throw new BadRequestException('One of these jobs is already invoiced');
 
-    const adjustments = await this.pendingAdjustments(partnerId);
-    const calculation = calculatePayment(
-      jobs.map((job) => ({
-        jobId: job.id,
-        jobNumber: job.jobNumber,
-        acceptedQuantity: job.acceptedQuantity,
-        conversionRate: job.rate,
-        amount: 0,
-      })),
-      adjustments,
-      input.taxPercent,
-    );
+    const lines = jobs.map((job) => ({
+      jobId: job.id,
+      jobNumber: job.jobNumber,
+      acceptedQuantity: job.acceptedQuantity,
+      conversionRate: job.rate,
+      amount: 0,
+    }));
+
+    // Incentives are earned against the basic amount, so that has to be known before the rules can
+    // be judged; calculatePayment is then run once more with the full adjustment set.
+    const basicAmount = calculatePayment(lines, [], 0).basicAmount;
+    const earned = await this.earnedIncentivesFor(partnerId, jobs, basicAmount);
+    const adjustments = [...(await this.pendingAdjustments(partnerId)), ...earned];
+
+    const calculation = calculatePayment(lines, adjustments, input.taxPercent);
 
     const invoiceNumber = await this.sequence.next('INVOICE');
     const invoice = await this.prisma.partnerInvoice.create({
@@ -256,6 +262,22 @@ export class CommercialsService {
       where: { partnerId, invoiceId: null },
       data: { invoiceId: invoice.id },
     });
+
+    // The adjustment ledger carries incentives as well as deductions, so an earned incentive is
+    // recorded line by line rather than disappearing into a single total on the invoice. They are
+    // written already attached to this invoice so the sweep above cannot pick them up twice.
+    if (earned.length > 0) {
+      await this.prisma.partnerDeduction.createMany({
+        data: earned.map((incentive) => ({
+          partnerId,
+          invoiceId: invoice.id,
+          type: incentive.type,
+          reason: incentive.label,
+          amount: incentive.amount,
+          approvedAt: new Date(),
+        })),
+      });
+    }
 
     await this.notifications.notify({
       event: 'INVOICE_SUBMITTED',
@@ -484,6 +506,65 @@ export class CommercialsService {
     return deduction;
   }
 
+  /**
+   * Commercial - Approvals (Section 24). The invoice approval trail.
+   *
+   * Every stage sign-off was written to PaymentApproval and never read back, so the record of who
+   * verified quantity, quality, material and finance existed but could not be inspected — which is
+   * exactly the audit question this table is for.
+   */
+  async listApprovals(
+    actor: RequestUser,
+    filters: PaginationInput & { stage?: string; partnerId?: string; approved?: boolean },
+  ) {
+    const where: Prisma.PaymentApprovalWhereInput = {
+      invoice: {
+        ...companyWhere(actor),
+        ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
+        ...(filters.partnerId && !actor.partnerId ? { partnerId: filters.partnerId } : {}),
+      },
+      ...(filters.stage ? { stage: filters.stage } : {}),
+      ...(filters.approved === undefined ? {} : { approved: filters.approved }),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.paymentApproval.findMany({
+        where,
+        ...paginationArgs(filters),
+        orderBy: { createdAt: 'desc' },
+        include: {
+          approver: { select: { name: true } },
+          invoice: {
+            select: {
+              id: true,
+              invoiceNumber: true,
+              status: true,
+              netAmount: true,
+              partner: { select: { id: true, businessName: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.paymentApproval.count({ where }),
+    ]);
+
+    const data = rows.map((row) => ({
+      id: row.id,
+      stage: row.stage,
+      approved: row.approved,
+      remarks: row.remarks,
+      approverName: row.approver?.name ?? null,
+      createdAt: row.createdAt,
+      invoiceId: row.invoice.id,
+      invoiceNumber: row.invoice.invoiceNumber,
+      invoiceStatus: row.invoice.status,
+      netAmount: row.invoice.netAmount,
+      partnerName: row.invoice.partner?.businessName ?? null,
+    }));
+
+    return paginate(data, total, filters);
+  }
+
   async listIncentiveRules(partnerId?: string) {
     return this.prisma.partnerIncentiveRule.findMany({
       where: { isActive: true, ...(partnerId ? { OR: [{ partnerId }, { partnerId: null }] } : {}) },
@@ -511,5 +592,38 @@ export class CommercialsService {
       label: deduction.reason,
       amount: deduction.amount,
     }));
+  }
+
+  /**
+   * Module 11 pays \"accepted quantity x conversion rate + quality incentive + on-time delivery
+   * incentive\", so an invoice that only ever subtracts is short. Rules configured against this
+   * partner win over the network-wide default of the same type, which is how procurement expresses
+   * a negotiated rate for one partner.
+   */
+  private async earnedIncentivesFor(
+    partnerId: string,
+    jobs: {
+      acceptedQuantity: number;
+      rejectedQuantity: number;
+      dueDate: Date | null;
+      completedAt: Date | null;
+    }[],
+    basicAmount: number,
+  ): Promise<EarnedIncentive[]> {
+    const rules = await this.prisma.partnerIncentiveRule.findMany({
+      where: { isActive: true, OR: [{ partnerId }, { partnerId: null }] },
+      orderBy: { partnerId: 'desc' },
+    });
+
+    const mostSpecific = new Map<string, (typeof rules)[number]>();
+    for (const rule of rules) {
+      if (!mostSpecific.has(rule.type)) mostSpecific.set(rule.type, rule);
+    }
+
+    return earnedIncentives(
+      [...mostSpecific.values()],
+      performanceForJobs(jobs),
+      basicAmount,
+    );
   }
 }

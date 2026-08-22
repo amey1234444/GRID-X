@@ -12,6 +12,7 @@ import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { PermissionsGuard } from './auth/permissions.guard';
 import { RateLimitGuard } from './common/rate-limit.guard';
+import { SchedulerLockService } from './common/scheduler-lock.service';
 import { SentryService } from './common/sentry.service';
 import { PartnersModule } from './partners/partners.module';
 import { MastersModule } from './masters/masters.module';
@@ -66,7 +67,8 @@ import { HealthModule } from './health/health.module';
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     SentryService,
+    SchedulerLockService,
   ],
-  exports: [SentryService],
+  exports: [SentryService, SchedulerLockService],
 })
 export class AppModule {}

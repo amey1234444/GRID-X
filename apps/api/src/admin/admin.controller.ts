@@ -6,6 +6,7 @@ import {
   createCompanySchema,
   createUserSchema,
   paginationSchema,
+  updateRoleSchema,
   updateUserSchema,
 } from '@gridx/shared';
 import { Prisma } from '@gridx/db';
@@ -87,6 +88,16 @@ export class AdminController {
   @RequirePermissions(PERMISSIONS.USER_READ)
   listRoles() {
     return this.admin.listRoles();
+  }
+
+  @Patch('roles/:code')
+  @RequirePermissions(PERMISSIONS.ROLE_MANAGE)
+  updateRole(
+    @CurrentUser() user: RequestUser,
+    @Param('code') code: string,
+    @Body(zodBody(updateRoleSchema)) body: z.infer<typeof updateRoleSchema>,
+  ) {
+    return this.admin.updateRole(user, code, body);
   }
 
   @Get('companies')

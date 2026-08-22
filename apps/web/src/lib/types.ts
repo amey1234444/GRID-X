@@ -797,3 +797,163 @@ export const emptyPartnerDashboard = (): PartnerDashboard => ({
   paymentsDue: 0,
   jobs: [],
 });
+
+/** Production → Delays. One recorded delay, with the job it belongs to (Module 7). */
+export interface DelayRow {
+  id: string;
+  jobId: string;
+  jobNumber: string;
+  componentCode: string;
+  componentName: string;
+  partnerId: string | null;
+  partnerName: string | null;
+  jobStatus: string;
+  dueDate: string | null;
+  reason: string;
+  responsibility: string;
+  delayDays: number;
+  detail: string | null;
+  expectedCompletionDate: string | null;
+  reportedByName: string | null;
+  reportedAt: string;
+  resolvedAt: string | null;
+}
+
+/** Production → Clarifications. A partner's question and its answer (Module 7). */
+export interface ClarificationRow {
+  id: string;
+  jobId: string;
+  jobNumber: string;
+  componentCode: string;
+  componentName: string;
+  partnerId: string | null;
+  partnerName: string | null;
+  dueDate: string | null;
+  question: string;
+  answer: string | null;
+  status: string;
+  raisedByName: string | null;
+  raisedAt: string;
+  answeredByName: string | null;
+  answeredAt: string | null;
+  openForDays: number | null;
+}
+
+/** Section 7 screen 5 — the cross-partner capability matrix. */
+export interface CapabilityMatrix {
+  processes: string[];
+  partners: {
+    id: string;
+    partnerCode: string;
+    businessName: string;
+    city: string;
+    category: string;
+    approvalStatus: string;
+    allocatable: boolean;
+    capabilities: Record<string, { approved: boolean; capacityHours: number }>;
+  }[];
+  coverage: { process: string; approvedPartners: number; allocatablePartners: number }[];
+}
+
+/** Quality → Corrective actions. Module 8's CAPA workflow, across all non-conformances. */
+export interface CorrectiveActionRow {
+  id: string;
+  caNumber: string;
+  stage: string;
+  dueDate: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  ownerName: string | null;
+  ncNumber: string;
+  defectType: string;
+  quantityAffected: number;
+  jobId: string | null;
+  jobNumber: string | null;
+  partnerName: string | null;
+  overdueDays: number | null;
+}
+
+/** Materials → Partner stock. OSWAR material currently held in partner workshops. */
+export interface PartnerStock {
+  rows: {
+    partnerId: string;
+    partnerName: string;
+    jobId: string;
+    jobNumber: string;
+    jobStatus: string;
+    itemId: string;
+    itemCode: string;
+    itemName: string;
+    issuedKg: number;
+    consumedKg: number;
+    scrapReturnedKg: number;
+    balanceKg: number;
+    oldestIssueDate: string | null;
+    daysHeld: number | null;
+  }[];
+  totals: { issuedKg: number; balanceKg: number; partners: number };
+}
+
+/** Materials → Scrap. The scrap-return register (Module 6). */
+export interface ScrapRow {
+  id: string;
+  jobId: string;
+  jobNumber: string;
+  partnerName: string | null;
+  itemCode: string;
+  itemName: string;
+  scrapWeightKg: number;
+  returnedWeightKg: number;
+  outstandingKg: number;
+  scrapPercent: number;
+  challanNumber: string | null;
+  returnedAt: string;
+}
+
+/** Commercial → Approvals. One stage sign-off on a partner invoice (Module 11). */
+export interface PaymentApprovalRow {
+  id: string;
+  stage: string;
+  approved: boolean;
+  remarks: string | null;
+  approverName: string | null;
+  createdAt: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  invoiceStatus: string;
+  netAmount: number;
+  partnerName: string | null;
+}
+
+/** Partners → Machines. The network-wide machine register (Module 1). */
+export interface MachineRow {
+  id: string;
+  partnerId: string;
+  partnerName: string;
+  city: string;
+  machineType: string;
+  make: string | null;
+  model: string | null;
+  size: string | null;
+  capacity: string | null;
+  accuracy: string | null;
+  condition: string;
+  ownership: string;
+  quantity: number;
+  lastServicedAt: string | null;
+}
+
+/** Partners → Audits. Every partner audit, newest first (Module 1). */
+export interface PartnerAuditRow {
+  id: string;
+  partnerId: string;
+  partnerName: string;
+  city: string;
+  auditDate: string;
+  auditType: string;
+  score: number | null;
+  status: string;
+  findings: string | null;
+  auditorName: string | null;
+  nextAuditDate: string | null;
+}

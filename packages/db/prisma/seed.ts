@@ -4,7 +4,7 @@
  * Creates the permission catalogue, roles, OSWAR companies, internal users, a small partner
  * network and one complete job flow so every screen has meaningful data on first run.
  */
-import { PrismaClient, Prisma, ProcessType, RoleCode } from '@prisma/client';
+import { PrismaClient, Prisma, JobStatus, ProcessType, RoleCode } from '@prisma/client';
 import { PERMISSIONS, ROLE_PERMISSIONS, ROLE_DESCRIPTIONS, ROLE_LABELS } from '@gridx/shared';
 import * as argon2 from 'argon2';
 
@@ -633,6 +633,40 @@ async function main(): Promise<void> {
       maxCapacityHours: 420,
       capabilities: ['CUTTING', 'PAINTING', 'PACKING'] as ProcessType[],
     },
+    // Phase 3 runs the pilot with five partners. Four and five deliberately widen the spread:
+    // one strategic partner with the heavy machining the network otherwise lacks, and one micro
+    // unit still in capability audit, so the approval workflow and the allocation guards both
+    // have something to refuse.
+    {
+      partnerCode: 'PTR-00004',
+      businessName: 'Kalmeshwar Heavy Fabricators',
+      ownerName: 'Anil Rathod',
+      phone: '9811100004',
+      email: 'owner@kalmeshwarheavy.example',
+      city: 'Kalmeshwar',
+      distanceKm: 27,
+      category: 'A' as const,
+      level: 'L4_STRATEGIC' as const,
+      approvalStatus: 'STRATEGIC' as const,
+      auditStatus: 'PASSED' as const,
+      maxCapacityHours: 2400,
+      capabilities: ['MACHINING', 'FABRICATION', 'WELDING', 'ASSEMBLY'] as ProcessType[],
+    },
+    {
+      partnerCode: 'PTR-00005',
+      businessName: 'Umred Sheet Metal Works',
+      ownerName: 'Nitin Kale',
+      phone: '9811100005',
+      email: 'owner@umredsheetmetal.example',
+      city: 'Umred',
+      distanceKm: 48,
+      category: 'C' as const,
+      level: 'L1_MICRO' as const,
+      approvalStatus: 'CAPABILITY_AUDIT' as const,
+      auditStatus: 'SCHEDULED' as const,
+      maxCapacityHours: 320,
+      capabilities: ['BENDING', 'CUTTING', 'PAINTING'] as ProcessType[],
+    },
   ];
 
   const partners = [];
@@ -730,7 +764,15 @@ async function main(): Promise<void> {
       });
     }
 
-    for (const component of components) {
+    // A partner is only on a component's approved list if they can actually run its primary
+    // process — the same rule the API and the CSV importer enforce. Approving everyone for
+    // everything would make the allocation engine, the capability matrix and the concentration
+    // report meaningless at pilot scale.
+    const capableComponents = components.filter((component) =>
+      definition.capabilities.includes(component.primaryProcess),
+    );
+
+    for (const component of capableComponents) {
       await prisma.approvedPartnerComponent.upsert({
         where: { componentId_partnerId: { componentId: component.id, partnerId: partner.id } },
         create: {
@@ -746,12 +788,15 @@ async function main(): Promise<void> {
       await prisma.partnerRate.deleteMany({
         where: { partnerId: partner.id, componentId: component.id },
       });
+      // Rates vary a little by partner so the allocation engine's cost factor has a real spread
+      // to rank on rather than an identical number for everyone.
+      const discount = { A: 0.9, B: 0.88, C: 0.84, D: 0.82, SUSPENDED: 0.85 }[definition.category];
       await prisma.partnerRate.create({
         data: {
           companyId: company.id,
           partnerId: partner.id,
           componentId: component.id,
-          conversionRate: Math.round((component.standardConversionRate ?? 500) * 0.88),
+          conversionRate: Math.round((component.standardConversionRate ?? 500) * discount),
           effectiveFrom: days(-90),
           approvedBy: internalUsers.get('PROCUREMENT_USER'),
         },
@@ -885,13 +930,19 @@ async function main(): Promise<void> {
     componentIndex: number;
     partnerIndex: number;
     quantity: number;
-    status: Prisma.GridJobCreateInput['status'];
+    status: JobStatus;
     dueOffset: number;
     accepted?: number;
     rejected?: number;
+    /** Days past the due date this job was completed. Negative (the default) is early. */
+    lateDays?: number;
   }[] = [
+    // Component and partner indices are paired so the partner can actually run the component's
+    // primary process — the same pairing the approved list above allows.
+    //   components: 0 WELDING · 1 FABRICATION · 2 CUTTING · 3,5,13 MACHINING · 4 BENDING · 14 ASSEMBLY
+    //   partners:   0 weld/fab/cut · 1 machining · 2 cutting · 3 machining/fab/weld/assembly
     { suffix: '00001', componentIndex: 0, partnerIndex: 0, quantity: 6, status: 'IN_PRODUCTION', dueOffset: 8 },
-    { suffix: '00002', componentIndex: 1, partnerIndex: 1, quantity: 4, status: 'AWAITING_PARTNER_ACCEPTANCE', dueOffset: 14 },
+    { suffix: '00002', componentIndex: 1, partnerIndex: 3, quantity: 4, status: 'AWAITING_PARTNER_ACCEPTANCE', dueOffset: 14 },
     { suffix: '00003', componentIndex: 2, partnerIndex: 2, quantity: 40, status: 'INSPECTION_REQUESTED', dueOffset: 3 },
     {
       suffix: '00004',
@@ -903,7 +954,72 @@ async function main(): Promise<void> {
       accepted: 58,
       rejected: 2,
     },
-    { suffix: '00005', componentIndex: 0, partnerIndex: 1, quantity: 2, status: 'MATERIAL_ISSUED', dueOffset: -2 },
+    { suffix: '00005', componentIndex: 0, partnerIndex: 3, quantity: 2, status: 'MATERIAL_ISSUED', dueOffset: -2 },
+    // Enough further history for the scorecard to clear its minimum-jobs floor and for the
+    // concentration report and capacity board to show a real spread.
+    {
+      suffix: '00006',
+      componentIndex: 3,
+      partnerIndex: 1,
+      quantity: 12,
+      status: 'CLOSED',
+      dueOffset: -30,
+      accepted: 12,
+    },
+    {
+      suffix: '00007',
+      componentIndex: 5,
+      partnerIndex: 1,
+      quantity: 20,
+      status: 'CLOSED',
+      dueOffset: -22,
+      accepted: 19,
+      rejected: 1,
+      // Delivered late, so on-time-in-full is not a flat 100% across the network.
+      lateDays: 4,
+    },
+    {
+      suffix: '00008',
+      componentIndex: 13,
+      partnerIndex: 1,
+      quantity: 8,
+      status: 'CLOSED',
+      dueOffset: -15,
+      accepted: 8,
+    },
+    {
+      suffix: '00009',
+      componentIndex: 9,
+      partnerIndex: 3,
+      quantity: 10,
+      status: 'CLOSED',
+      dueOffset: -26,
+      accepted: 10,
+    },
+    {
+      suffix: '00010',
+      componentIndex: 6,
+      partnerIndex: 3,
+      quantity: 14,
+      status: 'CLOSED',
+      dueOffset: -18,
+      accepted: 13,
+      rejected: 1,
+      lateDays: 2,
+    },
+    {
+      suffix: '00011',
+      componentIndex: 14,
+      partnerIndex: 3,
+      quantity: 25,
+      status: 'CLOSED',
+      dueOffset: -9,
+      accepted: 25,
+    },
+    { suffix: '00012', componentIndex: 18, partnerIndex: 1, quantity: 30, status: 'IN_PRODUCTION', dueOffset: 6 },
+    { suffix: '00013', componentIndex: 7, partnerIndex: 2, quantity: 120, status: 'ACCEPTED', dueOffset: 11 },
+    { suffix: '00014', componentIndex: 16, partnerIndex: 0, quantity: 9, status: 'QUALITY_ACCEPTED', dueOffset: -1, accepted: 9 },
+    { suffix: '00015', componentIndex: 11, partnerIndex: 0, quantity: 5, status: 'DRAFT', dueOffset: 21 },
   ];
 
   const jobs = [];
@@ -939,8 +1055,14 @@ async function main(): Promise<void> {
         )
           ? days(-7)
           : null,
-        completedAt: definition.status === 'CLOSED' ? days(-13) : null,
-        closedAt: definition.status === 'CLOSED' ? days(-11) : null,
+        // Completion is measured against this job's own due date, not a fixed day, so a
+        // back-dated job is on time or late because the plan says so — which is what the
+        // on-time-in-full KPI reads.
+        completedAt:
+          definition.status === 'CLOSED' || definition.status === 'QUALITY_ACCEPTED'
+            ? days(definition.dueOffset + (definition.lateDays ?? -1))
+            : null,
+        closedAt: definition.status === 'CLOSED' ? days(definition.dueOffset + 1) : null,
         createdById: gridxHeadId,
         items: {
           create: [

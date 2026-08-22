@@ -5,6 +5,7 @@ import { MILESTONE_LABELS, MILESTONE_TYPES, MILESTONES_REQUIRING_PHOTO } from '@
 import { CheckCircle2, CloudUpload, Loader2 } from 'lucide-react';
 
 import { FileUpload } from '@/components/app/file-upload';
+import { photosSupported, queuePhotos } from '@/lib/offline-photos';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -32,6 +33,9 @@ export function MilestoneForm({
   const [quantity, setQuantity] = useState('');
   const [remarks, setRemarks] = useState('');
   const [photographFileIds, setPhotographFileIds] = useState<string[]>([]);
+  // Photographs chosen while offline. They are written to IndexedDB on submit and uploaded when
+  // the connection returns, ahead of the milestone that cites them.
+  const [deferredPhotos, setDeferredPhotos] = useState<File[]>([]);
   const [pending, setPending] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>(null);
 
@@ -39,10 +43,17 @@ export function MilestoneForm({
     event.preventDefault();
     setPending(true);
     setOutcome(null);
+    const clientRequestId = newRequestId();
+    const photoIds =
+      deferredPhotos.length > 0 && photosSupported()
+        ? await queuePhotos(clientRequestId, deferredPhotos, 'PHOTOGRAPH')
+        : [];
+
     const result = await submit({
-      clientRequestId: newRequestId(),
+      clientRequestId,
       path: `/jobs/${jobId}/milestones`,
       label: MILESTONE_LABELS[type as keyof typeof MILESTONE_LABELS] ?? type,
+      photoIds,
       body: {
         type,
         quantityCompleted: quantity === '' ? undefined : Number(quantity),
@@ -56,6 +67,7 @@ export function MilestoneForm({
       setQuantity('');
       setRemarks('');
       setPhotographFileIds([]);
+      setDeferredPhotos([]);
     }
   };
 
@@ -111,14 +123,15 @@ export function MilestoneForm({
           multiple
           required={photoNeeded}
           onChange={setPhotographFileIds}
+          onDeferred={setDeferredPhotos}
           label={language === 'HI' ? 'फ़ोटो जोड़ें' : 'Add photos'}
         />
         {photoNeeded ? (
           <p className="flex items-start gap-2 rounded-md bg-secondary p-3 text-xs text-muted-foreground">
             <CloudUpload className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             {language === 'HI'
-              ? 'इस चरण के लिए फ़ोटो चाहिए। फ़ोटो भेजने के लिए नेटवर्क ज़रूरी है।'
-              : 'This milestone expects photographic evidence. Photos need a connection to upload; the update itself can still be saved offline.'}
+              ? 'इस चरण के लिए फ़ोटो ज़रूरी है। नेटवर्क न हो तो फ़ोटो फ़ोन में सुरक्षित रहेगी और कनेक्शन आते ही अपने आप भेज दी जाएगी।'
+              : 'This milestone expects photographic evidence. With no connection the photos are held on your phone and sent automatically once you are back online.'}
           </p>
         ) : null}
       </div>

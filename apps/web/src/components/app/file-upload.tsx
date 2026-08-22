@@ -37,6 +37,7 @@ export function FileUpload({
   required = false,
   disabled = false,
   onChange,
+  onDeferred,
   label,
 }: {
   name: string;
@@ -47,6 +48,11 @@ export function FileUpload({
   disabled?: boolean;
   /** Controlled mode: receive the ids instead of relying on the hidden inputs. */
   onChange?: (fileIds: string[]) => void;
+  /**
+   * Offline-capable callers (the partner PWA) take the raw files when there is no connection and
+   * store them for upload on reconnection, instead of failing the selection.
+   */
+  onDeferred?: (files: File[]) => void;
   label?: string;
 }): React.JSX.Element {
   const inputId = useId();
@@ -58,6 +64,22 @@ export function FileUpload({
   const onSelect = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
     const selected = Array.from(event.currentTarget.files ?? []);
     if (selected.length === 0) return;
+
+    // Offline, with a caller that can hold on to them: keep the files rather than losing the
+    // selection to a failed request (Section 19).
+    if (onDeferred && typeof navigator !== 'undefined' && !navigator.onLine) {
+      onDeferred(selected);
+      setFiles(
+        selected.map((file) => ({
+          id: `deferred:${file.name}`,
+          originalName: file.name,
+          sizeBytes: file.size,
+        })),
+      );
+      setError(null);
+      event.currentTarget.value = '';
+      return;
+    }
     setPending(true);
     setError(null);
 

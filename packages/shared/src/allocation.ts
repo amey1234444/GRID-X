@@ -135,3 +135,121 @@ function clamp01to100(value: number): number {
   if (Number.isNaN(value)) return 0;
   return Math.min(Math.max(value, 0), 100);
 }
+
+// ---------------------------------------------------------------------------
+// Module 2 — outsourcing eligibility
+// ---------------------------------------------------------------------------
+
+/**
+ * Below this an engineer has judged the component a poor candidate for outsourcing — tooling too
+ * specialised, tolerances too tight, or the drawing not stable enough to hand out.
+ */
+export const MIN_OUTSOURCING_ELIGIBILITY = 40;
+
+export interface EligibilityVerdict {
+  /** Whether the component can be outsourced without a documented reason. */
+  eligible: boolean;
+  score: number;
+  /** Plain explanation for the planner. Null when the component is eligible. */
+  reason: string | null;
+}
+
+/**
+ * Module 2 records an outsourcing eligibility score against every component. It exists so a
+ * component can be judged unsuitable for the network on engineering grounds, separately from its
+ * criticality class — a Class C part with a 15 is still a part nobody outside should be making.
+ */
+export function outsourcingEligibility(score: number | null | undefined): EligibilityVerdict {
+  // A component nobody has scored yet has not been judged unsuitable — it has not been judged at
+  // all, and an unmade judgement must not read as a refusal.
+  if (score === null || score === undefined || !Number.isFinite(score)) {
+    return { eligible: true, score: MIN_OUTSOURCING_ELIGIBILITY, reason: null };
+  }
+  if (score >= MIN_OUTSOURCING_ELIGIBILITY) {
+    return { eligible: true, score, reason: null };
+  }
+  return {
+    eligible: false,
+    score,
+    reason:
+      `This component scores ${score} for outsourcing eligibility, below the ${MIN_OUTSOURCING_ELIGIBILITY} ` +
+      'the network expects. Engineering has judged it a poor candidate to send out.',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Module 4 — distance
+// ---------------------------------------------------------------------------
+
+export interface Coordinates {
+  latitude: number;
+  longitude: number;
+}
+
+const EARTH_RADIUS_KM = 6371;
+
+function toRadians(degrees: number): number {
+  return (degrees * Math.PI) / 180;
+}
+
+/**
+ * Great-circle distance between two points, in kilometres.
+ *
+ * Distance is one of the nine factors the allocation engine ranks partners on, and it was being
+ * typed in by hand while the coordinates sat unused on the record. A hand-entered figure is not
+ * only easy to get wrong — it can be understated to make a partner rank better.
+ *
+ * This is straight-line distance. Road distance is longer, so the figure is scaled by a factor
+ * that reflects typical road networks; it is an estimate either way, and a consistent estimate
+ * ranks partners fairly, which is what the allocation engine needs.
+ */
+export function haversineKm(from: Coordinates, to: Coordinates): number {
+  const dLat = toRadians(to.latitude - from.latitude);
+  const dLon = toRadians(to.longitude - from.longitude);
+  const lat1 = toRadians(from.latitude);
+  const lat2 = toRadians(to.latitude);
+
+  const a =
+    Math.sin(dLat / 2) ** 2 + Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+/** Roads are not straight; this is the usual planning allowance over great-circle distance. */
+export const ROAD_DISTANCE_FACTOR = 1.3;
+
+/** Coordinates only count when both are present and inside the valid ranges. */
+export function isUsableCoordinate(
+  latitude: number | null | undefined,
+  longitude: number | null | undefined,
+): boolean {
+  return (
+    typeof latitude === 'number' &&
+    typeof longitude === 'number' &&
+    Number.isFinite(latitude) &&
+    Number.isFinite(longitude) &&
+    Math.abs(latitude) <= 90 &&
+    Math.abs(longitude) <= 180 &&
+    // 0,0 is in the Atlantic: it is a default that was never filled in, not a location.
+    !(latitude === 0 && longitude === 0)
+  );
+}
+
+/**
+ * Road distance from the plant to a partner, or null when either end lacks usable coordinates —
+ * in which case the caller keeps whatever was entered by hand.
+ */
+export interface MaybeCoordinates {
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+export function roadDistanceKm(
+  plant: MaybeCoordinates | null | undefined,
+  partner: MaybeCoordinates | null | undefined,
+): number | null {
+  if (!isUsableCoordinate(plant?.latitude, plant?.longitude)) return null;
+  if (!isUsableCoordinate(partner?.latitude, partner?.longitude)) return null;
+
+  const straight = haversineKm(plant as Coordinates, partner as Coordinates);
+  return round2(straight * ROAD_DISTANCE_FACTOR);
+}

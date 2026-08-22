@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { DetailList } from '@/components/app/detail-list';
 import { PageHeader } from '@/components/app/page-header';
 import { ChangePasswordForm } from '@/components/auth/change-password-form';
+import { TwoFactorSetup } from '@/components/auth/two-factor-setup';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { currentUser } from '@/lib/session';
@@ -54,6 +55,19 @@ export default async function AccountPage(): Promise<React.JSX.Element> {
         </CardHeader>
         <CardContent>
           <ChangePasswordForm />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Two-factor authentication</CardTitle>
+          <CardDescription>
+            A code from your phone in addition to your password. Required for admins by the
+            security section of the blueprint.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TwoFactorSetup enabled={user.twoFactorEnabled} />
         </CardContent>
       </Card>
 

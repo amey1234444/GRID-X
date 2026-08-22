@@ -32,6 +32,16 @@ const inspectionQuerySchema = paginationSchema.extend({
 const ncQuerySchema = paginationSchema.extend({ jobId: z.string().optional() });
 const reworkQuerySchema = paginationSchema.extend({ status: z.string().optional() });
 
+const capaQuerySchema = paginationSchema.extend({
+  stage: z.string().optional(),
+  ownerId: z.string().optional(),
+  overdue: z.coerce.boolean().optional(),
+});
+
+const deviationQuerySchema = paginationSchema.extend({
+  status: z.string().optional(),
+});
+
 @ApiTags('Quality')
 @Controller('quality')
 export class QualityController {
@@ -169,6 +179,24 @@ export class QualityController {
     return this.quality.updateReworkStatus(user, id, body);
   }
 
+  @Get('corrective-actions')
+  @RequirePermissions(PERMISSIONS.INSPECTION_READ)
+  listCorrectiveActions(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(capaQuerySchema)) query: z.infer<typeof capaQuerySchema>,
+  ) {
+    return this.quality.listCorrectiveActions(user, query);
+  }
+
+  @Get('deviations')
+  @RequirePermissions(PERMISSIONS.INSPECTION_READ)
+  listDeviations(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(deviationQuerySchema)) query: z.infer<typeof deviationQuerySchema>,
+  ) {
+    return this.quality.listDeviations(user, query);
+  }
+
   @Post('corrective-actions')
   @RequirePermissions(PERMISSIONS.CORRECTIVE_ACTION_MANAGE)
   createCorrectiveAction(
@@ -189,8 +217,13 @@ export class QualityController {
     return this.quality.advanceCorrectiveAction(user, id, body);
   }
 
+  /**
+   * Accepting a component that misses its specification is an engineering call, not an inspection
+   * one — Module 8 lists \"accepted with deviation\" and \"hold for engineering review\" side by
+   * side for that reason. DEVIATION_APPROVE is held by ENGINEERING_USER alone.
+   */
   @Patch('deviations/:id')
-  @RequirePermissions(PERMISSIONS.CORRECTIVE_ACTION_MANAGE)
+  @RequirePermissions(PERMISSIONS.DEVIATION_APPROVE)
   decideDeviation(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,

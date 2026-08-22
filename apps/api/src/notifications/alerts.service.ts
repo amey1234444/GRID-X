@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
+import { SchedulerLockService } from '../common/scheduler-lock.service';
 import { NotificationsService } from './notifications.service';
 
 /**
@@ -15,29 +16,36 @@ export class AlertsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly locks: SchedulerLockService,
   ) {}
 
-  @Cron(CronExpression.EVERY_HOUR)
+  // Claimed before running: on more than one instance these would otherwise alert partners two or
+  // three times for the same job (Section 18 — scalability).
+  @Cron(CronExpression.EVERY_HOUR, { name: 'hourly-alerts' })
   async runHourlyAlerts(): Promise<void> {
-    await Promise.all([
-      this.alertPendingJobAcceptance(),
-      this.alertUnacknowledgedMaterial(),
-      this.alertDelayedInspections(),
-    ]);
+    await this.locks.runExclusively('hourly-alerts', 600, async () => {
+      await Promise.all([
+        this.alertPendingJobAcceptance(),
+        this.alertUnacknowledgedMaterial(),
+        this.alertDelayedInspections(),
+      ]);
+    });
   }
 
-  @Cron(CronExpression.EVERY_DAY_AT_7AM)
+  @Cron(CronExpression.EVERY_DAY_AT_7AM, { name: 'daily-alerts' })
   async runDailyAlerts(): Promise<void> {
-    await Promise.all([
-      this.alertOverdueMilestones(),
-      this.alertExpiringDocuments(),
-      this.alertCalibrationDue(),
-      this.alertPendingReconciliation(),
-      this.alertToolsNotReturned(),
-      this.alertDamagedTools(),
-      this.alertUnauthorisedToolCustody(),
-      this.alertCorrectiveActionsDue(),
-    ]);
+    await this.locks.runExclusively('daily-alerts', 900, async () => {
+      await Promise.all([
+        this.alertOverdueMilestones(),
+        this.alertExpiringDocuments(),
+        this.alertCalibrationDue(),
+        this.alertPendingReconciliation(),
+        this.alertToolsNotReturned(),
+        this.alertDamagedTools(),
+        this.alertUnauthorisedToolCustody(),
+        this.alertCorrectiveActionsDue(),
+      ]);
+    });
   }
 
   async alertPendingJobAcceptance(): Promise<number> {

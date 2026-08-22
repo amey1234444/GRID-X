@@ -74,7 +74,7 @@ export default async function PartnerMaterialPage({
                           {issue.vehicleNumber ? ` · ${issue.vehicleNumber}` : ''}
                         </p>
                       </div>
-                      <StatusBadge status={issue.status} />
+                      <StatusBadge language={hindi ? 'HI' : 'EN'} status={issue.status} />
                       {ack ? (
                         <span className="text-xs text-muted-foreground">
                           {formatNumber(ack.receivedWeightKg, 3)} kg {hindi ? 'मिला' : 'received'}

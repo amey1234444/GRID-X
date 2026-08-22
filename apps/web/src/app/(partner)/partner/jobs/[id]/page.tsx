@@ -83,7 +83,7 @@ export default async function PartnerJobDetailPage({
         description={`${job.jobNumber} · ${job.component.componentCode} · ${humanise(job.priority)}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={job.status} />
+            <StatusBadge language={language} status={job.status} />
             {awaitingResponse ? (
               <>
                 <ActionDialog
@@ -159,7 +159,7 @@ export default async function PartnerJobDetailPage({
                 <p className="truncate text-xs text-muted-foreground">{revision.drawing.title}</p>
               </div>
               <Badge variant="secondary">Rev {revision.revisionCode}</Badge>
-              <StatusBadge status={revision.status} />
+              <StatusBadge language={language} status={revision.status} />
               <Button asChild variant="outline" size="sm">
                 <Link href={`/partner/drawings?revisionId=${revision.id}`}>{hindi ? 'खोलें' : 'Open'}</Link>
               </Button>
@@ -209,7 +209,7 @@ export default async function PartnerJobDetailPage({
                     {issue.items.map((item) => item.item.code).join(', ')}
                   </p>
                 </div>
-                <StatusBadge status={issue.status} />
+                <StatusBadge language={language} status={issue.status} />
                 {issue.status === 'ACKNOWLEDGED' ? null : (
                   <ActionDialog
                     title={hindi ? 'माल की पुष्टि' : 'Acknowledge material'}
@@ -336,7 +336,7 @@ export default async function PartnerJobDetailPage({
               <div key={clarification.id} className="rounded-lg border p-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-medium">{clarification.question}</p>
-                  <StatusBadge status={clarification.status} />
+                  <StatusBadge language={language} status={clarification.status} />
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(clarification.raisedAt)}</p>
                 {clarification.answer ? <p className="mt-2 text-sm">{clarification.answer}</p> : null}
@@ -363,7 +363,7 @@ export default async function PartnerJobDetailPage({
                 <span className="text-xs text-muted-foreground">
                   {formatNumber(inspection.acceptedQuantity)} ok / {formatNumber(inspection.rejectedQuantity)} rej
                 </span>
-                <StatusBadge status={inspection.decision ?? inspection.status} />
+                <StatusBadge language={language} status={inspection.decision ?? inspection.status} />
               </div>
             ))}
           </CardContent>

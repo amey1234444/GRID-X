@@ -1,3 +1,4 @@
+import { SchedulerLockService } from '../common/scheduler-lock.service';
 import { Global, Module } from '@nestjs/common';
 import { ImsController } from './ims.controller';
 import { ImsScheduler } from './ims.scheduler';
@@ -10,7 +11,7 @@ import { ImsService } from './ims.service';
 @Global()
 @Module({
   controllers: [ImsController],
-  providers: [ImsService, ImsScheduler],
+  providers: [ImsService, ImsScheduler, SchedulerLockService],
   exports: [ImsService],
 })
 export class ImsModule {}

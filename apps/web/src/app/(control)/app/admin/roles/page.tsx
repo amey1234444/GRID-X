@@ -1,15 +1,18 @@
+import { updateRoleAction } from '@/app/actions/control';
+import { ActionDialog } from '@/components/app/action-dialog';
 import { PageHeader } from '@/components/app/page-header';
 import { StatCard } from '@/components/app/stat-card';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatNumber, humanise } from '@/lib/format';
-import { apiGet } from '@/lib/session';
+import { apiGet, currentUser } from '@/lib/session';
 import type { RoleRow } from '@/lib/types';
 
 export const metadata = { title: 'Roles · GRID-X' };
 
 export default async function RolesPage(): Promise<React.JSX.Element> {
-  const roles = await apiGet<RoleRow[]>('/roles', []);
+  const [roles, user] = await Promise.all([apiGet<RoleRow[]>('/roles', []), currentUser()]);
+  const canManage = user?.permissions.includes('role:manage') ?? false;
   const internal = roles.filter((role) => !role.isPartnerRole);
   const partner = roles.filter((role) => role.isPartnerRole);
 
@@ -42,9 +45,36 @@ export default async function RolesPage(): Promise<React.JSX.Element> {
           <div className="grid gap-4 lg:grid-cols-2">
             {group.rows.map((role) => (
               <Card key={role.id}>
-                <CardHeader>
-                  <CardTitle className="text-base">{role.label ?? role.name}</CardTitle>
-                  <CardDescription>{role.description ?? humanise(role.code)}</CardDescription>
+                <CardHeader className="flex flex-row items-start justify-between gap-3">
+                  <div className="space-y-1.5">
+                    <CardTitle className="text-base">{role.label ?? role.name}</CardTitle>
+                    <CardDescription>{role.description ?? humanise(role.code)}</CardDescription>
+                  </div>
+                  {canManage ? (
+                    <ActionDialog
+                      triggerLabel="Edit"
+                      triggerVariant="ghost"
+                      title={`Edit ${role.label ?? role.name}`}
+                      description="Changes how this role reads to whoever assigns it. What the role can do is fixed in code and is shown below."
+                      action={updateRoleAction}
+                      submitLabel="Save role"
+                      fields={[
+                        {
+                          name: 'name',
+                          label: 'Name',
+                          required: true,
+                          defaultValue: role.name,
+                        },
+                        {
+                          name: 'description',
+                          label: 'Description',
+                          type: 'textarea',
+                          defaultValue: role.description ?? '',
+                        },
+                      ]}
+                      hidden={{ code: role.code }}
+                    />
+                  ) : null}
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

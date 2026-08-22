@@ -24,8 +24,14 @@ import { JobsService } from '../jobs/jobs.service';
 
 export interface ShipmentFilters extends PaginationInput {
   status?: string;
+  /** Several statuses at once, comma separated — the pickup and delivery boards are status groups. */
+  statuses?: string;
   direction?: string;
   partnerId?: string;
+  /** Planned pickup has passed and the vehicle has not collected. */
+  pickupOverdue?: boolean;
+  /** Expected delivery has passed and nothing has been signed for. */
+  deliveryOverdue?: boolean;
 }
 
 /** Module 10 — pickups, deliveries and proof of delivery across the partner network. */
@@ -49,6 +55,19 @@ export class LogisticsService {
       ...companyWhere(actor),
       ...partnerScope,
       ...(filters.status ? { status: filters.status as Prisma.EnumShipmentStatusFilter } : {}),
+      ...(filters.statuses
+        ? {
+            status: {
+              in: filters.statuses.split(',').filter(Boolean) as Prisma.EnumShipmentStatusFilter['in'],
+            },
+          }
+        : {}),
+      ...(filters.pickupOverdue
+        ? { plannedPickupAt: { lt: new Date() }, actualPickupAt: null }
+        : {}),
+      ...(filters.deliveryOverdue
+        ? { expectedDeliveryAt: { lt: new Date() }, actualDeliveryAt: null }
+        : {}),
       ...(filters.direction
         ? { direction: filters.direction as Prisma.EnumShipmentDirectionFilter }
         : {}),

@@ -27,6 +27,16 @@ const listQuerySchema = paginationSchema.extend({
   companyId: z.string().optional(),
 });
 
+const machineQuerySchema = paginationSchema.extend({
+  partnerId: z.string().optional(),
+  search: z.string().optional(),
+});
+
+const auditQuerySchema = paginationSchema.extend({
+  partnerId: z.string().optional(),
+  result: z.string().optional(),
+});
+
 @ApiTags('Partners')
 @Controller('partners')
 export class PartnersController {
@@ -42,6 +52,34 @@ export class PartnersController {
       ...query,
       approvalStatus: query.approvalStatus as never,
     });
+  }
+
+  /** Section 7 screen 5 — declared before :id so \"capability-matrix\" is not read as a partner id. */
+  @Get('capability-matrix')
+  @RequirePermissions(PERMISSIONS.PARTNER_READ)
+  capabilityMatrix(
+    @CurrentUser() user: RequestUser,
+    @Query('companyId') companyId?: string,
+  ) {
+    return this.partners.capabilityMatrix(user, companyId);
+  }
+
+  @Get('machines')
+  @RequirePermissions(PERMISSIONS.PARTNER_READ)
+  listMachines(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(machineQuerySchema)) query: z.infer<typeof machineQuerySchema>,
+  ) {
+    return this.partners.listMachines(user, query);
+  }
+
+  @Get('audits')
+  @RequirePermissions(PERMISSIONS.PARTNER_READ)
+  listAudits(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(auditQuerySchema)) query: z.infer<typeof auditQuerySchema>,
+  ) {
+    return this.partners.listAudits(user, query);
   }
 
   @Get(':id')

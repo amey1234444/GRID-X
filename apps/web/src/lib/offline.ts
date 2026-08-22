@@ -1,11 +1,21 @@
 'use client';
 
 /**
- * Offline write queue for the partner PWA (Section 8). Milestone updates and
+ * Offline write queue for the partner PWA (Sections 8 and 19). Milestone updates and
  * acknowledgements are queued in localStorage when the device is offline and
  * replayed automatically once connectivity returns. Every entry carries a
  * clientRequestId so replays are idempotent on the server.
+ *
+ * Photographs are too large for localStorage, so they live in IndexedDB alongside the entry that
+ * references them — see offline-photos.ts — and are uploaded first on replay.
  */
+
+import {
+  discardPhotos,
+  photosFor,
+  photosSupported,
+  uploadQueuedPhoto,
+} from '@/lib/offline-photos';
 
 const STORAGE_KEY = 'gridx.offline.queue.v1';
 
@@ -15,6 +25,12 @@ export interface QueuedRequest {
   body: Record<string, unknown>;
   label: string;
   queuedAt: string;
+  /**
+   * IndexedDB ids of photographs captured while offline. They are uploaded first on replay and the
+   * resulting file ids are merged into the body, so the milestone never arrives citing evidence
+   * the server does not have.
+   */
+  photoIds?: string[];
 }
 
 function read(): QueuedRequest[] {
@@ -47,15 +63,54 @@ export function newRequestId(): string {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+/**
+ * Uploads the photographs captured alongside an offline milestone and folds the stored file ids
+ * into its body. Returns null when an upload is worth retrying, so the whole entry stays queued
+ * rather than being sent without its evidence.
+ */
+async function attachPhotographs(entry: QueuedRequest): Promise<QueuedRequest | null> {
+  if (!entry.photoIds?.length || !photosSupported()) return entry;
+
+  const queued = await photosFor(entry.clientRequestId);
+  if (queued.length === 0) return entry;
+
+  const fileIds: string[] = [];
+  for (const photo of queued) {
+    let id: string | null;
+    try {
+      id = await uploadQueuedPhoto(photo);
+    } catch {
+      // The server will never take this file. Drop it rather than blocking the milestone for ever.
+      await discardPhotos([photo.id]);
+      continue;
+    }
+    if (id === null) return null;
+    fileIds.push(id);
+  }
+
+  const existing = Array.isArray(entry.body.photographFileIds)
+    ? (entry.body.photographFileIds as string[])
+    : [];
+  return {
+    ...entry,
+    body: { ...entry.body, photographFileIds: [...existing, ...fileIds] },
+  };
+}
+
 async function post(entry: QueuedRequest): Promise<boolean> {
+  const ready = await attachPhotographs(entry);
+  if (ready === null) return false;
+
   try {
-    const response = await fetch(`/api/gridx${entry.path}`, {
+    const response = await fetch(`/api/gridx${ready.path}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...entry.body, clientRequestId: entry.clientRequestId, syncedFromOffline: true }),
+      body: JSON.stringify({ ...ready.body, clientRequestId: ready.clientRequestId, syncedFromOffline: true }),
     });
     // 4xx responses are permanent: the entry is dropped so the queue cannot jam.
-    return response.ok || (response.status >= 400 && response.status < 500);
+    const settled = response.ok || (response.status >= 400 && response.status < 500);
+    if (settled && ready.photoIds?.length) await discardPhotos(ready.photoIds);
+    return settled;
   } catch {
     return false;
   }

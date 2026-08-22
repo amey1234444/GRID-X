@@ -1,7 +1,16 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
-import { GridJob, JobStatus, MilestoneType, Prisma } from '@gridx/db';
+import {
+  ClarificationStatus,
+  DelayReason,
+  GridJob,
+  JobStatus,
+  MilestoneType,
+  Prisma,
+  ResponsibleParty,
+} from '@gridx/db';
 import {
   ALLOCATABLE_PARTNER_STATUSES,
+  outsourcingEligibility,
   AllocationInput,
   CreateJobInput,
   JOB_STATUS_TRANSITIONS,
@@ -50,6 +59,61 @@ export interface JobFilters extends PaginationInput {
   overdue?: boolean;
 }
 
+export interface DelayFilters extends PaginationInput {
+  companyId?: string;
+  partnerId?: string;
+  reason?: DelayReason;
+  responsibility?: ResponsibleParty;
+  /** Hide delays that have already been closed out. */
+  openOnly?: boolean;
+}
+
+export interface DelayRow {
+  id: string;
+  jobId: string;
+  jobNumber: string;
+  componentCode: string;
+  componentName: string;
+  partnerId: string | null;
+  partnerName: string | null;
+  jobStatus: JobStatus;
+  dueDate: Date | null;
+  reason: DelayReason;
+  responsibility: ResponsibleParty;
+  delayDays: number;
+  detail: string | null;
+  expectedCompletionDate: Date | null;
+  reportedByName: string | null;
+  reportedAt: Date;
+  resolvedAt: Date | null;
+}
+
+export interface ClarificationFilters extends PaginationInput {
+  companyId?: string;
+  partnerId?: string;
+  status?: ClarificationStatus;
+}
+
+export interface ClarificationRow {
+  id: string;
+  jobId: string;
+  jobNumber: string;
+  componentCode: string;
+  componentName: string;
+  partnerId: string | null;
+  partnerName: string | null;
+  dueDate: Date | null;
+  question: string;
+  answer: string | null;
+  status: ClarificationStatus;
+  raisedByName: string | null;
+  raisedAt: Date;
+  answeredByName: string | null;
+  answeredAt: Date | null;
+  /** How long an open question has been waiting. Null once answered. */
+  openForDays: number | null;
+}
+
 @Injectable()
 export class JobsService {
   constructor(
@@ -71,6 +135,152 @@ export class JobsService {
       ...companyWhere(actor, companyId),
       ...(actor.userType === 'PARTNER' ? { partnerId: actor.partnerId ?? '' } : {}),
     };
+  }
+
+  /**
+   * Section 12's \"get delayed jobs\", and the pilot criterion that management can identify delays
+   * without calling every workshop. Until this existed a delay was only visible by opening the one
+   * job it belonged to, which made the reason and responsibility recorded against it unreadable in
+   * aggregate.
+   */
+  async listDelays(actor: RequestUser, filters: DelayFilters): Promise<Paginated<DelayRow>> {
+    const where: Prisma.JobDelayWhereInput = {
+      job: this.scopeWhere(actor, filters.companyId),
+      ...(filters.reason ? { reason: filters.reason } : {}),
+      ...(filters.responsibility ? { responsibility: filters.responsibility } : {}),
+      ...(filters.partnerId ? { job: { partnerId: filters.partnerId } } : {}),
+      ...(filters.openOnly ? { resolvedAt: null } : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.jobDelay.findMany({
+        where,
+        ...paginationArgs(filters),
+        orderBy: { reportedAt: 'desc' },
+        include: {
+          job: {
+            select: {
+              id: true,
+              jobNumber: true,
+              dueDate: true,
+              status: true,
+              partner: { select: { id: true, businessName: true } },
+              component: { select: { componentCode: true, name: true } },
+            },
+          },
+          reportedBy: { select: { name: true } },
+        },
+      }),
+      this.prisma.jobDelay.count({ where }),
+    ]);
+
+    const data: DelayRow[] = rows.map((delay) => ({
+      id: delay.id,
+      jobId: delay.job.id,
+      jobNumber: delay.job.jobNumber,
+      componentCode: delay.job.component.componentCode,
+      componentName: delay.job.component.name,
+      partnerId: delay.job.partner?.id ?? null,
+      partnerName: delay.job.partner?.businessName ?? null,
+      jobStatus: delay.job.status,
+      dueDate: delay.job.dueDate,
+      reason: delay.reason,
+      responsibility: delay.responsibility,
+      delayDays: delay.delayDays,
+      detail: delay.detail,
+      expectedCompletionDate: delay.expectedCompletionDate,
+      reportedByName: delay.reportedBy?.name ?? null,
+      reportedAt: delay.reportedAt,
+      resolvedAt: delay.resolvedAt,
+    }));
+
+    return paginate(data, total, filters);
+  }
+
+  /** Closes a delay once the job has recovered, so the queue shows what is still outstanding. */
+  async resolveDelay(actor: RequestUser, delayId: string): Promise<{ id: string }> {
+    const delay = await this.prisma.jobDelay.findUniqueOrThrow({
+      where: { id: delayId },
+      include: { job: { select: { id: true, companyId: true, partnerId: true } } },
+    });
+    await this.assertJobScope(actor, delay.job.id);
+    if (delay.resolvedAt) return { id: delay.id };
+
+    await this.prisma.jobDelay.update({
+      where: { id: delayId },
+      data: { resolvedAt: new Date() },
+    });
+    await this.audit.record(actor, {
+      action: 'JOB_DELAY_RESOLVED',
+      entityType: 'JobDelay',
+      entityId: delayId,
+      companyId: delay.job.companyId,
+    });
+    return { id: delayId };
+  }
+
+  /**
+   * The clarification queue (Section 24, Production - Clarifications). A partner raising a question
+   * previously reached nobody: the record could only be read by opening that exact job, so a
+   * question could sit unanswered indefinitely while the job ran late for want of an answer.
+   */
+  async listClarifications(
+    actor: RequestUser,
+    filters: ClarificationFilters,
+  ): Promise<Paginated<ClarificationRow>> {
+    const where: Prisma.JobClarificationWhereInput = {
+      job: this.scopeWhere(actor, filters.companyId),
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.partnerId ? { job: { partnerId: filters.partnerId } } : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.jobClarification.findMany({
+        where,
+        ...paginationArgs(filters),
+        // Open questions first, then oldest first: the one waiting longest is the one hurting most.
+        orderBy: [{ status: 'asc' }, { raisedAt: 'asc' }],
+        include: {
+          job: {
+            select: {
+              id: true,
+              jobNumber: true,
+              dueDate: true,
+              partner: { select: { id: true, businessName: true } },
+              component: { select: { componentCode: true, name: true } },
+            },
+          },
+          raisedBy: { select: { name: true } },
+          answeredBy: { select: { name: true } },
+        },
+      }),
+      this.prisma.jobClarification.count({ where }),
+    ]);
+
+    const now = Date.now();
+    const data: ClarificationRow[] = rows.map((row) => ({
+      id: row.id,
+      jobId: row.job.id,
+      jobNumber: row.job.jobNumber,
+      componentCode: row.job.component.componentCode,
+      componentName: row.job.component.name,
+      partnerId: row.job.partner?.id ?? null,
+      partnerName: row.job.partner?.businessName ?? null,
+      dueDate: row.job.dueDate,
+      question: row.question,
+      answer: row.answer,
+      status: row.status,
+      raisedByName: row.raisedBy?.name ?? null,
+      raisedAt: row.raisedAt,
+      answeredByName: row.answeredBy?.name ?? null,
+      answeredAt: row.answeredAt,
+      openForDays:
+        row.status === 'OPEN'
+          ? Math.floor((now - row.raisedAt.getTime()) / 86_400_000)
+          : null,
+    }));
+
+    return paginate(data, total, filters);
   }
 
   private async assertJobScope(actor: RequestUser, jobId: string): Promise<GridJob> {
@@ -221,6 +431,34 @@ export class JobsService {
     }
   }
 
+  /**
+   * Module 2's outsourcing eligibility score, which until now was recorded and never read. It is a
+   * separate judgement from criticality: engineering may mark a low-class part unsuitable to send
+   * out because of tooling or tolerance, and that judgement should be as hard to walk past as the
+   * Class A rule. Overriding it takes the same senior authorisation.
+   */
+  private assertOutsourcingEligible(
+    actor: RequestUser,
+    score: number,
+    reason: string | undefined,
+    existingAuthorisationBy?: string | null,
+  ): void {
+    const verdict = outsourcingEligibility(score);
+    if (verdict.eligible) return;
+    if (!reason && existingAuthorisationBy) return;
+
+    if (!reason) {
+      throw new BadRequestException(
+        `${verdict.reason} Outsourcing it anyway requires a documented authorisation reason.`,
+      );
+    }
+    if (!actor.permissions.includes(PERMISSIONS.JOB_CLASS_A_OVERRIDE)) {
+      throw new ForbiddenException(
+        `${verdict.reason} Ask the GRID-X Head or a Group Admin to authorise this job.`,
+      );
+    }
+  }
+
   async create(actor: RequestUser, input: CreateJobInput): Promise<GridJob> {
     assertCanWriteToCompany(actor, input.companyId);
     const component = await this.prisma.component.findUniqueOrThrow({
@@ -232,6 +470,11 @@ export class JobsService {
       component.criticality,
       input.classAOverrideReason,
       'Outsourcing',
+    );
+    this.assertOutsourcingEligible(
+      actor,
+      component.outsourcingEligibilityScore,
+      input.classAOverrideReason,
     );
 
     const jobNumber = await this.sequence.next('JOB');

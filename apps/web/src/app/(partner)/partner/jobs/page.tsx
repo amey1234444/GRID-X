@@ -77,7 +77,7 @@ export default async function PartnerJobsPage({
                       {job.jobNumber} · {job.componentCode}
                     </p>
                   </div>
-                  <StatusBadge status={job.status} />
+                  <StatusBadge language={hindi ? 'HI' : 'EN'} status={job.status} />
                 </div>
                 <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
                   <div>

@@ -77,7 +77,7 @@ export default async function PartnerInspectionsPage({
                     {formatNumber(inspection.acceptedQuantity)} {hindi ? 'स्वीकृत' : 'accepted'} ·{' '}
                     {formatNumber(inspection.rejectedQuantity)} {hindi ? 'अस्वीकृत' : 'rejected'}
                   </span>
-                  <StatusBadge status={inspection.decision ?? inspection.status} />
+                  <StatusBadge language={hindi ? 'HI' : 'EN'} status={inspection.decision ?? inspection.status} />
                   {inspection.job ? (
                     <Link href={`/partner/jobs/${inspection.job.id}`} className="text-sm text-primary underline">
                       {hindi ? 'काम देखें' : 'View job'}
@@ -105,7 +105,7 @@ export default async function PartnerInspectionsPage({
                     {order.job ? ` · ${order.job.jobNumber}` : ''} · {order.instructions}
                   </p>
                 </div>
-                <StatusBadge status={order.status} />
+                <StatusBadge language={hindi ? 'HI' : 'EN'} status={order.status} />
               </CardContent>
             </Card>
           ))}

@@ -345,6 +345,7 @@ export async function answerClarificationAction(
   if (!clarificationId || !answer) return { error: 'Type your answer' };
   return send(`/jobs/clarifications/${clarificationId}/answer`, { answer }, [
     `/app/production/jobs/${jobId ?? ''}`,
+    '/app/production/clarifications',
   ]);
 }
 
@@ -363,6 +364,32 @@ export async function cancelJobAction(_state: ActionState, data: FormData): Prom
   const reason = text(data, 'reason');
   if (!jobId || !reason) return { error: 'A cancellation reason is required' };
   return send(`/jobs/${jobId}/cancel`, { reason }, [`/app/production/jobs/${jobId}`, '/app/production/jobs']);
+}
+
+/** Closes out a delay from the Production - Delays queue once the job has recovered. */
+export async function resolveDelayAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const delayId = text(data, 'delayId');
+  if (!delayId) return { error: 'The delay could not be identified' };
+  return send(`/jobs/delays/${delayId}/resolve`, {}, ['/app/production/delays']);
+}
+
+/**
+ * Renames a role or rewrites how it reads. The permission matrix behind it stays in code, so this
+ * changes what people assigning the role see, not what the role can do.
+ */
+export async function updateRoleAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const code = text(data, 'code');
+  const name = text(data, 'name');
+  const description = text(data, 'description');
+  if (!code) return { error: 'The role could not be identified' };
+  if (!name) return { error: 'A role needs a name' };
+  return send(`/roles/${code}`, { name, description }, ['/app/admin/roles'], 'PATCH');
 }
 
 // ---------------------------------------------------------------------------
@@ -698,7 +725,11 @@ export async function advanceCorrectiveActionAction(
       correctiveAction: text(data, 'correctiveAction'),
       verification: text(data, 'verification'),
     },
-    ['/app/quality/non-conformances', '/inspector/non-conformances'],
+    [
+      '/app/quality/non-conformances',
+      '/app/quality/corrective-actions',
+      '/inspector/non-conformances',
+    ],
     'PATCH',
   );
 }

@@ -211,11 +211,15 @@ describe('JobsService — first article gate (Section 2)', () => {
 
   it('never gates the milestones that come before the first article', async () => {
     const { service, prisma } = withJob();
-    prisma.jobMilestone.create.mockResolvedValue({ id: 'm2', type: 'PRODUCTION_STARTED' });
+    prisma.jobMilestone.create.mockResolvedValue({ id: 'm2', type: 'FIRST_PIECE_READY' });
     prisma.gridJob.update.mockResolvedValue({ id: 'j1', status: 'IN_PRODUCTION' });
 
     await expect(
-      service.updateMilestone(partner, 'j1', { type: 'FIRST_PIECE_READY' } as never),
+      service.updateMilestone(partner, 'j1', {
+        type: 'FIRST_PIECE_READY',
+        // This milestone carries photographic evidence in its own right (Module 7).
+        photographFileIds: ['file-1'],
+      } as never),
     ).resolves.toBeDefined();
     expect(prisma.inspection.findFirst).not.toHaveBeenCalled();
   });
@@ -252,6 +256,95 @@ describe('JobsService — first article gate (Section 2)', () => {
       } as never),
     ).resolves.toMatchObject({ id: 'm-existing' });
     expect(prisma.inspection.findFirst).not.toHaveBeenCalled();
+  });
+});
+
+describe('JobsService — progress evidence (Module 7)', () => {
+  const job = {
+    id: 'j1',
+    companyId: OSWAR,
+    partnerId: 'partner-1',
+    materialResponsibility: 'OSWAR_SUPPLIED',
+    dueDate: new Date('2026-12-31'),
+    component: { inspectionLevel: 'LEVEL_1_VISUAL', criticality: 'CLASS_D' },
+  };
+  const partner = user({
+    userType: 'PARTNER',
+    roleCode: 'PARTNER_SUPERVISOR',
+    partnerId: 'partner-1',
+    companyIds: [],
+    defaultCompanyId: null,
+  });
+
+  function withJob() {
+    const mocks = build();
+    mocks.prisma.gridJob.findUniqueOrThrow.mockResolvedValue(job);
+    mocks.prisma.jobMilestone.create.mockResolvedValue({ id: 'm1' });
+    mocks.prisma.gridJob.update.mockResolvedValue({ id: 'j1' });
+    return mocks;
+  }
+
+  it('refuses a milestone that needs a photograph without one', async () => {
+    const { service } = withJob();
+    await expect(
+      service.updateMilestone(partner, 'j1', { type: 'MATERIAL_RECEIVED' } as never),
+    ).rejects.toThrow(/photograph is required/i);
+  });
+
+  it('refuses when the client sends an empty photograph list', async () => {
+    const { service } = withJob();
+    await expect(
+      service.updateMilestone(partner, 'j1', {
+        type: 'DISPATCHED',
+        photographFileIds: [],
+      } as never),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('accepts the milestone once evidence is attached', async () => {
+    const { service, files } = withJob();
+    await expect(
+      service.updateMilestone(partner, 'j1', {
+        type: 'MATERIAL_RECEIVED',
+        photographFileIds: ['file-1'],
+      } as never),
+    ).resolves.toBeDefined();
+    expect(files.attachPhotographs).toHaveBeenCalled();
+  });
+
+  it('leaves milestones that carry no evidence requirement alone', async () => {
+    const { service } = withJob();
+    await expect(
+      service.updateMilestone(partner, 'j1', { type: 'BATCH_25_PERCENT' } as never),
+    ).resolves.toBeDefined();
+  });
+
+  it('attributes an OSWAR-caused delay to OSWAR, not to whoever reported it', async () => {
+    const { service, prisma } = withJob();
+    await service.updateMilestone(partner, 'j1', {
+      type: 'BATCH_25_PERCENT',
+      delayReason: 'OSWAR_APPROVAL_PENDING',
+    } as never);
+
+    expect(prisma.jobDelay.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ responsibility: 'OSWAR' }),
+      }),
+    );
+  });
+
+  it('still attributes a partner-caused delay to the partner', async () => {
+    const { service, prisma } = withJob();
+    await service.updateMilestone(partner, 'j1', {
+      type: 'BATCH_25_PERCENT',
+      delayReason: 'MACHINE_BREAKDOWN',
+    } as never);
+
+    expect(prisma.jobDelay.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ responsibility: 'PARTNER' }),
+      }),
+    );
   });
 });
 

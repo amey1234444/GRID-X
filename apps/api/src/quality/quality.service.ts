@@ -548,6 +548,136 @@ export class QualityService {
     return paginate(data, total, filters);
   }
 
+  /**
+   * The corrective-action queue (Section 24, Quality - Corrective Actions).
+   *
+   * A CAPA could be raised and advanced but never listed, so the only way to find an open one was
+   * to already know which non-conformance it hung off. Module 8's workflow only means something if
+   * somebody can see what is sitting at each stage.
+   */
+  async listCorrectiveActions(
+    actor: RequestUser,
+    filters: PaginationInput & { stage?: string; ownerId?: string; overdue?: boolean },
+  ) {
+    const where: Prisma.CorrectiveActionWhereInput = {
+      nonConformance: {
+        ...nestedCompanyWhere(actor, 'job'),
+        ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
+      },
+      ...(filters.stage ? { stage: filters.stage as Prisma.EnumCorrectiveActionStageFilter } : {}),
+      ...(filters.ownerId ? { ownerId: filters.ownerId } : {}),
+      ...(filters.overdue ? { dueDate: { lt: new Date() }, closedAt: null } : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.correctiveAction.findMany({
+        where,
+        ...paginationArgs(filters),
+        // Open first, oldest first: the one that has been sitting longest needs attention most.
+        orderBy: [{ closedAt: 'asc' }, { dueDate: 'asc' }],
+        include: {
+          owner: { select: { id: true, name: true } },
+          nonConformance: {
+            select: {
+              id: true,
+              ncNumber: true,
+              defectType: true,
+              quantityAffected: true,
+              job: { select: { id: true, jobNumber: true } },
+              partner: { select: { id: true, businessName: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.correctiveAction.count({ where }),
+    ]);
+
+    const now = Date.now();
+    const data = rows.map((row) => ({
+      id: row.id,
+      caNumber: row.caNumber,
+      stage: row.stage,
+      dueDate: row.dueDate,
+      closedAt: row.closedAt,
+      createdAt: row.createdAt,
+      ownerName: row.owner?.name ?? null,
+      ncNumber: row.nonConformance.ncNumber,
+      defectType: row.nonConformance.defectType,
+      quantityAffected: row.nonConformance.quantityAffected,
+      jobId: row.nonConformance.job?.id ?? null,
+      jobNumber: row.nonConformance.job?.jobNumber ?? null,
+      partnerName: row.nonConformance.partner?.businessName ?? null,
+      overdueDays:
+        row.closedAt === null && row.dueDate !== null && row.dueDate.getTime() < now
+          ? Math.floor((now - row.dueDate.getTime()) / 86_400_000)
+          : null,
+    }));
+
+    return paginate(data, total, filters);
+  }
+
+  /**
+   * Deviations awaiting an engineering decision (Module 8).
+   *
+   * Accepting a component that misses its specification is now an engineering call, so engineering
+   * needs somewhere to find the requests waiting on them.
+   */
+  async listDeviations(actor: RequestUser, filters: PaginationInput & { status?: string }) {
+    const where: Prisma.DeviationApprovalWhereInput = {
+      inspection: {
+        job: {
+          ...companyWhere(actor),
+          ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
+        },
+      },
+      ...(filters.status ? { status: filters.status as Prisma.EnumDeviationStatusFilter } : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.deviationApproval.findMany({
+        where,
+        ...paginationArgs(filters),
+        orderBy: [{ status: 'asc' }, { createdAt: 'asc' }],
+        include: {
+          decidedBy: { select: { name: true } },
+          inspection: {
+            select: {
+              id: true,
+              inspectionNumber: true,
+              job: {
+                select: {
+                  id: true,
+                  jobNumber: true,
+                  component: { select: { componentCode: true, name: true } },
+                  partner: { select: { businessName: true } },
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.deviationApproval.count({ where }),
+    ]);
+
+    const data = rows.map((row) => ({
+      id: row.id,
+      status: row.status,
+      requestNote: row.requestNote,
+      decisionNote: row.decisionNote,
+      decidedByName: row.decidedBy?.name ?? null,
+      decidedAt: row.decidedAt,
+      createdAt: row.createdAt,
+      inspectionId: row.inspection.id,
+      inspectionNumber: row.inspection.inspectionNumber,
+      jobId: row.inspection.job?.id ?? null,
+      jobNumber: row.inspection.job?.jobNumber ?? null,
+      componentCode: row.inspection.job?.component?.componentCode ?? null,
+      partnerName: row.inspection.job?.partner?.businessName ?? null,
+    }));
+
+    return paginate(data, total, filters);
+  }
+
   async createRework(actor: RequestUser, input: z.infer<typeof createReworkSchema>) {
     await this.assertJobScope(actor, input.jobId);
     const reworkNumber = await this.sequence.next('REWORK');

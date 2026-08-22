@@ -116,7 +116,7 @@ export default async function PartnerInvoicesPage({
                       </p>
                     </div>
                     <span className="text-sm font-medium">{formatCurrency(invoice.netAmount)}</span>
-                    <StatusBadge status={invoice.status} />
+                    <StatusBadge language={hindi ? 'HI' : 'EN'} status={invoice.status} />
                   </div>
                   <div className="flex flex-wrap gap-2 text-xs">
                     {[
