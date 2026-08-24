@@ -9,6 +9,7 @@ import {
   partnerCapabilitySchema,
   partnerDocumentSchema,
   partnerEmployeeSchema,
+  partnerLocationSchema,
   partnerMachineSchema,
   suspendPartnerSchema,
   updatePartnerSchema,
@@ -177,6 +178,29 @@ export class PartnersController {
   @RequirePermissions(PERMISSIONS.PARTNER_DOCUMENT_MANAGE)
   verifyDocument(@CurrentUser() user: RequestUser, @Param('documentId') documentId: string) {
     return this.partners.verifyDocument(user, documentId);
+  }
+
+  /** Module 1 — additional units for a partner working out of more than one address. */
+  @Get(':id/locations')
+  @RequirePermissions(PERMISSIONS.PARTNER_READ)
+  listLocations(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.partners.listLocations(user, id);
+  }
+
+  @Post(':id/locations')
+  @RequirePermissions(PERMISSIONS.PARTNER_LOCATION_MANAGE)
+  addLocation(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body(zodBody(partnerLocationSchema)) body: z.infer<typeof partnerLocationSchema>,
+  ) {
+    return this.partners.addLocation(user, id, body);
+  }
+
+  @Delete('locations/:locationId')
+  @RequirePermissions(PERMISSIONS.PARTNER_LOCATION_MANAGE)
+  removeLocation(@CurrentUser() user: RequestUser, @Param('locationId') locationId: string) {
+    return this.partners.removeLocation(user, locationId);
   }
 
   @Post(':id/employees')

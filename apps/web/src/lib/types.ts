@@ -125,6 +125,9 @@ export interface InspectionPlanRow {
   name: string;
   inspectionType: string;
   samplingPlan: string | null;
+  /** Module 8 — enforced sampling. Null falls back to the component's inspection level. */
+  samplePercent: number | null;
+  minSampleSize: number | null;
   version: number;
   isActive: boolean;
   component: { componentCode: string; name: string };
@@ -343,11 +346,20 @@ export interface CompanyRow {
   isActive: boolean;
 }
 
+/**
+ * Section 7 — one entry from the settings catalogue. Settings used to be free-form rows read
+ * straight from the table; the API now returns only keys the platform actually reads, each with
+ * the rule it governs and whether it is still at its default.
+ */
 export interface SettingRow {
-  id: string;
   key: string;
+  label: string;
+  description: string;
+  group: 'security' | 'governance' | 'drawings' | 'materials' | 'commercial';
+  type: 'boolean' | 'number' | 'roleList';
   value: unknown;
-  updatedAt: string;
+  isDefault: boolean;
+  default: unknown;
 }
 
 export interface AuditLogRow {
@@ -408,10 +420,52 @@ export interface CapacityDeclarationRow {
   process: { id: string; code: string; name: string };
 }
 
+/**
+ * Module 5 management output: the network view of capacity — totals, capacity by process and by
+ * location, and who is overloaded or idle.
+ */
+export interface CapacityNetworkSummary {
+  totalCapacityHours: number;
+  utilisedHours: number;
+  freeHours: number;
+  utilisationPercent: number;
+  partnersDeclaring: number;
+  byProcess: {
+    processCode: string;
+    availableHours: number;
+    committedHours: number;
+    freeHours: number;
+    utilisationPercent: number;
+  }[];
+  byLocation: {
+    city: string;
+    partners: number;
+    availableHours: number;
+    committedHours: number;
+    freeHours: number;
+    utilisationPercent: number;
+  }[];
+  overloaded: CapacityPartnerLoad[];
+  underutilised: CapacityPartnerLoad[];
+}
+
+export interface CapacityPartnerLoad {
+  partnerId: string;
+  partnerCode: string;
+  businessName: string;
+  city: string;
+  availableHours: number;
+  committedHours: number;
+  freeHours: number;
+  utilisationPercent: number;
+  expectedBottleneck: string | null;
+}
+
 export interface CapacityHeatmapCell {
   partnerId: string;
   partnerCode: string;
   businessName: string;
+  city: string;
   processCode: string;
   periodStart: string;
   periodEnd: string;
@@ -506,6 +560,19 @@ export interface PartnerDetail {
     maxWeightKg: number | null;
     toleranceMm: number | null;
     monthlyCapacityHours: number;
+  }[];
+  /** Module 1 — additional workshops. The primary one is where material goes by default. */
+  locations: {
+    id: string;
+    label: string;
+    addressLine1: string;
+    addressLine2: string | null;
+    city: string;
+    state: string;
+    pincode: string;
+    latitude: number | null;
+    longitude: number | null;
+    isPrimary: boolean;
   }[];
   machines: {
     id: string;
@@ -956,4 +1023,45 @@ export interface PartnerAuditRow {
   findings: string | null;
   auditorName: string | null;
   nextAuditDate: string | null;
+}
+
+/** Module 6 step 2 — what a job's bill of material says stores should issue. */
+export interface MaterialRequirement {
+  jobId: string;
+  jobNumber: string;
+  quantity: number;
+  componentCode: string;
+  componentName: string;
+  scrapAllowancePercent: number;
+  hasBillOfMaterial: boolean;
+  lines: {
+    itemId: string;
+    itemCode?: string;
+    itemName?: string;
+    uom: string;
+    quantityPerUnit: number;
+    netQuantity: number;
+    scrapAllowanceQuantity: number;
+    grossQuantity: number;
+    grossWeightKg: number | null;
+    alreadyIssued: number;
+    outstanding: number;
+  }[];
+}
+
+/** Module 6 — one movement of material in or out of a partner's custody. */
+export interface MaterialTransactionRow {
+  id: string;
+  type: string;
+  quantityKg: number;
+  directionKg: number;
+  batchNumber: string | null;
+  heatNumber: string | null;
+  reference: string | null;
+  remarks: string | null;
+  occurredAt: string;
+  item: { code: string; name: string; uom: string };
+  job: { jobNumber: string } | null;
+  partner: { partnerCode: string; businessName: string } | null;
+  recordedBy: { name: string } | null;
 }

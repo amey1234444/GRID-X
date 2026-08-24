@@ -21,6 +21,7 @@ import {
 import { AppConfig } from '../config/configuration';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { SettingsService } from '../common/settings.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
   generateRecoveryCodes,
@@ -45,6 +46,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly settings: SettingsService,
   ) {}
 
   static hashToken(token: string): string {
@@ -72,9 +74,29 @@ export class AuthService {
     if (user.twoFactorEnabled && user.twoFactorConfirmedAt) {
       if (!input.twoFactorCode) throw new UnauthorizedException('Two-factor code required');
       await this.assertSecondFactor(user, input.twoFactorCode);
+      return this.issueSession(user.id, device, 'PASSWORD_LOGIN');
+    }
+
+    // Section 18 — "two-factor authentication for admins". Being opt-in made that unenforceable:
+    // a Group Admin could run on a password indefinitely, and an admin setting the flag on someone
+    // changed nothing until that person chose to enrol.
+    //
+    // A senior role that has not enrolled gets in, but only as far as the enrolment screen. That
+    // is the one shape of enforcement that cannot lock anybody out of their own account.
+    if (await this.twoFactorRequiredFor(user.roleId)) {
+      return this.issueEnrolmentSession(user.id, device);
     }
 
     return this.issueSession(user.id, device, 'PASSWORD_LOGIN');
+  }
+
+  /** Whether the roles configured in system settings oblige this user to hold a second factor. */
+  private async twoFactorRequiredFor(roleId: string): Promise<boolean> {
+    const [required, role] = await Promise.all([
+      this.settings.get('security.twoFactorRequiredRoles'),
+      this.prisma.role.findUnique({ where: { id: roleId }, select: { code: true } }),
+    ]);
+    return Boolean(role && required.includes(role.code));
   }
 
   // -------------------------------------------------------------------------
@@ -113,7 +135,8 @@ export class AuthService {
   async confirmTwoFactorEnrolment(
     userId: string,
     code: string,
-  ): Promise<{ recoveryCodes: string[] }> {
+    device: DeviceContext = {},
+  ): Promise<{ recoveryCodes: string[]; session: LoginResponse }> {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
     if (!user.twoFactorSecret) {
       throw new BadRequestException('Start two-factor enrolment before confirming it');
@@ -143,7 +166,11 @@ export class AuthService {
       entityType: 'User',
       entityId: userId,
     });
-    return { recoveryCodes };
+
+    // Enrolling is the last step of signing in for a user who was sent here by the role
+    // requirement, so a full session is issued now rather than making them log in twice.
+    const session = await this.issueSession(userId, device, 'TWO_FACTOR_ENROLLED');
+    return { recoveryCodes, session };
   }
 
   /** Turning 2FA off requires a current code or a recovery code, so a stolen session cannot. */
@@ -304,6 +331,241 @@ export class AuthService {
     });
   }
 
+  // -------------------------------------------------------------------------
+  // Password recovery (Section 18)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Starts a reset.
+   *
+   * Partners sign in with an OTP, so a forgotten password costs them nothing. An internal user had
+   * only a password and no way back from losing it short of someone editing the database.
+   *
+   * The response is identical whether or not the address is known, so this cannot be used to
+   * enumerate staff.
+   */
+  async requestPasswordReset(
+    email: string,
+    device: DeviceContext,
+  ): Promise<{ sent: true; expiresInMinutes: number }> {
+    const ttlMinutes = await this.settings.get('security.passwordResetTokenTtlMinutes');
+    const user = await this.prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+      select: { id: true, email: true, name: true, status: true },
+    });
+
+    if (user && user.status !== 'SUSPENDED' && user.email) {
+      const { token } = await this.issueResetToken(user.id, ttlMinutes, null, device.ipAddress);
+      await this.deliverResetLink(user.email, user.name, token, ttlMinutes);
+      await this.audit.record(null, {
+        action: 'PASSWORD_RESET_REQUESTED',
+        entityType: 'User',
+        entityId: user.id,
+        ipAddress: device.ipAddress,
+        userAgent: device.userAgent,
+      });
+    }
+
+    return { sent: true, expiresInMinutes: ttlMinutes };
+  }
+
+  /**
+   * Issues a reset on someone else's behalf, for a user whose email no longer reaches them.
+   *
+   * Returns the link so an administrator can pass it on, and optionally a one-time password for
+   * when there is no way to send a link at all. Neither is ever stored in the clear.
+   */
+  async issueAdminPasswordReset(
+    actorId: string,
+    userId: string,
+    returnTemporaryPassword: boolean,
+  ): Promise<{
+    resetUrl: string | null;
+    temporaryPassword: string | null;
+    expiresInMinutes: number;
+    emailed: boolean;
+  }> {
+    const ttlMinutes = await this.settings.get('security.passwordResetTokenTtlMinutes');
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { id: true, email: true, name: true },
+    });
+
+    if (returnTemporaryPassword) {
+      // A temporary password and a live link are two ways in, and only one should exist, so any
+      // outstanding token is consumed here rather than left usable alongside it.
+      const temporaryPassword = this.generateTemporaryPassword();
+      const passwordHash = await this.hashPassword(temporaryPassword);
+      await this.prisma.$transaction([
+        this.prisma.user.update({
+          where: { id: userId },
+          data: { passwordHash, passwordUpdatedAt: new Date() },
+        }),
+        this.prisma.passwordResetToken.updateMany({
+          where: { userId, consumedAt: null },
+          data: { consumedAt: new Date() },
+        }),
+        this.prisma.refreshToken.updateMany({
+          where: { userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        }),
+      ]);
+      await this.audit.record(null, {
+        action: 'PASSWORD_RESET_ISSUED_BY_ADMIN',
+        entityType: 'User',
+        entityId: userId,
+        after: { issuedBy: actorId, method: 'TEMPORARY_PASSWORD' },
+      });
+      return { resetUrl: null, temporaryPassword, expiresInMinutes: ttlMinutes, emailed: false };
+    }
+
+    const { token } = await this.issueResetToken(userId, ttlMinutes, actorId, null);
+    const emailed = user.email
+      ? await this.deliverResetLink(user.email, user.name, token, ttlMinutes)
+      : false;
+
+    await this.audit.record(null, {
+      action: 'PASSWORD_RESET_ISSUED_BY_ADMIN',
+      entityType: 'User',
+      entityId: userId,
+      after: { issuedBy: actorId, method: 'LINK', emailed },
+    });
+    return {
+      resetUrl: this.resetUrl(token),
+      temporaryPassword: null,
+      expiresInMinutes: ttlMinutes,
+      emailed,
+    };
+  }
+
+  /**
+   * Completes a reset. The token is single-use, and every existing session is revoked — a reset is
+   * the moment when "someone else may be holding a session" is most likely to be true.
+   */
+  async resetPassword(token: string, newPassword: string): Promise<{ reset: true }> {
+    const record = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash: AuthService.hashToken(token) },
+      include: { user: { select: { id: true, status: true } } },
+    });
+
+    if (!record || record.consumedAt || record.expiresAt < new Date()) {
+      throw new UnauthorizedException(
+        'This reset link is no longer valid. Request a new one and use it while it is fresh.',
+      );
+    }
+    if (record.user.status === 'SUSPENDED') {
+      throw new UnauthorizedException('This account is suspended. Ask an administrator.');
+    }
+
+    const passwordHash = await this.hashPassword(newPassword);
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: record.userId },
+        data: {
+          passwordHash,
+          passwordUpdatedAt: new Date(),
+          // Someone completing a reset has proved they hold the address they were invited on.
+          status: record.user.status === 'INVITED' ? 'ACTIVE' : record.user.status,
+        },
+      }),
+      this.prisma.passwordResetToken.updateMany({
+        where: { userId: record.userId, consumedAt: null },
+        data: { consumedAt: new Date() },
+      }),
+      this.prisma.refreshToken.updateMany({
+        where: { userId: record.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+
+    await this.audit.record(null, {
+      action: 'PASSWORD_RESET_COMPLETED',
+      entityType: 'User',
+      entityId: record.userId,
+    });
+    return { reset: true };
+  }
+
+  /** A fresh token, with any previous one consumed so only the newest link works. */
+  private async issueResetToken(
+    userId: string,
+    ttlMinutes: number,
+    issuedById: string | null,
+    requestedIp?: string | null,
+  ): Promise<{ token: string }> {
+    const token = randomBytes(32).toString('base64url');
+    await this.prisma.$transaction([
+      this.prisma.passwordResetToken.updateMany({
+        where: { userId, consumedAt: null },
+        data: { consumedAt: new Date() },
+      }),
+      this.prisma.passwordResetToken.create({
+        data: {
+          userId,
+          tokenHash: AuthService.hashToken(token),
+          issuedById,
+          requestedIp: requestedIp ?? null,
+          expiresAt: new Date(Date.now() + ttlMinutes * 60_000),
+        },
+      }),
+    ]);
+    return { token };
+  }
+
+  private resetUrl(token: string): string {
+    const base = (this.config.get<string>('webAppUrl') ?? 'http://localhost:3000').replace(
+      /\/$/,
+      '',
+    );
+    return `${base}/reset-password?token=${token}`;
+  }
+
+  private async deliverResetLink(
+    email: string,
+    name: string,
+    token: string,
+    ttlMinutes: number,
+  ): Promise<boolean> {
+    const url = this.resetUrl(token);
+    const delivered = await this.notifications.sendDirectEmail(
+      email,
+      'Reset your GRID-X password',
+      [
+        `Hello ${name},`,
+        '',
+        `Use the link below to set a new GRID-X password. It expires in ${ttlMinutes} minutes and works once.`,
+        '',
+        url,
+        '',
+        'If you did not ask for this, ignore this message — your password has not changed.',
+      ].join('\n'),
+    );
+    if (!delivered) {
+      // Development only: production configures SMTP, so a link never reaches the logs there.
+      this.logger.warn(`Email is not configured; password reset link for ${email} is ${url}`);
+    }
+    return delivered;
+  }
+
+  /** Readable, unambiguous characters, because this gets read out over a phone. */
+  private generateTemporaryPassword(): string {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const body = Array.from({ length: 12 }, () => alphabet[randomInt(0, alphabet.length)]).join('');
+    return `Gx-${body}`;
+  }
+
+  /**
+   * Section 19 — a partner switching their own interface language.
+   *
+   * `User.language` drove the Hindi partner UI and could only be set by an administrator through
+   * the user directory, which a partner worker cannot reach. A shop-floor user who needs Hindi had
+   * to ask someone at OSWAR to change it for them.
+   */
+  async setLanguage(userId: string, language: 'EN' | 'HI'): Promise<{ language: 'EN' | 'HI' }> {
+    await this.prisma.user.update({ where: { id: userId }, data: { language } });
+    return { language };
+  }
+
   async changePassword(
     userId: string,
     currentPassword: string,
@@ -369,6 +631,42 @@ export class AuthService {
       userAgent: device.userAgent,
     });
     return { ...(await this.accessToken(userId)), refreshToken: refresh.token, user };
+  }
+
+  /**
+   * A session that can reach only the two-factor enrolment routes.
+   *
+   * The user is authenticated — they gave the right password — but until they hold a second factor
+   * their role says they must have, the token opens nothing else. No refresh token is issued: the
+   * enrolment window is short by design, and completing it produces a full session.
+   */
+  private async issueEnrolmentSession(
+    userId: string,
+    device: DeviceContext,
+  ): Promise<LoginResponse> {
+    const jwtConfig = this.config.get<AppConfig['jwt']>('jwt');
+    if (!jwtConfig) throw new Error('JWT configuration missing');
+
+    const accessToken = await this.jwt.signAsync(
+      { sub: userId, typ: 'enrol' },
+      { secret: jwtConfig.accessSecret, expiresIn: '15m' },
+    );
+    const user = await this.loadAuthUser(userId);
+    await this.audit.record(null, {
+      action: 'PASSWORD_LOGIN_TWO_FACTOR_ENROLMENT_REQUIRED',
+      entityType: 'User',
+      entityId: userId,
+      ipAddress: device.ipAddress,
+      userAgent: device.userAgent,
+    });
+
+    return {
+      accessToken,
+      expiresIn: 900,
+      refreshToken: '',
+      user,
+      twoFactorEnrolmentRequired: true,
+    };
   }
 
   private async accessToken(userId: string): Promise<{ accessToken: string; expiresIn: number }> {

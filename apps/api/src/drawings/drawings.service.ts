@@ -29,6 +29,7 @@ import {
 import { StorageService } from '../files/storage.service';
 import { WatermarkContext, WatermarkService } from '../files/watermark.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettingsService } from '../common/settings.service';
 
 export interface DrawingAccessContext {
   ipAddress?: string;
@@ -48,6 +49,7 @@ export class DrawingsService {
     private readonly storage: StorageService,
     private readonly notifications: NotificationsService,
     private readonly watermarks: WatermarkService,
+    private readonly settings: SettingsService,
   ) {}
 
   async list(
@@ -417,6 +419,63 @@ export class DrawingsService {
     return updated;
   }
 
+  /**
+   * When a grant should lapse: the date given, otherwise the configured default from the moment of
+   * granting. Never later than the revision's own expiry — access to a drawing that is no longer
+   * valid is not access to anything.
+   */
+  private async defaultAccessExpiry(
+    requested: Date | null | undefined,
+    revisionExpiry: Date | null,
+  ): Promise<Date | null> {
+    const days = await this.settings.get('drawings.accessExpiryDays');
+    const fallback = days > 0 ? new Date(Date.now() + days * 86_400_000) : null;
+    const candidate = requested ?? fallback;
+    if (!candidate) return revisionExpiry;
+    if (!revisionExpiry) return candidate;
+    return candidate < revisionExpiry ? candidate : revisionExpiry;
+  }
+
+  /**
+   * Module 3 — whether a partner has acknowledged the revision a job is built to.
+   *
+   * Acknowledgement was recorded and then read by nothing: the release notification asked partners
+   * to acknowledge "before continuing production" and no step checked. This is what makes that
+   * sentence true, and it is deliberately readable by other services rather than private.
+   */
+  async assertRevisionAcknowledged(
+    partnerId: string,
+    jobId: string,
+    activity: string,
+  ): Promise<void> {
+    const required = await this.settings.get('drawings.requireAcknowledgementBeforeProduction');
+    if (!required) return;
+
+    const job = await this.prisma.gridJob.findUniqueOrThrow({
+      where: { id: jobId },
+      select: {
+        drawingRevisionId: true,
+        drawingRevision: { select: { revisionCode: true, drawing: { select: { drawingNumber: true } } } },
+      },
+    });
+    // A job with no controlled drawing has nothing to acknowledge.
+    if (!job.drawingRevisionId || !job.drawingRevision) return;
+
+    const acknowledgement = await this.prisma.drawingAcknowledgement.findUnique({
+      where: {
+        revisionId_partnerId: { revisionId: job.drawingRevisionId, partnerId },
+      },
+      select: { id: true },
+    });
+    if (acknowledgement) return;
+
+    throw new BadRequestException(
+      `Acknowledge drawing ${job.drawingRevision.drawing.drawingNumber} revision ` +
+        `${job.drawingRevision.revisionCode} before ${activity}. This confirms you are working to ` +
+        'the current issue.',
+    );
+  }
+
   async grantAccess(
     actor: RequestUser,
     revisionId: string,
@@ -428,6 +487,12 @@ export class DrawingsService {
     if (revision.status !== 'RELEASED') {
       throw new BadRequestException('Only released revisions can be shared with partners');
     }
+
+    // Section 7 — `drawings.accessExpiryDays` existed as a setting the platform never read, so a
+    // grant lived forever unless someone typed a date. It now supplies the default, and the
+    // revision's own expiry caps it: access cannot outlive the drawing it opens.
+    const expiresAt = await this.defaultAccessExpiry(input.expiresAt, revision.expiryDate);
+
     const existing = await this.prisma.drawingAccess.findFirst({
       where: { revisionId, partnerId: input.partnerId, jobId: input.jobId ?? null },
     });
@@ -437,7 +502,7 @@ export class DrawingsService {
           data: {
             revokedAt: null,
             revokedBy: null,
-            expiresAt: input.expiresAt,
+            expiresAt,
             mode: input.mode,
           },
         })
@@ -447,7 +512,7 @@ export class DrawingsService {
             partnerId: input.partnerId,
             jobId: input.jobId,
             grantedBy: actor.id,
-            expiresAt: input.expiresAt,
+            expiresAt,
             mode: input.mode,
           },
         });
@@ -534,6 +599,19 @@ export class DrawingsService {
       if (!access) throw new ForbiddenException('This drawing revision is not shared with you');
       if (revision.status !== 'RELEASED') {
         throw new ForbiddenException('This revision is no longer valid for production');
+      }
+      // Module 3 lists "issue date and expiry date" as a control. The date was written on release
+      // and read by nothing, so a revision that had expired stayed as viewable as a current one.
+      if (revision.expiryDate && revision.expiryDate < new Date()) {
+        throw new ForbiddenException(
+          `This revision expired on ${revision.expiryDate.toDateString()}. ` +
+            'Ask engineering to reissue it before working to it.',
+        );
+      }
+      if (revision.issueDate && revision.issueDate > new Date()) {
+        throw new ForbiddenException(
+          `This revision is not in force until ${revision.issueDate.toDateString()}.`,
+        );
       }
       if (action === 'DOWNLOADED' && access.mode !== 'VIEW_AND_DOWNLOAD') {
         throw new ForbiddenException('Download is not permitted for this drawing');

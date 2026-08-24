@@ -15,6 +15,8 @@ import { z } from 'zod';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { SettingsService } from '../common/settings.service';
+import { AuthService } from '../auth/auth.service';
 import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
 import {
@@ -42,6 +44,8 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly settings: SettingsService,
+    private readonly auth: AuthService,
   ) {}
 
   /**
@@ -348,22 +352,56 @@ export class AdminService {
     return paginate(data, total, filters);
   }
 
+  /**
+   * Section 7 — the settings catalogue: every setting the platform actually reads, with its
+   * effective value. Settings used to be listed straight from the table, which meant the screen
+   * showed keys nothing honoured and offered no clue what any of them changed.
+   */
   async listSettings() {
-    return this.prisma.systemSetting.findMany({ orderBy: { key: 'asc' } });
+    return this.settings.catalogue();
   }
 
-  async upsertSetting(actor: RequestUser, key: string, value: Prisma.InputJsonValue) {
-    const setting = await this.prisma.systemSetting.upsert({
-      where: { key },
-      create: { key, value },
-      update: { value },
-    });
+  async upsertSetting(actor: RequestUser, key: string, value: unknown) {
+    const before = await this.prisma.systemSetting.findUnique({ where: { key } });
+    const setting = await this.settings.set(key, value);
     await this.audit.record(actor, {
       action: 'SETTING_UPDATED',
       entityType: 'SystemSetting',
-      entityId: setting.id,
-      after: { key, value },
+      entityId: key,
+      before: before ? { key, value: before.value as Prisma.InputJsonValue } : undefined,
+      after: { key, value: setting.value as Prisma.InputJsonValue },
     });
     return setting;
+  }
+
+  /**
+   * Section 18 — an administrator putting a locked-out user back in.
+   *
+   * `updateUser` deliberately never touches the password hash, so before this existed an internal
+   * user who forgot their password had no way back: partners have OTP, staff had nothing.
+   *
+   * Sends a reset link by default. A temporary password is the fallback for a user whose mailbox
+   * is the thing they have lost, and it is shown to the administrator exactly once.
+   */
+  async resetUserPassword(actor: RequestUser, id: string, useTemporaryPassword: boolean) {
+    const target = await this.prisma.user.findUniqueOrThrow({
+      where: { id },
+      include: { role: true },
+    });
+    await this.assertMayAdminister(actor, target.role.isPartnerRole, target.partnerId, undefined);
+
+    if (target.role.isPartnerRole && !target.email) {
+      throw new BadRequestException(
+        `${target.name} signs in with a one-time code sent to their phone, so there is no password to reset.`,
+      );
+    }
+
+    const result = await this.auth.issueAdminPasswordReset(actor.id, id, useTemporaryPassword);
+    return {
+      userId: id,
+      name: target.name,
+      email: target.email,
+      ...result,
+    };
   }
 }

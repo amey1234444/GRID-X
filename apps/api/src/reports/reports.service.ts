@@ -48,6 +48,8 @@ export const REPORT_DEFINITIONS = [
   { key: 'payment-ageing', title: 'Payment ageing' },
   { key: 'outsourcing-vs-internal', title: 'Outsourcing cost versus internal cost' },
   { key: 'logistics-cost', title: 'Logistics cost' },
+  { key: 'logistics-cost-by-partner', title: 'Transport cost by partner' },
+  { key: 'logistics-cost-by-component', title: 'Transport cost by component' },
   { key: 'rework-cost', title: 'Rework cost' },
   { key: 'avoided-capex', title: 'Avoided capex' },
   { key: 'capacity-added', title: 'Production capacity added' },
@@ -178,6 +180,10 @@ export class ReportsService {
         return this.paymentAgeing(filters);
       case 'outsourcing-vs-internal':
         return this.outsourcingVsInternal(filters);
+      case 'logistics-cost-by-partner':
+        return this.logisticsCostByPartner(filters);
+      case 'logistics-cost-by-component':
+        return this.logisticsCostByComponent(filters);
       case 'logistics-cost':
         return this.logisticsCost(filters);
       case 'rework-cost':
@@ -527,6 +533,10 @@ export class ReportsService {
       where: {
         ...this.companyVia(filters, 'partner'),
         ...(filters.partnerId ? { partnerId: filters.partnerId } : {}),
+        // Scores are held as period month and year rather than a date, so the range has to be
+        // matched against the period rather than a column. Every other report honoured the filter
+        // bar's dates and this one quietly returned every period ever computed.
+        ...periodRangeFilter(filters.from, filters.to),
       },
       orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }, { totalScore: 'desc' }],
       take: 500,
@@ -698,6 +708,188 @@ export class ReportsService {
         saving: round(row.internal - row.outsourced),
         savingPercent: row.internal > 0 ? round(((row.internal - row.outsourced) / row.internal) * 100, 1) : 0,
       })),
+    };
+  }
+
+  /**
+   * Module 10 — "transport cost by partner".
+   *
+   * The logistics report listed shipments one per row, which answers "what did this run cost" but
+   * not "what is this partner costing us to serve", which is the figure the logistics dashboard
+   * asks for and the one that decides whether a distant partner is worth their rate.
+   */
+  private async logisticsCostByPartner(filters: ReportFilters) {
+    const shipments = await this.prisma.shipment.findMany({
+      where: {
+        ...this.company(filters),
+        ...(filters.partnerId
+          ? { OR: [{ fromPartnerId: filters.partnerId }, { toPartnerId: filters.partnerId }] }
+          : {}),
+        ...this.pickupRange(filters),
+      },
+      select: {
+        weightKg: true,
+        transportCost: true,
+        fromPartner: { select: { id: true, partnerCode: true, businessName: true, city: true, distanceKm: true } },
+        toPartner: { select: { id: true, partnerCode: true, businessName: true, city: true, distanceKm: true } },
+      },
+    });
+
+    type Row = {
+      partnerCode: string;
+      businessName: string;
+      city: string;
+      distanceKm: number | null;
+      shipments: number;
+      weightKg: number;
+      transportCost: number;
+    };
+    const byPartner = new Map<string, Row>();
+
+    for (const shipment of shipments) {
+      // A partner-to-partner move is a cost to both ends, so it is counted against each. The
+      // totals are therefore a cost-to-serve view rather than a ledger that must sum to spend.
+      const partners = [shipment.fromPartner, shipment.toPartner].filter(
+        (partner): partner is NonNullable<typeof partner> => Boolean(partner),
+      );
+      for (const partner of partners) {
+        const row = byPartner.get(partner.id) ?? {
+          partnerCode: partner.partnerCode,
+          businessName: partner.businessName,
+          city: partner.city,
+          distanceKm: partner.distanceKm,
+          shipments: 0,
+          weightKg: 0,
+          transportCost: 0,
+        };
+        row.shipments += 1;
+        row.weightKg += shipment.weightKg;
+        row.transportCost += shipment.transportCost;
+        byPartner.set(partner.id, row);
+      }
+    }
+
+    return {
+      columns: [
+        { key: 'partnerCode', label: 'Partner code', type: 'text' as const },
+        { key: 'businessName', label: 'Partner', type: 'text' as const },
+        { key: 'city', label: 'City', type: 'text' as const },
+        { key: 'distanceKm', label: 'Distance (km)', type: 'number' as const },
+        { key: 'shipments', label: 'Shipments', type: 'number' as const },
+        { key: 'weightKg', label: 'Weight (kg)', type: 'number' as const },
+        { key: 'transportCost', label: 'Transport cost', type: 'currency' as const },
+        { key: 'costPerKg', label: 'Cost per kg', type: 'currency' as const },
+        { key: 'costPerShipment', label: 'Cost per shipment', type: 'currency' as const },
+      ],
+      rows: [...byPartner.values()]
+        .map((row) => ({
+          ...row,
+          weightKg: round(row.weightKg, 3),
+          transportCost: round(row.transportCost),
+          costPerKg: row.weightKg > 0 ? round(row.transportCost / row.weightKg) : 0,
+          costPerShipment: row.shipments > 0 ? round(row.transportCost / row.shipments) : 0,
+        }))
+        .sort((a, b) => b.transportCost - a.transportCost),
+    };
+  }
+
+  /**
+   * Module 10 — "transport cost by component".
+   *
+   * Cost is carried on the shipment, not the line, so each shipment's cost is apportioned across
+   * the jobs it carried by weight where weights are known and evenly otherwise. That is an
+   * estimate and is meant to be: the alternative is not reporting the figure the blueprint asks
+   * for at all, and the shape of the answer — which components are expensive to move — survives
+   * the approximation.
+   */
+  private async logisticsCostByComponent(filters: ReportFilters) {
+    const shipments = await this.prisma.shipment.findMany({
+      where: { ...this.company(filters), ...this.pickupRange(filters) },
+      select: {
+        weightKg: true,
+        transportCost: true,
+        items: {
+          select: {
+            weightKg: true,
+            quantity: true,
+            job: {
+              select: {
+                partnerId: true,
+                component: { select: { id: true, componentCode: true, name: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    type Row = {
+      componentCode: string;
+      componentName: string;
+      shipments: number;
+      quantity: number;
+      weightKg: number;
+      transportCost: number;
+    };
+    const byComponent = new Map<string, Row>();
+
+    for (const shipment of shipments) {
+      const lines = shipment.items.filter((item) => item.job?.component);
+      if (lines.length === 0) continue;
+      if (filters.partnerId && !lines.some((line) => line.job?.partnerId === filters.partnerId)) {
+        continue;
+      }
+
+      const lineWeight = lines.reduce((sum, line) => sum + line.weightKg, 0);
+      for (const line of lines) {
+        const component = line.job!.component;
+        const share =
+          lineWeight > 0 ? line.weightKg / lineWeight : 1 / lines.length;
+        const row = byComponent.get(component.id) ?? {
+          componentCode: component.componentCode,
+          componentName: component.name,
+          shipments: 0,
+          quantity: 0,
+          weightKg: 0,
+          transportCost: 0,
+        };
+        row.shipments += 1;
+        row.quantity += line.quantity;
+        row.weightKg += line.weightKg;
+        row.transportCost += shipment.transportCost * share;
+        byComponent.set(component.id, row);
+      }
+    }
+
+    return {
+      columns: [
+        { key: 'componentCode', label: 'Component', type: 'text' as const },
+        { key: 'componentName', label: 'Description', type: 'text' as const },
+        { key: 'shipments', label: 'Shipment lines', type: 'number' as const },
+        { key: 'quantity', label: 'Quantity moved', type: 'number' as const },
+        { key: 'weightKg', label: 'Weight (kg)', type: 'number' as const },
+        { key: 'transportCost', label: 'Apportioned cost', type: 'currency' as const },
+        { key: 'costPerUnit', label: 'Cost per unit', type: 'currency' as const },
+      ],
+      rows: [...byComponent.values()]
+        .map((row) => ({
+          ...row,
+          weightKg: round(row.weightKg, 3),
+          transportCost: round(row.transportCost),
+          costPerUnit: row.quantity > 0 ? round(row.transportCost / row.quantity) : 0,
+        }))
+        .sort((a, b) => b.transportCost - a.transportCost),
+    };
+  }
+
+  /** The filter bar's date range, applied to when a shipment was due to be collected. */
+  private pickupRange(filters: ReportFilters) {
+    if (!filters.from && !filters.to) return {};
+    return {
+      plannedPickupAt: {
+        ...(filters.from ? { gte: filters.from } : {}),
+        ...(filters.to ? { lte: filters.to } : {}),
+      },
     };
   }
 
@@ -998,4 +1190,30 @@ export class ReportsService {
       })),
     };
   }
+}
+
+/**
+ * Turns a date range into a filter over `PartnerScore`'s period month and year.
+ *
+ * Scores are keyed by period rather than a timestamp, so a plain `gte`/`lte` has nothing to bite
+ * on. Expressed as "after this year, or in this year and at or after this month", which is the
+ * period equivalent of a half-open range.
+ */
+function periodRangeFilter(from?: Date, to?: Date) {
+  const clauses: Array<Record<string, unknown>> = [];
+  if (from) {
+    const year = from.getUTCFullYear();
+    const month = from.getUTCMonth() + 1;
+    clauses.push({
+      OR: [{ periodYear: { gt: year } }, { periodYear: year, periodMonth: { gte: month } }],
+    });
+  }
+  if (to) {
+    const year = to.getUTCFullYear();
+    const month = to.getUTCMonth() + 1;
+    clauses.push({
+      OR: [{ periodYear: { lt: year } }, { periodYear: year, periodMonth: { lte: month } }],
+    });
+  }
+  return clauses.length > 0 ? { AND: clauses } : {};
 }

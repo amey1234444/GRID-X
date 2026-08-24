@@ -62,6 +62,22 @@ async function send(
   return { error: null, success: 'Saved' };
 }
 
+/**
+ * A write whose response the caller needs to show — a password reset hands back a one-time secret
+ * that exists nowhere else, so the usual "Saved" is not enough.
+ */
+async function sendJson<T>(
+  path: string,
+  body: Record<string, unknown>,
+  revalidate: string[],
+  method: 'POST' | 'PATCH' = 'POST',
+): Promise<ActionState & { data?: T }> {
+  const result = await apiFetch<T>(path, { method, body: JSON.stringify(body) });
+  if (result.error) return { error: result.error };
+  for (const route of revalidate) revalidatePath(route);
+  return { error: null, data: result.data ?? undefined };
+}
+
 /** DELETE carries no body, so it gets its own helper rather than an unused argument. */
 async function remove(path: string, revalidate: string[]): Promise<ActionState> {
   const result = await apiFetch<unknown>(path, { method: 'DELETE' });
@@ -1216,22 +1232,153 @@ export async function createCompanyAction(_state: ActionState, data: FormData): 
   );
 }
 
+/**
+ * Section 7 — writes one catalogued setting.
+ *
+ * The value arrives typed by the control the catalogue chose, so this no longer guesses at JSON:
+ * a checkbox posts on/off, a number posts a number, and a role list posts one entry per checked
+ * role. The API rejects any key that is not in the catalogue.
+ */
 export async function updateSettingAction(_state: ActionState, data: FormData): Promise<ActionState> {
   const key = text(data, 'key');
-  const raw = text(data, 'value');
-  if (!key || raw === undefined) return { error: 'Provide a value' };
-  let value: unknown = raw;
-  try {
-    value = JSON.parse(raw);
-  } catch {
+  const type = text(data, 'type');
+  if (!key) return { error: 'Provide a setting key' };
+
+  let value: unknown;
+  if (type === 'boolean') {
+    value = data.get('value') !== null;
+  } else if (type === 'number') {
+    const raw = number(data, 'value');
+    if (raw === undefined) return { error: 'Enter a number' };
     value = raw;
+  } else if (type === 'roleList') {
+    value = data.getAll('value').map(String).filter(Boolean);
+  } else {
+    value = text(data, 'value');
   }
+
   return send(`/settings/${key}`, { value }, ['/app/admin/settings'], 'PATCH');
+}
+
+/**
+ * Section 18 — an administrator putting a locked-out user back in.
+ *
+ * A link is the default. A temporary password is the fallback for someone whose mailbox is the
+ * thing they have lost, and the response carries it once for the administrator to pass on.
+ */
+export async function resetUserPasswordAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const id = text(data, 'id');
+  if (!id) return { error: 'Select a user' };
+  const useTemporaryPassword = data.get('useTemporaryPassword') !== null;
+
+  const result = await sendJson<{
+    temporaryPassword: string | null;
+    resetUrl: string | null;
+    emailed: boolean;
+    expiresInMinutes: number;
+    email: string | null;
+  }>(`/users/${id}/reset-password`, { useTemporaryPassword }, ['/app/admin/users'], 'POST');
+
+  if (result.error) return { error: result.error };
+  const payload = result.data;
+  if (payload?.temporaryPassword) {
+    return {
+      error: null,
+      success:
+        `Temporary password: ${payload.temporaryPassword} — read it out, then have them change it. ` +
+        'Every other session for this user has been signed out.',
+    };
+  }
+  if (payload?.emailed) {
+    return {
+      error: null,
+      success: `A reset link has been emailed to ${payload.email}. It expires in ${payload.expiresInMinutes} minutes.`,
+    };
+  }
+  return {
+    error: null,
+    success: payload?.resetUrl
+      ? `Email is not configured, so pass this link on yourself: ${payload.resetUrl}`
+      : 'Reset issued.',
+  };
+}
+
+/**
+ * Module 6 — records a movement the issue, consumption, scrap and reconciliation flows do not
+ * produce: rejected material going back, replacement material coming out, unused material
+ * returned, or a shortage or excess found at the partner.
+ */
+export async function recordMaterialTransactionAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const jobId = text(data, 'jobId');
+  const itemId = text(data, 'itemId');
+  const type = text(data, 'type');
+  const quantityKg = number(data, 'quantityKg');
+  if (!jobId || !itemId || !type) return { error: 'Choose an item and a movement type' };
+  if (quantityKg === undefined || quantityKg <= 0) return { error: 'Enter a weight in kilograms' };
+
+  return send(
+    '/materials/transactions',
+    {
+      jobId,
+      itemId,
+      type,
+      quantityKg,
+      batchNumber: text(data, 'batchNumber'),
+      heatNumber: text(data, 'heatNumber'),
+      replacesTransactionId: text(data, 'replacesTransactionId'),
+      reference: text(data, 'reference'),
+      remarks: text(data, 'remarks'),
+      photographFileIds: fileIds(data, 'photographFileIds'),
+    },
+    [`/app/production/jobs/${jobId}`, '/app/materials/partner-stock'],
+    'POST',
+  );
 }
 
 // ---------------------------------------------------------------------------
 // Partner onboarding and profile
 // ---------------------------------------------------------------------------
+
+/** Module 1 — an additional workshop for a partner working out of more than one address. */
+export async function addPartnerLocationAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const id = text(data, 'partnerId');
+  if (!id) return { error: 'Select a partner' };
+  return send(
+    `/partners/${id}/locations`,
+    {
+      label: text(data, 'label'),
+      addressLine1: text(data, 'addressLine1'),
+      addressLine2: text(data, 'addressLine2'),
+      city: text(data, 'city'),
+      state: text(data, 'state'),
+      pincode: text(data, 'pincode'),
+      latitude: number(data, 'latitude'),
+      longitude: number(data, 'longitude'),
+      isPrimary: data.get('isPrimary') !== null,
+    },
+    [`/app/partners/${id}`],
+    'POST',
+  );
+}
+
+export async function removePartnerLocationAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const locationId = text(data, 'locationId');
+  const partnerId = text(data, 'partnerId');
+  if (!locationId) return { error: 'Select a location' };
+  return remove(`/partners/locations/${locationId}`, [`/app/partners/${partnerId}`]);
+}
 
 export async function createPartnerAction(_state: ActionState, data: FormData): Promise<ActionState> {
   const companyId = text(data, 'companyId');
@@ -1675,6 +1822,10 @@ export async function createInspectionPlanAction(
       name,
       inspectionType: text(data, 'inspectionType') ?? 'FINAL',
       samplingPlan: text(data, 'samplingPlan'),
+      // Module 8 — how much of the lot must actually be measured. Blank falls back to the
+      // component's inspection level rather than to "whatever the inspector felt like".
+      samplePercent: number(data, 'samplePercent'),
+      minSampleSize: number(data, 'minSampleSize'),
       characteristics,
     },
     ['/app/engineering/inspection-plans'],

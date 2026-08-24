@@ -17,6 +17,7 @@ import {
   LANGUAGES,
   MACHINE_CONDITIONS,
   MATERIAL_RESPONSIBILITIES,
+  MATERIAL_TRANSACTION_TYPES,
   OWNERSHIP_STATUSES,
   PARTNER_APPROVAL_STATUSES,
   PARTNER_DOCUMENT_TYPES,
@@ -33,6 +34,8 @@ import {
   TOOL_CONDITIONS,
   MILESTONE_TYPES,
 } from './enums';
+import { MANUAL_TRANSACTION_TYPES } from './materials';
+import { SETTING_KEYS } from './settings';
 
 const id = z.string().min(1);
 const optionalString = z.string().trim().min(1).optional().or(z.literal('').transform(() => undefined));
@@ -85,6 +88,38 @@ export const changePasswordSchema = z
     message: 'Passwords do not match',
     path: ['confirmPassword'],
   });
+
+/**
+ * Section 18 — password recovery. The same strength rule as a deliberate change: a reset is the
+ * commonest way a weak password gets in, not a reason to relax the rule.
+ */
+const strongPassword = z
+  .string()
+  .min(10, 'Use at least 10 characters')
+  .regex(/[A-Z]/, 'Include an uppercase letter')
+  .regex(/[a-z]/, 'Include a lowercase letter')
+  .regex(/[0-9]/, 'Include a number');
+
+export const forgotPasswordSchema = z.object({ email });
+
+export const resetPasswordSchema = z
+  .object({
+    token: z.string().min(20),
+    password: strongPassword,
+    confirmPassword: z.string(),
+  })
+  .refine((v) => v.password === v.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
+
+/**
+ * An administrator resetting someone else's password. A link is the default; a temporary password
+ * is for the user whose mailbox is the thing they have lost.
+ */
+export const adminResetPasswordSchema = z.object({
+  useTemporaryPassword: z.coerce.boolean().default(false),
+});
 
 /**
  * A second factor: either a 6-digit TOTP code from an authenticator app, or one of the recovery
@@ -209,6 +244,22 @@ export const partnerDocumentSchema = z.object({
   issueDate: dateLike.optional(),
   expiryDate: dateLike.optional(),
   remarks: optionalString,
+});
+
+/**
+ * Module 1 — an additional unit for a partner working out of more than one address. The primary
+ * location is where material goes when a job does not say otherwise.
+ */
+export const partnerLocationSchema = z.object({
+  label: z.string().trim().min(2),
+  addressLine1: z.string().trim().min(3),
+  addressLine2: optionalString,
+  city: z.string().trim().min(2),
+  state: z.string().trim().min(2),
+  pincode: z.string().trim().regex(/^[0-9]{6}$/, 'Enter a 6-digit pincode'),
+  latitude: z.coerce.number().min(-90).max(90).optional(),
+  longitude: z.coerce.number().min(-180).max(180).optional(),
+  isPrimary: z.coerce.boolean().default(false),
 });
 
 export const partnerEmployeeSchema = z.object({
@@ -336,6 +387,18 @@ export const engineeringChangeSchema = z.object({
 // Module 4 — jobs
 // ---------------------------------------------------------------------------
 
+/**
+ * Section 11 `GridJobItem` — a job raised from one order that covers several components. The model
+ * existed with no write path, so a multi-component requirement had to be split into separate jobs
+ * and lost its link to the order.
+ */
+export const jobItemSchema = z.object({
+  componentId: id,
+  drawingRevisionId: id.optional(),
+  quantity: positive,
+  rate: nonNegative,
+});
+
 export const createJobSchema = z.object({
   companyId: id,
   source: z.enum(JOB_SOURCES).default('MANUAL'),
@@ -355,10 +418,17 @@ export const createJobSchema = z.object({
   priority: z.enum(JOB_PRIORITIES).default('NORMAL'),
   notes: optionalString,
   classAOverrideReason: optionalString,
+  /**
+   * Additional components on the same job. The `componentId` above stays the job's primary line —
+   * it is what the status workflow, the inspection plan and the drawing revision hang off — and
+   * these are the further lines that travelled on the same order.
+   */
+  items: z.array(jobItemSchema).default([]),
 });
 export type CreateJobInput = z.infer<typeof createJobSchema>;
+export type JobItemInput = z.infer<typeof jobItemSchema>;
 
-export const updateJobSchema = createJobSchema.partial().omit({ companyId: true });
+export const updateJobSchema = createJobSchema.partial().omit({ companyId: true, items: true });
 
 export const allocateJobSchema = z.object({
   partnerId: id,
@@ -380,6 +450,9 @@ export const updateMilestoneSchema = z.object({
   photographFileIds: z.array(id).default([]),
   delayReason: z.enum(DELAY_REASONS).optional(),
   clientRequestId: z.string().min(6).optional(),
+  /** Where the phone was when the evidence photograph was taken, if it offered a position. */
+  latitude: z.coerce.number().min(-90).max(90).optional(),
+  longitude: z.coerce.number().min(-180).max(180).optional(),
 });
 export type UpdateMilestoneInput = z.infer<typeof updateMilestoneSchema>;
 
@@ -450,6 +523,8 @@ export const acknowledgeMaterialSchema = z.object({
   signatureName: optionalString,
   photographFileIds: z.array(id).default([]),
   clientRequestId: z.string().min(6).optional(),
+  latitude: z.coerce.number().min(-90).max(90).optional(),
+  longitude: z.coerce.number().min(-180).max(180).optional(),
 });
 
 export const updateConsumptionSchema = z.object({
@@ -473,6 +548,61 @@ export const completeReconciliationSchema = z.object({
   remarks: optionalString,
 });
 
+/**
+ * Module 6 — a movement of material recorded by hand.
+ *
+ * Issue, consumption and scrap each have their own flow; this covers the four transaction types
+ * that had none: material rejected and sent back, replacement material issued against it, unused
+ * material returned outside reconciliation, and excess found at the partner.
+ */
+export const recordMaterialTransactionSchema = z
+  .object({
+    jobId: id,
+    itemId: id,
+    type: z.enum(MATERIAL_TRANSACTION_TYPES),
+    quantityKg: positive,
+    materialIssueId: id.optional(),
+    batchNumber: optionalString,
+    heatNumber: optionalString,
+    /** Required on REPLACEMENT_MATERIAL: the rejection this replaces. */
+    replacesTransactionId: id.optional(),
+    reference: optionalString,
+    remarks: optionalString,
+    occurredAt: dateLike.optional(),
+    photographFileIds: z.array(id).default([]),
+  })
+  .superRefine((value, ctx) => {
+    if (!MANUAL_TRANSACTION_TYPES.includes(value.type)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['type'],
+        message:
+          'This movement is recorded by the issue, acknowledgement, consumption or reconciliation ' +
+          'flow rather than by hand.',
+      });
+    }
+    if (value.type === 'REPLACEMENT_MATERIAL' && !value.replacesTransactionId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['replacesTransactionId'],
+        message: 'Say which rejected material this replaces, so the two can be traced together.',
+      });
+    }
+  });
+export type RecordMaterialTransactionInput = z.infer<typeof recordMaterialTransactionSchema>;
+
+export const materialTransactionQuerySchema = z.object({
+  jobId: id.optional(),
+  partnerId: id.optional(),
+  itemId: id.optional(),
+  type: z.enum(MATERIAL_TRANSACTION_TYPES).optional(),
+  from: dateLike.optional(),
+  to: dateLike.optional(),
+});
+
+/** Module 6 step 2 — the requirement a job's bill of material implies. */
+export const materialRequirementQuerySchema = z.object({ jobId: id });
+
 // ---------------------------------------------------------------------------
 // Module 8 — quality
 // ---------------------------------------------------------------------------
@@ -495,6 +625,9 @@ export const createInspectionPlanSchema = z.object({
   name: z.string().trim().min(2),
   inspectionType: z.enum(INSPECTION_TYPES).default('FINAL'),
   samplingPlan: optionalString,
+  /** Share of the offered lot that must be measured. Blank falls back to the inspection level. */
+  samplePercent: z.coerce.number().min(0).max(100).optional(),
+  minSampleSize: z.coerce.number().int().min(0).optional(),
   characteristics: z.array(inspectionCharacteristicSchema).min(1),
 });
 
@@ -802,6 +935,28 @@ export const uploadIntentSchema = z.object({
 // ---------------------------------------------------------------------------
 // Common query helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Section 7 — system settings. Only keys in the catalogue may be written, so the screen cannot
+ * invent a setting no rule honours.
+ */
+export const updateSettingSchema = z.object({
+  value: z.union([z.boolean(), z.coerce.number(), z.array(z.string()), z.string()]),
+});
+
+export const settingKeySchema = z.enum(SETTING_KEYS as [string, ...string[]]);
+
+/** Section 19 — a partner switching their own interface language. */
+export const updateLanguageSchema = z.object({ language: z.enum(LANGUAGES) });
+
+/** Module 5 — the capacity board, optionally rolled up by location. */
+export const capacityWindowSchema = z.object({
+  from: dateLike,
+  to: dateLike,
+  partnerId: id.optional(),
+  processCode: z.enum(PROCESS_TYPES).optional(),
+  city: optionalString,
+});
 
 export const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),

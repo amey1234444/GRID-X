@@ -1,6 +1,11 @@
 import { LANGUAGES, ROLE_CODES, USER_STATUSES } from '@gridx/shared';
 
-import { createUserAction, suspendUserAction, updateUserAction } from '@/app/actions/control';
+import {
+  createUserAction,
+  resetUserPasswordAction,
+  suspendUserAction,
+  updateUserAction,
+} from '@/app/actions/control';
 import { ActionDialog } from '@/components/app/action-dialog';
 import { DataTable, type Column } from '@/components/app/data-table';
 import { PageHeader } from '@/components/app/page-header';
@@ -116,6 +121,27 @@ export default async function UsersPage({
               },
             ]}
           />
+          {row.userType === 'PARTNER' && !row.email ? null : (
+            <ActionDialog
+              title="Reset password"
+              description="Emails a single-use link that expires within the hour. Use a temporary password only when the mailbox itself is what they have lost — it is shown once."
+              triggerLabel="Reset password"
+              triggerVariant="outline"
+              triggerSize="sm"
+              submitLabel="Issue reset"
+              action={resetUserPasswordAction}
+              hidden={{ id: row.id }}
+              fields={[
+                {
+                  name: 'useTemporaryPassword',
+                  label: 'Give me a temporary password to read out instead',
+                  type: 'checkbox',
+                  help: 'Signs the user out everywhere and sets a one-time password shown only in the response.',
+                  span: 2,
+                },
+              ]}
+            />
+          )}
           {row.status === 'SUSPENDED' ? null : (
             <ActionDialog
               title="Suspend user"

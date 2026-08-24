@@ -12,6 +12,9 @@ import {
   decideDeviationSchema,
   inspectionCharacteristicSchema,
   requestInspectionSchema,
+  SamplingCompliance,
+  samplingCompliance,
+  samplingRule,
   saveInspectionResultsSchema,
   updateReworkStatusSchema,
 } from '@gridx/shared';
@@ -32,6 +35,7 @@ import {
 } from '../common/company-scope';
 import { JobsService } from '../jobs/jobs.service';
 import { ImsService } from '../ims/ims.service';
+import { DrawingsService } from '../drawings/drawings.service';
 
 export interface InspectionFilters extends PaginationInput {
   status?: string;
@@ -55,6 +59,7 @@ export class QualityService {
     private readonly notifications: NotificationsService,
     private readonly jobs: JobsService,
     private readonly ims: ImsService,
+    private readonly drawings: DrawingsService,
   ) {}
 
   /** Guards a job reached by id: partner isolation first, then company reach (Section 4 and 18). */
@@ -105,6 +110,8 @@ export class QualityService {
         name: input.name,
         inspectionType: input.inspectionType,
         samplingPlan: input.samplingPlan,
+        samplePercent: input.samplePercent,
+        minSampleSize: input.minSampleSize,
         characteristics: { create: input.characteristics },
       },
       include: { characteristics: true },
@@ -246,6 +253,15 @@ export class QualityService {
       throw new BadRequestException('Offered quantity cannot exceed the job quantity');
     }
 
+    // Module 3 — offering work for inspection is a claim that it was built to the current revision.
+    if (job.partnerId) {
+      await this.drawings.assertRevisionAcknowledged(
+        job.partnerId,
+        job.id,
+        'requesting inspection',
+      );
+    }
+
     const inspectionNumber = await this.sequence.next('INSPECTION');
     const inspection = await this.prisma.inspection.create({
       data: {
@@ -361,13 +377,49 @@ export class QualityService {
       },
       include: { results: true },
     });
+    const compliance = await this.samplingComplianceFor(id);
     await this.audit.record(actor, {
       action: 'INSPECTION_RESULTS_RECORDED',
       entityType: 'Inspection',
       entityId: id,
-      after: { results: input.results.length },
+      after: {
+        results: input.results.length,
+        samplesRecorded: compliance.recordedSamples,
+        samplesRequired: compliance.requiredSamples,
+      },
     });
-    return updated;
+    // Returned rather than enforced here: an inspector saves as they measure, and refusing a
+    // partial save would lose work. The rule is enforced when the inspection is completed.
+    return { ...updated, sampling: compliance };
+  }
+
+  /**
+   * Module 8 — how much of the offered lot the plan requires to be measured, and how much has been.
+   *
+   * The sampling plan was free text and the component's inspection level drove nothing, so an
+   * inspector could record one sample against a 500-piece batch and the record looked complete.
+   *
+   * Counts distinct sample numbers rather than result rows: measuring six characteristics on one
+   * piece is one piece inspected, however many rows that produces.
+   */
+  async samplingComplianceFor(inspectionId: string): Promise<SamplingCompliance> {
+    const inspection = await this.prisma.inspection.findUniqueOrThrow({
+      where: { id: inspectionId },
+      select: {
+        offeredQuantity: true,
+        type: true,
+        job: { select: { component: { select: { inspectionLevel: true } } } },
+        inspectionPlan: { select: { samplePercent: true, minSampleSize: true } },
+        results: { select: { sampleNumber: true } },
+      },
+    });
+    const rule = samplingRule(inspection.job.component.inspectionLevel, inspection.inspectionPlan);
+    return samplingCompliance(
+      inspection.offeredQuantity,
+      inspection.results.map((result) => result.sampleNumber),
+      rule,
+      inspection.type,
+    );
   }
 
   /**
@@ -389,6 +441,23 @@ export class QualityService {
     }
     if (disposition > inspection.offeredQuantity) {
       throw new BadRequestException('Disposition cannot exceed the offered quantity');
+    }
+
+    // Module 8 — the plan says how much of the lot must be measured, and this is where that is
+    // enforced. An acceptance is a statement about the whole batch, so it may not rest on fewer
+    // samples than the plan calls for.
+    //
+    // A rejection is exempt: finding a defect early is a complete reason to stop, and demanding
+    // that an inspector measure the rest of a bad batch first would be perverse.
+    if (input.decision === 'ACCEPTED' || input.decision === 'ACCEPTED_WITH_DEVIATION') {
+      const compliance = await this.samplingComplianceFor(id);
+      if (!compliance.satisfied) {
+        throw new BadRequestException(
+          `The inspection plan requires ${compliance.requiredSamples} sample(s) ` +
+            `(${compliance.rule.label}); ${compliance.recordedSamples} recorded. ` +
+            `Measure ${compliance.shortfall} more before accepting.`,
+        );
+      }
     }
 
     const job = inspection.job;
@@ -518,7 +587,63 @@ export class QualityService {
         reworkQuantity: input.reworkQuantity,
       },
     });
+
+    await this.recordFirstArticleResult(actor, inspection, job, input.decision);
     return completed;
+  }
+
+  /**
+   * Module 2 and Module 8 — a first article that passes proves the partner can make the component,
+   * so the approved-partner record says so.
+   *
+   * `ApprovedPartnerComponent.firstArticleDone` was only ever set by hand, on a form or a CSV
+   * import, so the master record of "this partner has proven this component" drifted from the
+   * inspection evidence and depended on somebody remembering to tick a box.
+   */
+  private async recordFirstArticleResult(
+    actor: RequestUser,
+    inspection: { type: string; decision: string | null },
+    job: { id: string; jobNumber: string; componentId: string; partnerId: string | null },
+    decision: string,
+  ): Promise<void> {
+    if (inspection.type !== 'FIRST_ARTICLE' || !job.partnerId) return;
+    if (decision !== 'ACCEPTED' && decision !== 'ACCEPTED_WITH_DEVIATION') return;
+
+    const link = await this.prisma.approvedPartnerComponent.findUnique({
+      where: {
+        componentId_partnerId: { componentId: job.componentId, partnerId: job.partnerId },
+      },
+      select: { id: true, firstArticleDone: true },
+    });
+    // No approval link means the job was allocated some other way; there is nothing to update, and
+    // creating one here would be granting an approval the inspection did not ask for.
+    if (!link || link.firstArticleDone) return;
+
+    await this.prisma.approvedPartnerComponent.update({
+      where: { id: link.id },
+      data: { firstArticleDone: true, firstArticleDate: new Date() },
+    });
+    await this.audit.record(actor, {
+      action: 'FIRST_ARTICLE_APPROVED',
+      entityType: 'ApprovedPartnerComponent',
+      entityId: link.id,
+      after: {
+        componentId: job.componentId,
+        partnerId: job.partnerId,
+        provenOn: job.jobNumber,
+        decision,
+      },
+    });
+    await this.notifications.notify({
+      event: 'INSPECTION_COMPLETED',
+      title: 'First article approved',
+      body: `The first article on ${job.jobNumber} passed. This partner is now proven for the component and can take series work on it.`,
+      link: `/app/production/jobs/${job.id}`,
+      entityType: 'GridJob',
+      entityId: job.id,
+      partnerId: job.partnerId,
+      roleCodes: ['GRIDX_HEAD', 'OPERATIONS_HEAD', 'QUALITY_INSPECTOR'],
+    });
   }
 
   // -------------------------------------------------------------------------

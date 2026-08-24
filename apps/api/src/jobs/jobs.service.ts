@@ -45,7 +45,8 @@ import {
   assertCompanyScope,
   companyWhere,
 } from '../common/company-scope';
-import { CapacityService } from '../capacity/capacity.service';
+import { CapacityService, DeclaredCapacity } from '../capacity/capacity.service';
+import { DrawingsService } from '../drawings/drawings.service';
 import { ImsService } from '../ims/ims.service';
 import { FilesService } from '../files/files.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -124,6 +125,7 @@ export class JobsService {
     private readonly notifications: NotificationsService,
     private readonly capacity: CapacityService,
     private readonly ims: ImsService,
+    private readonly drawings: DrawingsService,
   ) {}
 
   /**
@@ -477,6 +479,39 @@ export class JobsService {
       input.classAOverrideReason,
     );
 
+    // Section 11 `GridJobItem` — a job raised from one order covering several components. The
+    // model existed with quantities and rates and had no write path anywhere, so a multi-component
+    // order had to be split into separate jobs and lost the fact that it was one delivery.
+    //
+    // The header component stays the primary line: everything downstream — the drawing, the
+    // inspection plan, the material bill — hangs off it, and the extra lines ride alongside.
+    const additionalItems = input.items ?? [];
+    if (additionalItems.length > 0) {
+      const components = await this.prisma.component.findMany({
+        where: { id: { in: additionalItems.map((item) => item.componentId) } },
+        select: { id: true, componentCode: true, companyId: true, criticality: true, outsourcingEligibilityScore: true },
+      });
+      if (components.length !== new Set(additionalItems.map((i) => i.componentId)).size) {
+        throw new BadRequestException('One of the additional components does not exist');
+      }
+      // Each line is a separate outsourcing decision and is checked as one; a Class A part cannot
+      // ride into the network as a line item on a job about something else.
+      for (const line of components) {
+        assertCompanyScope(actor, line.companyId, 'component');
+        this.assertClassAAuthorised(
+          actor,
+          line.criticality,
+          input.classAOverrideReason,
+          `Outsourcing ${line.componentCode}`,
+        );
+        this.assertOutsourcingEligible(
+          actor,
+          line.outsourcingEligibilityScore,
+          input.classAOverrideReason,
+        );
+      }
+    }
+
     const jobNumber = await this.sequence.next('JOB');
     const job = await this.prisma.gridJob.create({
       data: {
@@ -502,14 +537,38 @@ export class JobsService {
         classAOverrideReason: input.classAOverrideReason,
         createdById: actor.id,
         statusHistory: { create: { toStatus: 'DRAFT', changedById: actor.id } },
+        items: {
+          create: [
+            // The header component as line 1, so a job's lines are the whole job rather than
+            // "everything except the main thing".
+            {
+              componentId: input.componentId,
+              drawingRevisionId: input.drawingRevisionId,
+              quantity: input.quantity,
+              rate: input.rate,
+            },
+            ...additionalItems.map((item) => ({
+              componentId: item.componentId,
+              drawingRevisionId: item.drawingRevisionId,
+              quantity: item.quantity,
+              rate: item.rate,
+            })),
+          ],
+        },
       },
+      include: { items: true },
     });
     await this.audit.record(actor, {
       action: 'JOB_CREATED',
       entityType: 'GridJob',
       entityId: job.id,
       companyId: job.companyId,
-      after: { jobNumber, componentId: job.componentId, quantity: job.quantity },
+      after: {
+        jobNumber,
+        componentId: job.componentId,
+        quantity: job.quantity,
+        lines: additionalItems.length + 1,
+      },
     });
     return job;
   }
@@ -544,9 +603,6 @@ export class JobsService {
         partner: {
           include: {
             capabilities: true,
-            capacityAllocations: {
-              where: { job: { status: { notIn: ['CLOSED', 'CANCELLED'] } } },
-            },
             rates: { where: { componentId: job.componentId, isActive: true } },
             kpis: { orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }], take: 12 },
           },
@@ -559,37 +615,62 @@ export class JobsService {
       (link) => link.partner.rates[0]?.conversionRate ?? job.rate,
     );
     const bestRate = candidateRates.length > 0 ? Math.min(...candidateRates) : job.rate;
-    const networkValue = await this.prisma.gridJob.findMany({
-      where: { status: { notIn: ['CANCELLED'] } },
-      select: { partnerId: true, rate: true, quantity: true },
-    });
-    const totalNetworkValue = networkValue.reduce(
-      (sum, item) => sum + item.rate * item.quantity,
-      0,
+
+    // Module 5 — the ranking's "available capacity" factor reads what the partner actually
+    // declared for the job's window and process. It used to read `Partner.maxCapacityHours`, a
+    // static number on the master, so a declared shutdown never reached the score.
+    const windowStart = job.plannedStartDate ?? new Date();
+    const windowEnd = job.dueDate;
+    const processId = await this.capacity.processForComponent(job.componentId);
+    const partnerIds = approved.map((link) => link.partner.id);
+    const declaredCapacity = processId
+      ? await this.capacity.declaredCapacityForMany(partnerIds, processId, windowStart, windowEnd)
+      : new Map<string, DeclaredCapacity>();
+
+    // Concentration risk is measured inside the company that owns the job. Reading every company's
+    // jobs both crossed the group boundary and loaded the whole table to produce one number.
+    const [networkValueRows, openJobCounts] = await Promise.all([
+      // Value is quantity x rate, which Prisma cannot sum, and loading every job to multiply them
+      // in memory is what this replaces. Grouped in the database, one row per partner.
+      this.prisma.$queryRaw<Array<{ partnerId: string | null; value: number }>>`
+        SELECT "partnerId", COALESCE(SUM("quantity" * "rate"), 0)::double precision AS "value"
+        FROM "GridJob"
+        WHERE "companyId" = ${job.companyId} AND "status" <> 'CANCELLED'
+        GROUP BY "partnerId"
+      `,
+      this.prisma.gridJob.groupBy({
+        by: ['partnerId'],
+        where: { partnerId: { in: partnerIds }, status: { notIn: ['CLOSED', 'CANCELLED'] } },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const totalNetworkValue = networkValueRows.reduce((sum, row) => sum + Number(row.value), 0);
+    const valueByPartner = new Map(
+      networkValueRows.map((row) => [row.partnerId ?? '', Number(row.value)]),
+    );
+    const openJobsByPartner = new Map(
+      openJobCounts.map((row) => [row.partnerId ?? '', row._count._all]),
     );
 
-    const recommendations = await Promise.all(
-      approved.map(async (link) => {
-        const partner = link.partner;
-        const openJobs = await this.prisma.gridJob.count({
-          where: { partnerId: partner.id, status: { notIn: ['CLOSED', 'CANCELLED'] } },
-        });
-        const committedHours = partner.capacityAllocations.reduce(
-          (sum, allocation) => sum + allocation.allocatedHours,
-          0,
-        );
+    const recommendations = approved.map((link) => {
+      const partner = link.partner;
+        const openJobs = openJobsByPartner.get(partner.id) ?? 0;
+        const declared = declaredCapacity.get(partner.id);
         const capability = partner.capabilities.find(
           (item) => item.process === job.component.primaryProcess,
         );
         const rate = partner.rates[0]?.conversionRate ?? job.rate;
-        const freeCapacityHours = Math.max(0, partner.maxCapacityHours - committedHours);
+        // No declaration is not "unlimited": a partner who has not said what they can take should
+        // not outrank one who has. Fall back to the capability's monthly figure, then to zero.
+        const freeCapacityHours = declared?.hasDeclaration
+          ? declared.freeHours
+          : Math.max(0, (capability?.monthlyCapacityHours ?? 0) - (declared?.committedHours ?? 0));
         const onTimeDeliveryPercent =
           partner.kpis.find((kpi) => kpi.code === 'ON_TIME_IN_FULL_DELIVERY')?.value ?? 0;
         const firstPassQualityPercent =
           partner.kpis.find((kpi) => kpi.code === 'FIRST_PASS_QUALITY')?.value ?? 0;
-        const partnerValue = networkValue
-          .filter((item) => item.partnerId === partner.id)
-          .reduce((sum, item) => sum + item.rate * item.quantity, 0);
+        const partnerValue = valueByPartner.get(partner.id) ?? 0;
 
         const input: AllocationInput = {
           hasApprovedCapability: Boolean(capability?.isApproved) && link.isActive,
@@ -614,6 +695,9 @@ export class JobsService {
           blockers.push('Partner is not approved for allocation');
         }
         if (openJobs >= partner.maxOpenJobs) blockers.push('Open job limit reached');
+        if (processId && !declared?.hasDeclaration) {
+          blockers.push('No capacity declared for this period — ask the partner to confirm');
+        }
 
         return {
           partnerId: partner.id,
@@ -625,16 +709,18 @@ export class JobsService {
           score: score.total,
           rating: partner.currentScore ?? 0,
           freeCapacityHours,
+          capacityDeclared: Boolean(declared?.hasDeclaration),
+          declaredHours: declared?.declaredHours ?? 0,
+          committedHours: declared?.committedHours ?? 0,
           openJobs,
           onTimeDeliveryPercent,
           firstPassQualityPercent,
           conversionRate: rate,
           networkSharePercent: input.networkSharePercent,
-          blockers,
-          breakdown: score.breakdown,
-        } satisfies PartnerRecommendation;
-      }),
-    );
+        blockers,
+        breakdown: score.breakdown,
+      } satisfies PartnerRecommendation;
+    });
     return recommendations.sort((a, b) => b.score - a.score);
   }
 
@@ -909,6 +995,17 @@ export class JobsService {
     await this.assertFirstArticleCleared(id, input.type);
     assertMilestoneEvidence(input.type, input.photographFileIds);
 
+    // Module 3 — a partner may not report production against a revision they have not
+    // acknowledged. Acknowledgement was recorded and read by nothing, which made the "acknowledge
+    // before continuing production" line in the release notification an unenforced request.
+    if (job.partnerId && PRODUCTION_MILESTONES.includes(input.type)) {
+      await this.drawings.assertRevisionAcknowledged(
+        job.partnerId,
+        id,
+        'reporting production progress',
+      );
+    }
+
     const milestone = await this.prisma.jobMilestone.create({
       data: {
         jobId: id,
@@ -917,12 +1014,18 @@ export class JobsService {
         remarks: input.remarks,
         expectedCompletionDate: input.expectedCompletionDate,
         reportedById: actor.id,
+        // Module 7 — when this step was due, so an overdue milestone can be found by comparing
+        // against a date rather than only against the job's own due date.
+        dueAt: milestoneDueAt(input.type, job.plannedStartDate, job.dueDate),
         isOverdue: job.dueDate < new Date(),
         syncedFromOffline: Boolean(input.clientRequestId),
         clientRequestId: input.clientRequestId,
       },
     });
-    await this.files.attachPhotographs(input.photographFileIds, 'GridJob', id, input.type);
+    await this.files.attachPhotographs(input.photographFileIds, 'GridJob', id, input.type, {
+      latitude: input.latitude,
+      longitude: input.longitude,
+    });
 
     if (input.delayReason) {
       await this.prisma.jobDelay.create({
@@ -1123,4 +1226,50 @@ export class JobsService {
       },
     });
   }
+}
+
+/**
+ * Module 7 — milestones that mean the partner is building to the drawing, so acknowledgement of
+ * the current revision must already be on record.
+ *
+ * Accepting the job and confirming material receipt are deliberately not here: a partner has to be
+ * able to take a job and receive steel before they have opened the drawing.
+ */
+const PRODUCTION_MILESTONES: MilestoneType[] = [
+  'PRODUCTION_STARTED',
+  'FIRST_PIECE_READY',
+  'BATCH_25_PERCENT',
+  'BATCH_50_PERCENT',
+  'BATCH_READY_FOR_INSPECTION',
+  'DISPATCHED',
+];
+
+/**
+ * When a milestone was due, spread across the job window.
+ *
+ * `JobMilestone.dueAt` was a column nothing wrote, so "milestone overdue" could only ever mean
+ * "the whole job is late" — by which point the early warning the field exists to give has passed.
+ * The fractions are the share of the window each step should be reached by.
+ */
+const MILESTONE_SCHEDULE: Record<MilestoneType, number> = {
+  JOB_ACCEPTED: 0,
+  MATERIAL_RECEIVED: 0.1,
+  PRODUCTION_STARTED: 0.2,
+  FIRST_PIECE_READY: 0.35,
+  BATCH_25_PERCENT: 0.5,
+  BATCH_50_PERCENT: 0.65,
+  BATCH_READY_FOR_INSPECTION: 0.85,
+  DISPATCHED: 1,
+};
+
+function milestoneDueAt(
+  type: MilestoneType,
+  plannedStart: Date | null,
+  dueDate: Date,
+): Date | null {
+  const start = plannedStart ?? null;
+  if (!start) return dueDate;
+  const window = dueDate.getTime() - start.getTime();
+  if (window <= 0) return dueDate;
+  return new Date(start.getTime() + window * MILESTONE_SCHEDULE[type]);
 }

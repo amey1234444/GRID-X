@@ -1,6 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import type { AuthUser } from '@gridx/shared';
 
 import { API_URL } from '@/lib/config';
@@ -10,12 +11,17 @@ export interface AuthActionState {
   error: string | null;
   twoFactorRequired?: boolean;
   otpSent?: boolean;
+  /** Set once a password reset has been requested, so the form can confirm without leaking. */
+  resetRequested?: boolean;
+  success?: string;
 }
 
 interface LoginResponse {
   accessToken: string;
   refreshToken: string;
   user: AuthUser;
+  /** The role requires a second factor the user has not enrolled yet (Section 18). */
+  twoFactorEnrolmentRequired?: boolean;
 }
 
 function landingFor(user: AuthUser): string {
@@ -66,7 +72,53 @@ export async function loginAction(
 
   const session = result.payload as LoginResponse;
   writeTokens({ accessToken: session.accessToken, refreshToken: session.refreshToken });
+
+  // Section 18 — the session that comes back opens only the enrolment screen, so sending them to
+  // a dashboard would land them on a page that refuses every request it makes.
+  if (session.twoFactorEnrolmentRequired) redirect('/account?enrol=required');
   redirect(landingFor(session.user));
+}
+
+/**
+ * Section 18 — asks for a reset link.
+ *
+ * Always reports success: the API answers identically whether or not the address is known, and
+ * saying "no such user" here would undo that.
+ */
+export async function forgotPasswordAction(
+  _previous: AuthActionState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  const email = String(formData.get('email') ?? '').trim();
+  if (!email) return { error: 'Enter the work email you sign in with.' };
+
+  const result = await post('/auth/password/forgot', { email });
+  if (!result.ok && result.status !== 429) {
+    return { error: messageOf(result.payload, 'Unable to send a reset link just now.') };
+  }
+  if (result.status === 429) {
+    return { error: 'Too many attempts. Wait a few minutes before trying again.' };
+  }
+  return { error: null, resetRequested: true };
+}
+
+/** Section 18 — completes a reset from the emailed link. */
+export async function resetPasswordAction(
+  _previous: AuthActionState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  const token = String(formData.get('token') ?? '');
+  const password = String(formData.get('password') ?? '');
+  const confirmPassword = String(formData.get('confirmPassword') ?? '');
+
+  if (!token) return { error: 'This reset link is incomplete. Request a new one.' };
+  if (!password) return { error: 'Choose a new password.' };
+  if (password !== confirmPassword) return { error: 'The passwords do not match.' };
+
+  const result = await post('/auth/password/reset', { token, password, confirmPassword });
+  if (!result.ok) return { error: messageOf(result.payload, 'Unable to set that password.') };
+
+  redirect('/login?passwordChanged=1');
 }
 
 export async function requestOtpAction(
@@ -137,6 +189,25 @@ export async function changePasswordAction(
 
   clearTokens();
   redirect('/login?passwordChanged=1');
+}
+
+/** Section 19 — a user switching their own interface language. */
+export async function setLanguageAction(
+  _previous: AuthActionState,
+  formData: FormData,
+): Promise<AuthActionState> {
+  const language = String(formData.get('language') ?? '').trim();
+  if (language !== 'EN' && language !== 'HI') return { error: 'Choose English or Hindi.' };
+
+  const result = await apiFetch<unknown>('/auth/language', {
+    method: 'POST',
+    body: JSON.stringify({ language }),
+  });
+  if (result.error) return { error: result.error };
+
+  revalidatePath('/account');
+  revalidatePath('/partner');
+  return { error: null, success: language === 'HI' ? 'भाषा हिन्दी पर सेट है।' : 'Language set to English.' };
 }
 
 export async function logoutAction(): Promise<void> {

@@ -42,7 +42,20 @@ export default async function InspectionPlansPage(): Promise<React.JSX.Element> 
               { name: 'componentId', label: 'Component', type: 'select', required: true, options: components, span: 2 },
               { name: 'name', label: 'Plan name', required: true },
               { name: 'inspectionType', label: 'Inspection type', type: 'select', options: optionsFrom(INSPECTION_TYPES), defaultValue: 'FINAL' },
-              { name: 'samplingPlan', label: 'Sampling plan', placeholder: 'e.g. ISO 2859-1 Level II AQL 1.0', span: 2 },
+              { name: 'samplingPlan', label: 'Sampling standard', placeholder: 'e.g. ISO 2859-1 Level II AQL 1.0', span: 2 },
+              {
+                name: 'samplePercent',
+                label: 'Sample (% of lot)',
+                type: 'number',
+                step: 'any',
+                help: 'Enforced when the inspection is accepted. Blank uses the component inspection level.',
+              },
+              {
+                name: 'minSampleSize',
+                label: 'Minimum pieces',
+                type: 'number',
+                help: 'Floor for small batches, so 10% of 4 pieces is still meaningful.',
+              },
               {
                 name: 'characteristics',
                 label: 'Characteristics',
@@ -92,6 +105,11 @@ export default async function InspectionPlansPage(): Promise<React.JSX.Element> 
                   <p className="text-sm text-muted-foreground">
                     {plan.component.componentCode} · {humanise(plan.inspectionType)} · v{plan.version}
                     {plan.samplingPlan ? ` · ${plan.samplingPlan}` : ''}
+                    {plan.samplePercent
+                      ? ` · ${plan.samplePercent}% of lot${plan.minSampleSize ? `, min ${plan.minSampleSize}` : ''}`
+                      : plan.minSampleSize
+                        ? ` · min ${plan.minSampleSize} pieces`
+                        : ''}
                   </p>
                   <ActionDialog
                     title="Add characteristic"

@@ -33,6 +33,18 @@ import {
   companyWhere,
 } from '../common/company-scope';
 
+/**
+ * Module 11 — a job may be invoiced once quality has accepted it and it is on its way back or
+ * settled. Shared by the picker that lists invoiceable jobs and the guard on submission, so the
+ * screen and the endpoint cannot disagree about what is billable.
+ */
+export const INVOICEABLE_JOB_STATUSES = [
+  'QUALITY_ACCEPTED',
+  'DISPATCHED',
+  'RECEIVED',
+  'CLOSED',
+] as const;
+
 export interface InvoiceFilters extends PaginationInput {
   status?: string;
   partnerId?: string;
@@ -172,7 +184,7 @@ export class CommercialsService {
       where: {
         ...companyWhere(actor),
         partnerId: scopedPartnerId,
-        status: { in: ['QUALITY_ACCEPTED', 'DISPATCHED', 'RECEIVED', 'CLOSED'] },
+        status: { in: [...INVOICEABLE_JOB_STATUSES] },
         acceptedQuantity: { gt: 0 },
         invoiceItems: { none: {} },
       },
@@ -205,6 +217,34 @@ export class CommercialsService {
     if (notAccepted.length > 0) {
       throw new BadRequestException(
         `Quality acceptance is pending for ${notAccepted.map((job) => job.jobNumber).join(', ')}`,
+      );
+    }
+
+    // The job must have reached quality acceptance, not merely have some accepted quantity on it.
+    // A partially accepted job sitting in REWORK has an accepted quantity that is still moving —
+    // invoicing it bills for a figure that is not final. The `include: { reworkOrders: true }`
+    // above was the trace of a guard that was intended here and never written; the picker on the
+    // invoice screen filtered correctly, so only a direct API call reached this.
+    const notReady = jobs.filter(
+      (job) => !INVOICEABLE_JOB_STATUSES.includes(job.status as (typeof INVOICEABLE_JOB_STATUSES)[number]),
+    );
+    if (notReady.length > 0) {
+      throw new BadRequestException(
+        `Not ready to invoice: ${notReady
+          .map((job) => `${job.jobNumber} (${job.status.toLowerCase().replace(/_/g, ' ')})`)
+          .join(', ')}. Invoice once quality has accepted the work.`,
+      );
+    }
+
+    const openRework = jobs.filter((job) =>
+      job.reworkOrders.some(
+        (order) => order.status !== 'COMPLETED' && order.status !== 'SCRAPPED',
+      ),
+    );
+    if (openRework.length > 0) {
+      throw new BadRequestException(
+        `Rework is still open on ${openRework.map((job) => job.jobNumber).join(', ')}. ` +
+          'Close the rework so the accepted quantity and any deduction are final.',
       );
     }
     const alreadyInvoiced = await this.prisma.partnerInvoiceItem.findFirst({

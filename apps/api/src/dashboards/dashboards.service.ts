@@ -77,10 +77,7 @@ export class DashboardsService {
         },
       }),
       this.prisma.gridJob.count({ where: { ...scope.own, status: OPEN_JOB_STATUSES } }),
-      this.prisma.gridJob.findMany({
-        where: { ...scope.own, status: OPEN_JOB_STATUSES },
-        select: { id: true, quantity: true, rate: true, dueDate: true },
-      }),
+      this.openJobValue(scope, now),
       this.prisma.gridJob.groupBy({ by: ['status'], where: scope.own, _count: { _all: true } }),
       this.prisma.partnerScore.findMany({
         where: scope.viaPartner,
@@ -107,36 +104,16 @@ export class DashboardsService {
           paymentScheduledFor: { lt: now },
         },
       }),
-      this.prisma.gridJob.findMany({
-        where: { ...scope.own, completedAt: { not: null } },
-        select: {
-          completedAt: true,
-          dueDate: true,
-          acceptedQuantity: true,
-          rejectedQuantity: true,
-          reworkQuantity: true,
-          rate: true,
-          quantity: true,
-        },
-      }),
+      this.completedJobStats(scope),
     ]);
 
-    const totalOutsourcedValue = openJobs.reduce((sum, job) => sum + job.quantity * job.rate, 0);
-    const jobsAtRisk = openJobs.filter((job) => job.dueDate.getTime() < now.getTime() + 2 * DAY_MS)
-      .length;
+    const totalOutsourcedValue = openJobs.totalValue;
+    const jobsAtRisk = openJobs.atRisk;
 
-    const accepted = completedJobs.reduce((sum, job) => sum + job.acceptedQuantity, 0);
-    const notAccepted = completedJobs.reduce(
-      (sum, job) => sum + job.rejectedQuantity + job.reworkQuantity,
-      0,
-    );
+    const { accepted, notAccepted, onTime, total: completedCount } = completedJobs;
     const qualityAcceptanceRate =
       accepted + notAccepted > 0 ? round2((accepted / (accepted + notAccepted)) * 100) : 0;
-    const onTime = completedJobs.filter(
-      (job) => job.completedAt && job.completedAt.getTime() <= job.dueDate.getTime(),
-    ).length;
-    const onTimeDeliveryRate =
-      completedJobs.length > 0 ? round2((onTime / completedJobs.length) * 100) : 0;
+    const onTimeDeliveryRate = completedCount > 0 ? round2((onTime / completedCount) * 100) : 0;
 
     const availableHours = capacity._sum.availableHours ?? 0;
     const committedHours = Math.max(
@@ -547,38 +524,107 @@ export class DashboardsService {
   // Helpers
   // -------------------------------------------------------------------------
 
+  /** Value of OSWAR material sitting in partner workshops, summed in the database. */
   private async materialCustodyValue(scope: DashboardScope): Promise<number> {
-    const issues = await this.prisma.materialIssueItem.findMany({
-      where: {
-        materialIssue: { ...scope.own, job: { status: OPEN_JOB_STATUSES } },
-      },
-      select: { issueWeightKg: true, item: { select: { standardRate: true } } },
-    });
-    return round2(
-      issues.reduce((sum, row) => sum + row.issueWeightKg * (row.item.standardRate ?? 0), 0),
-    );
+    const rows = await this.prisma.$queryRaw<Array<{ value: number | null }>>`
+      SELECT COALESCE(SUM(mii."issueWeightKg" * COALESCE(i."standardRate", 0)), 0)::double precision AS value
+      FROM "MaterialIssueItem" mii
+      JOIN "MaterialIssue" mi ON mi."id" = mii."materialIssueId"
+      JOIN "Item" i ON i."id" = mii."itemId"
+      JOIN "GridJob" j ON j."id" = mi."jobId"
+      WHERE j."status" NOT IN ('DRAFT', 'CLOSED', 'CANCELLED')
+        ${this.companySqlFor(scope, 'mi')}
+    `;
+    return round2(Number(rows[0]?.value ?? 0));
   }
 
   /**
-   * Saving = (component standard conversion rate − partner rate) × accepted quantity.
-   * Components without a standard rate contribute nothing rather than a guessed number.
+   * What the network saved against the in-house standard rate, summed in the database.
+   *
+   * Saving = (component standard conversion rate − partner rate) × accepted quantity; components
+   * without a standard rate contribute nothing rather than a guessed number.
+   *
+   * This loaded every job with an accepted quantity — the whole history, growing forever — to
+   * produce one number on every dashboard load.
    */
   private async costSavings(scope: DashboardScope): Promise<number> {
-    const jobs = await this.prisma.gridJob.findMany({
-      where: { ...scope.own, acceptedQuantity: { gt: 0 } },
-      select: {
-        acceptedQuantity: true,
-        rate: true,
-        component: { select: { standardConversionRate: true } },
-      },
-    });
-    return round2(
-      jobs.reduce((sum, job) => {
-        const standard = job.component.standardConversionRate ?? 0;
-        if (standard <= 0) return sum;
-        return sum + Math.max(0, standard - job.rate) * job.acceptedQuantity;
-      }, 0),
-    );
+    const rows = await this.prisma.$queryRaw<Array<{ savings: number | null }>>`
+      SELECT COALESCE(SUM(
+        GREATEST(0, c."standardConversionRate" - j."rate") * j."acceptedQuantity"
+      ), 0)::double precision AS savings
+      FROM "GridJob" j
+      JOIN "Component" c ON c."id" = j."componentId"
+      WHERE j."acceptedQuantity" > 0
+        AND c."standardConversionRate" IS NOT NULL
+        AND c."standardConversionRate" > 0
+        ${this.companySqlFor(scope, 'j')}
+    `;
+    return round2(Number(rows[0]?.savings ?? 0));
+  }
+
+  /** Open-job value and how many are close to their due date, without loading the jobs. */
+  private async openJobValue(
+    scope: DashboardScope,
+    now: Date,
+  ): Promise<{ totalValue: number; atRisk: number }> {
+    const atRiskBefore = new Date(now.getTime() + 2 * DAY_MS);
+    const rows = await this.prisma.$queryRaw<
+      Array<{ totalvalue: number | null; atrisk: bigint }>
+    >`
+      SELECT
+        COALESCE(SUM(j."quantity" * j."rate"), 0)::double precision AS totalvalue,
+        COUNT(*) FILTER (WHERE j."dueDate" < ${atRiskBefore}) AS atrisk
+      FROM "GridJob" j
+      WHERE j."status" NOT IN ('DRAFT', 'CLOSED', 'CANCELLED')
+        ${this.companySqlFor(scope, 'j')}
+    `;
+    return {
+      totalValue: Number(rows[0]?.totalvalue ?? 0),
+      atRisk: Number(rows[0]?.atrisk ?? 0),
+    };
+  }
+
+  /** Quality acceptance and on-time delivery over every completed job, aggregated in SQL. */
+  private async completedJobStats(
+    scope: DashboardScope,
+  ): Promise<{ accepted: number; notAccepted: number; onTime: number; total: number }> {
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        accepted: number | null;
+        notaccepted: number | null;
+        ontime: bigint;
+        total: bigint;
+      }>
+    >`
+      SELECT
+        COALESCE(SUM(j."acceptedQuantity"), 0)::double precision AS accepted,
+        COALESCE(SUM(j."rejectedQuantity" + j."reworkQuantity"), 0)::double precision AS notaccepted,
+        COUNT(*) FILTER (WHERE j."completedAt" <= j."dueDate") AS ontime,
+        COUNT(*) AS total
+      FROM "GridJob" j
+      WHERE j."completedAt" IS NOT NULL
+        ${this.companySqlFor(scope, 'j')}
+    `;
+    return {
+      accepted: Number(rows[0]?.accepted ?? 0),
+      notAccepted: Number(rows[0]?.notaccepted ?? 0),
+      onTime: Number(rows[0]?.ontime ?? 0),
+      total: Number(rows[0]?.total ?? 0),
+    };
+  }
+
+  /**
+   * Company scope as SQL, qualified by a table alias.
+   *
+   * Several dashboard figures are sums of `quantity * rate`, which Prisma cannot express: it sums
+   * a column, not an expression. Those figures were produced by loading every matching job into
+   * memory and reducing — every completed job ever, on every dashboard load — which Section 18
+   * ("thousands of active jobs", "dashboards should load within a few seconds") does not survive.
+   */
+  private companySqlFor(scope: DashboardScope, alias: string): Prisma.Sql {
+    const ids = scope.own.companyId?.in;
+    if (!ids) return Prisma.empty;
+    return Prisma.sql`AND ${Prisma.raw(`"${alias}"."companyId"`)} IN (${Prisma.join(ids)})`;
   }
 
   private async costSavingsByCategory(
@@ -610,19 +656,30 @@ export class DashboardsService {
     since.setMonth(since.getMonth() - 5, 1);
     since.setHours(0, 0, 0, 0);
 
-    const jobs = await this.prisma.gridJob.findMany({
-      where: { ...scope.own, createdAt: { gte: since } },
-      select: {
-        createdAt: true,
-        completedAt: true,
-        dueDate: true,
-        quantity: true,
-        rate: true,
-        acceptedQuantity: true,
-        rejectedQuantity: true,
-        reworkQuantity: true,
-      },
-    });
+    // Grouped by month in the database. Six months of jobs was a bounded-ish query today and an
+    // unbounded one at the scale Section 18 asks for, and the shape of the result is six rows.
+    const grouped = await this.prisma.$queryRaw<
+      Array<{
+        month: string;
+        outsourcedvalue: number | null;
+        accepted: number | null;
+        rejected: number | null;
+        ontime: bigint;
+        done: bigint;
+      }>
+    >`
+      SELECT
+        to_char(date_trunc('month', j."createdAt"), 'YYYY-MM') AS month,
+        COALESCE(SUM(j."quantity" * j."rate"), 0)::double precision AS outsourcedvalue,
+        COALESCE(SUM(j."acceptedQuantity"), 0)::double precision AS accepted,
+        COALESCE(SUM(j."rejectedQuantity" + j."reworkQuantity"), 0)::double precision AS rejected,
+        COUNT(*) FILTER (WHERE j."completedAt" IS NOT NULL AND j."completedAt" <= j."dueDate") AS ontime,
+        COUNT(*) FILTER (WHERE j."completedAt" IS NOT NULL) AS done
+      FROM "GridJob" j
+      WHERE j."createdAt" >= ${since}
+        ${this.companySqlFor(scope, 'j')}
+      GROUP BY 1
+    `;
 
     const months = new Map<
       string,
@@ -640,16 +697,15 @@ export class DashboardsService {
       });
     }
 
-    for (const job of jobs) {
-      const bucket = months.get(monthKey(job.createdAt));
+    // Months with no jobs stay at zero rather than dropping out, so the trend line has six points.
+    for (const row of grouped) {
+      const bucket = months.get(row.month);
       if (!bucket) continue;
-      bucket.outsourcedValue += job.quantity * job.rate;
-      bucket.accepted += job.acceptedQuantity;
-      bucket.rejected += job.rejectedQuantity + job.reworkQuantity;
-      if (job.completedAt) {
-        bucket.done += 1;
-        if (job.completedAt.getTime() <= job.dueDate.getTime()) bucket.onTime += 1;
-      }
+      bucket.outsourcedValue = Number(row.outsourcedvalue ?? 0);
+      bucket.accepted = Number(row.accepted ?? 0);
+      bucket.rejected = Number(row.rejected ?? 0);
+      bucket.onTime = Number(row.ontime ?? 0);
+      bucket.done = Number(row.done ?? 0);
     }
 
     return [...months.entries()].map(([month, value]) => ({

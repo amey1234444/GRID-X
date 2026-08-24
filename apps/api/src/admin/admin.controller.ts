@@ -5,13 +5,14 @@ import {
   ROLE_CODES,
   createCompanySchema,
   createUserSchema,
+  adminResetPasswordSchema,
   paginationSchema,
   updateRoleSchema,
+  updateSettingSchema,
   updateUserSchema,
 } from '@gridx/shared';
-import { Prisma } from '@gridx/db';
 import { z } from 'zod';
-import { CurrentUser, RequirePermissions } from '../common/decorators';
+import { CurrentUser, RateLimit, RequirePermissions } from '../common/decorators';
 import { zodBody } from '../common/zod-validation.pipe';
 import { RequestUser } from '../common/request-user';
 import { AdminService } from './admin.service';
@@ -30,16 +31,6 @@ const auditQuerySchema = paginationSchema.extend({
 });
 
 const suspendUserSchema = z.object({ reason: z.string().trim().min(5) });
-const jsonValueSchema: z.ZodType<Prisma.InputJsonValue> = z.lazy(() =>
-  z.union([
-    z.string(),
-    z.number(),
-    z.boolean(),
-    z.array(jsonValueSchema),
-    z.record(jsonValueSchema),
-  ]),
-);
-const settingSchema = z.object({ value: jsonValueSchema });
 
 @ApiTags('Administration')
 @Controller()
@@ -82,6 +73,21 @@ export class AdminController {
     @Body(zodBody(suspendUserSchema)) body: z.infer<typeof suspendUserSchema>,
   ) {
     return this.admin.suspendUser(user, id, body.reason);
+  }
+
+  /**
+   * Section 18 — password recovery for a user who cannot start one themselves. Rate limited
+   * because it changes credentials, even though the caller is already an administrator.
+   */
+  @RateLimit(10, 15 * 60_000)
+  @Post('users/:id/reset-password')
+  @RequirePermissions(PERMISSIONS.USER_MANAGE)
+  resetUserPassword(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body(zodBody(adminResetPasswordSchema)) body: z.infer<typeof adminResetPasswordSchema>,
+  ) {
+    return this.admin.resetUserPassword(user, id, body.useTemporaryPassword);
   }
 
   @Get('roles')
@@ -134,7 +140,7 @@ export class AdminController {
   upsertSetting(
     @CurrentUser() user: RequestUser,
     @Param('key') key: string,
-    @Body(zodBody(settingSchema)) body: z.infer<typeof settingSchema>,
+    @Body(zodBody(updateSettingSchema)) body: z.infer<typeof updateSettingSchema>,
   ) {
     return this.admin.upsertSetting(user, key, body.value);
   }

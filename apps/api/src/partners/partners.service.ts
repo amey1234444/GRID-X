@@ -15,6 +15,7 @@ import {
   partnerAuditSchema,
   partnerDocumentSchema,
   partnerEmployeeSchema,
+  partnerLocationSchema,
   partnerMachineSchema,
   updatePartnerSchema,
 } from '@gridx/shared';
@@ -121,6 +122,8 @@ export class PartnersService {
         company: { select: { id: true, name: true } },
         capabilities: { orderBy: { process: 'asc' } },
         machines: { orderBy: { createdAt: 'desc' } },
+        // Module 1 — the units this partner works out of, primary first.
+        locations: { orderBy: [{ isPrimary: 'desc' }, { label: 'asc' }] },
         documents: { orderBy: { type: 'asc' } },
         employees: { orderBy: { name: 'asc' } },
         audits: { orderBy: { auditDate: 'desc' } },
@@ -609,6 +612,73 @@ export class PartnersService {
       entityId: documentId,
     });
     return document;
+  }
+
+  /**
+   * Module 1 — additional units for a partner who works out of more than one address.
+   *
+   * `PartnerLocation` was in the schema with a primary flag and coordinates and had no write path
+   * at all, so a partner with two workshops could only ever be recorded as the one address on
+   * their master record — and material was then despatched to whichever of them was typed in.
+   */
+  async addLocation(actor: RequestUser, id: string, input: z.infer<typeof partnerLocationSchema>) {
+    await this.assertScope(actor, id);
+
+    // Exactly one primary: it is the address material goes to when a job does not say otherwise.
+    const existing = await this.prisma.partnerLocation.count({ where: { partnerId: id } });
+    const isPrimary = input.isPrimary || existing === 0;
+
+    const location = await this.prisma.$transaction(async (tx) => {
+      if (isPrimary) {
+        await tx.partnerLocation.updateMany({
+          where: { partnerId: id, isPrimary: true },
+          data: { isPrimary: false },
+        });
+      }
+      return tx.partnerLocation.create({ data: { partnerId: id, ...input, isPrimary } });
+    });
+
+    await this.audit.record(actor, {
+      action: 'PARTNER_LOCATION_ADDED',
+      entityType: 'PartnerLocation',
+      entityId: location.id,
+      after: { partnerId: id, label: location.label, city: location.city, isPrimary },
+    });
+    return location;
+  }
+
+  async listLocations(actor: RequestUser, id: string) {
+    await this.assertScope(actor, id);
+    return this.prisma.partnerLocation.findMany({
+      where: { partnerId: id },
+      orderBy: [{ isPrimary: 'desc' }, { label: 'asc' }],
+    });
+  }
+
+  async removeLocation(actor: RequestUser, locationId: string) {
+    const location = await this.prisma.partnerLocation.findUniqueOrThrow({
+      where: { id: locationId },
+      select: { partnerId: true, isPrimary: true, label: true },
+    });
+    await this.assertScope(actor, location.partnerId);
+
+    const remaining = await this.prisma.partnerLocation.count({
+      where: { partnerId: location.partnerId },
+    });
+    if (location.isPrimary && remaining > 1) {
+      throw new BadRequestException(
+        'Make another location primary before removing this one, so deliveries still have an address.',
+      );
+    }
+
+    await this.prisma.partnerLocation.delete({ where: { id: locationId } });
+    await this.audit.record(actor, {
+      action: 'PARTNER_LOCATION_REMOVED',
+      entityType: 'PartnerLocation',
+      entityId: locationId,
+      before: { partnerId: location.partnerId, label: location.label },
+    });
+    return { success: true };
   }
 
   async addEmployee(actor: RequestUser, id: string, input: z.infer<typeof partnerEmployeeSchema>) {

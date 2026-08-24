@@ -40,6 +40,12 @@ export interface AuthTokens {
 
 export interface LoginResponse extends AuthTokens {
   user: AuthUser;
+  /**
+   * Section 18 — the user's role obliges them to hold a second factor and they have not enrolled
+   * yet. The session that comes back opens the enrolment screen and nothing else, so the client
+   * must send them there rather than to the dashboard.
+   */
+  twoFactorEnrolmentRequired?: boolean;
 }
 
 /** Chairman and management dashboard (Section 6). */
@@ -228,6 +234,14 @@ export interface PartnerRecommendation {
   score: number;
   rating: number;
   freeCapacityHours: number;
+  /**
+   * Whether the free-capacity figure comes from a declaration the partner actually made for this
+   * job's window, or from a fallback. A planner should weigh a declared number differently from an
+   * assumed one (Module 5).
+   */
+  capacityDeclared: boolean;
+  declaredHours: number;
+  committedHours: number;
   openJobs: number;
   onTimeDeliveryPercent: number;
   firstPassQualityPercent: number;

@@ -649,6 +649,9 @@ model User {
   approvedEngineeringChanges EngineeringChange[]              @relation("EcApprovedBy")
   uploadedFiles              StoredFile[]                     @relation("FileUploadedBy")
   jobDelaysReported          JobDelay[]                       @relation("DelayReportedBy")
+  passwordResets             PasswordResetToken[]             @relation("PasswordResetSubject")
+  passwordResetsIssued       PasswordResetToken[]             @relation("PasswordResetIssuer")
+  materialTransactions       MaterialTransaction[]            @relation("MaterialTransactionRecordedBy")
 
   @@index([userType, status])
   @@index([partnerId])
@@ -699,6 +702,29 @@ model OtpCode {
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([phone])
+}
+
+/// Section 18 — password recovery for internal users.
+///
+/// Partners sign in with an OTP, so a forgotten password costs them nothing. An internal user has
+/// only a password, and without this a forgotten one is a permanent lockout with no recourse short
+/// of editing the database. The token is single-use, short-lived and stored only as a hash.
+model PasswordResetToken {
+  id          String    @id @default(cuid())
+  userId      String
+  tokenHash   String    @unique
+  /// Set when an administrator issued the reset on the user's behalf rather than the user asking.
+  issuedById  String?
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  requestedIp String?
+  createdAt   DateTime  @default(now())
+
+  user     User  @relation("PasswordResetSubject", fields: [userId], references: [id], onDelete: Cascade)
+  issuedBy User? @relation("PasswordResetIssuer", fields: [issuedById], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model AuditLog {
@@ -832,6 +858,7 @@ model Partner {
   toolIssues           ToolIssue[]
   shipmentsFrom        Shipment[]                 @relation("ShipmentFromPartner")
   shipmentsTo          Shipment[]                 @relation("ShipmentToPartner")
+  materialTransactions MaterialTransaction[]
 
   @@index([companyId, approvalStatus])
   @@index([category])
@@ -1010,6 +1037,7 @@ model Item {
   consumptions       MaterialConsumption[]
   scrapReturns       ScrapReturn[]
   reconciliations    MaterialReconciliation[]
+  transactions       MaterialTransaction[]
 }
 
 model Process {
@@ -1316,24 +1344,25 @@ model GridJob {
   inspectionPlan  InspectionPlan?  @relation(fields: [inspectionPlanId], references: [id])
   createdBy       User?            @relation("JobCreatedBy", fields: [createdById], references: [id])
 
-  items               GridJobItem[]
-  assignments         JobAssignment[]
-  milestones          JobMilestone[]
-  statusHistory       JobStatusHistory[]
-  delays              JobDelay[]
-  clarifications      JobClarification[]
-  materialIssues      MaterialIssue[]
-  consumptions        MaterialConsumption[]
-  scrapReturns        ScrapReturn[]
-  reconciliations     MaterialReconciliation[]
-  inspections         Inspection[]
-  nonConformances     NonConformance[]
-  reworkOrders        ReworkOrder[]
-  drawingAccess       DrawingAccess[]
-  shipmentItems       ShipmentItem[]
-  invoiceItems        PartnerInvoiceItem[]
-  capacityAllocations CapacityAllocation[]
-  toolIssues          ToolIssue[]
+  items                GridJobItem[]
+  assignments          JobAssignment[]
+  milestones           JobMilestone[]
+  statusHistory        JobStatusHistory[]
+  delays               JobDelay[]
+  clarifications       JobClarification[]
+  materialIssues       MaterialIssue[]
+  consumptions         MaterialConsumption[]
+  scrapReturns         ScrapReturn[]
+  materialTransactions MaterialTransaction[]
+  reconciliations      MaterialReconciliation[]
+  inspections          Inspection[]
+  nonConformances      NonConformance[]
+  reworkOrders         ReworkOrder[]
+  drawingAccess        DrawingAccess[]
+  shipmentItems        ShipmentItem[]
+  invoiceItems         PartnerInvoiceItem[]
+  capacityAllocations  CapacityAllocation[]
+  toolIssues           ToolIssue[]
 
   @@index([companyId, status])
   @@index([partnerId, status])
@@ -1482,6 +1511,7 @@ model MaterialIssue {
   items            MaterialIssueItem[]
   acknowledgements MaterialReceiptAcknowledgement[]
   shipmentItems    ShipmentItem[]
+  transactions     MaterialTransaction[]
 
   @@index([jobId])
   @@index([partnerId, status])
@@ -1555,6 +1585,52 @@ model ScrapReturn {
   @@index([jobId])
 }
 
+/// Module 6 — the material transaction ledger.
+///
+/// The blueprint lists ten transaction types. Four of them — rejected material going back,
+/// replacement material coming out, excess returned and unused material returned — had no home:
+/// movements were inferred from the issue, consumption, scrap and reconciliation tables, so a
+/// return that was not one of those four shapes simply could not be recorded.
+///
+/// Every movement of OSWAR material in or out of a partner's custody is written here, signed
+/// (`+kg` towards the partner, `-kg` back to OSWAR), so partner stock is a sum over one table and
+/// the reconciliation has something to reconcile against.
+model MaterialTransaction {
+  id                    String                  @id @default(cuid())
+  type                  MaterialTransactionType
+  jobId                 String
+  itemId                String
+  /// Positive when material moves to the partner, negative when it comes back to OSWAR.
+  /// `CONSUMED` and `SCRAP_GENERATED` are neither: they are zero-sum events inside the partner's
+  /// custody and carry the weight in `quantityKg` with `directionKg` at 0.
+  directionKg           Float                   @default(0)
+  quantityKg            Float
+  partnerId             String?
+  /// The challan this movement travelled on, where there is one.
+  materialIssueId       String?
+  batchNumber           String?
+  heatNumber            String?
+  /// Set on REPLACEMENT_MATERIAL so the replacement can be traced to what it replaced.
+  replacesTransactionId String?
+  reference             String?
+  remarks               String?
+  recordedById          String?
+  occurredAt            DateTime                @default(now())
+  createdAt             DateTime                @default(now())
+
+  job           GridJob               @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  item          Item                  @relation(fields: [itemId], references: [id])
+  partner       Partner?              @relation(fields: [partnerId], references: [id])
+  materialIssue MaterialIssue?        @relation(fields: [materialIssueId], references: [id])
+  replaces      MaterialTransaction?  @relation("ReplacementOf", fields: [replacesTransactionId], references: [id])
+  replacedBy    MaterialTransaction[] @relation("ReplacementOf")
+  recordedBy    User?                 @relation("MaterialTransactionRecordedBy", fields: [recordedById], references: [id])
+
+  @@index([jobId, itemId])
+  @@index([partnerId, type])
+  @@index([occurredAt])
+}
+
 model MaterialReconciliation {
   id               String                  @id @default(cuid())
   jobId            String
@@ -1592,7 +1668,14 @@ model InspectionPlan {
   componentId    String
   name           String
   inspectionType InspectionType @default(FINAL)
+  /// Free-text description of the standard being followed, e.g. "IS 2500 Level II".
   samplingPlan   String?
+  /// Module 8 — how much of the lot must actually be measured. `samplingPlan` alone was a
+  /// sentence nobody could enforce: an inspector could measure one piece of a 500-piece batch and
+  /// the record looked complete. Null falls back to the component's inspection level.
+  samplePercent  Float?
+  /// Floor for a small lot, so a 4-piece batch at 10% still gets more than nothing measured.
+  minSampleSize  Int?
   version        Int            @default(1)
   isActive       Boolean        @default(true)
   createdAt      DateTime       @default(now())

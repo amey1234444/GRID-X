@@ -13,11 +13,13 @@ import {
   addPartnerCapabilityAction,
   addPartnerDocumentAction,
   addPartnerEmployeeAction,
+  addPartnerLocationAction,
   addPartnerMachineAction,
   changePartnerStatusAction,
   recordPartnerAuditAction,
   removePartnerCapabilityAction,
   removePartnerEmployeeAction,
+  removePartnerLocationAction,
   removePartnerMachineAction,
   suspendPartnerAction,
   updatePartnerAction,
@@ -202,7 +204,7 @@ export default async function PartnerDetailPage({
         <TabsList className="flex-wrap">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="capabilities">Capabilities</TabsTrigger>
-          <TabsTrigger value="machines">Machines &amp; people</TabsTrigger>
+          <TabsTrigger value="machines">Workshops, machines &amp; people</TabsTrigger>
           <TabsTrigger value="quality">Audits &amp; components</TabsTrigger>
           <TabsTrigger value="commercial">Commercial</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
@@ -420,6 +422,32 @@ export default async function PartnerDetailPage({
               ]}
             />
             <ActionDialog
+              title="Add workshop"
+              description="A partner working out of more than one address. Material goes to the primary workshop unless a job says otherwise."
+              triggerLabel="Add workshop"
+              triggerSize="sm"
+              triggerVariant="outline"
+              action={addPartnerLocationAction}
+              hidden={{ partnerId: partner.id }}
+              fields={[
+                { name: 'label', label: 'Name for this unit', required: true, placeholder: 'Unit 2 — machining' },
+                { name: 'addressLine1', label: 'Address line 1', required: true },
+                { name: 'addressLine2', label: 'Address line 2' },
+                { name: 'city', label: 'City', required: true },
+                { name: 'state', label: 'State', required: true },
+                { name: 'pincode', label: 'Pincode', required: true },
+                { name: 'latitude', label: 'Latitude', type: 'number', step: 'any' },
+                { name: 'longitude', label: 'Longitude', type: 'number', step: 'any' },
+                {
+                  name: 'isPrimary',
+                  label: 'Make this the primary workshop',
+                  type: 'checkbox',
+                  help: 'Deliveries default here. The first workshop added is primary automatically.',
+                  span: 2,
+                },
+              ]}
+            />
+            <ActionDialog
               title="Add team member"
               triggerLabel="Add person"
               triggerSize="sm"
@@ -434,6 +462,61 @@ export default async function PartnerDetailPage({
               ]}
             />
           </div>
+          <DataTable
+            columns={[
+              {
+                key: 'label',
+                header: 'Workshop',
+                render: (row: PartnerDetail['locations'][number]) => (
+                  <span className="block">
+                    <span className="block font-medium">{row.label}</span>
+                    {row.isPrimary ? (
+                      <span className="text-xs text-muted-foreground">Primary — deliveries default here</span>
+                    ) : null}
+                  </span>
+                ),
+              },
+              {
+                key: 'address',
+                header: 'Address',
+                render: (row: PartnerDetail['locations'][number]) =>
+                  [row.addressLine1, row.addressLine2, row.city, row.state, row.pincode]
+                    .filter(Boolean)
+                    .join(', '),
+              },
+              {
+                key: 'coords',
+                header: 'Coordinates',
+                render: (row: PartnerDetail['locations'][number]) =>
+                  row.latitude !== null && row.longitude !== null
+                    ? `${row.latitude.toFixed(4)}, ${row.longitude.toFixed(4)}`
+                    : '—',
+              },
+              {
+                key: 'actions',
+                header: '',
+                render: (row: PartnerDetail['locations'][number]) => (
+                  <ActionDialog
+                    title="Remove workshop"
+                    description="Removing a workshop does not affect jobs already despatched there."
+                    triggerLabel="Remove"
+                    triggerVariant="outline"
+                    triggerSize="sm"
+                    submitLabel="Remove"
+                    action={removePartnerLocationAction}
+                    hidden={{ locationId: row.id, partnerId: partner.id }}
+                    fields={[]}
+                  />
+                ),
+              },
+            ]}
+            rows={partner.locations}
+            empty={{
+              title: 'No additional workshops',
+              description: 'The address on the business profile is the only one on record.',
+            }}
+          />
+
           <DataTable
             columns={[
               { key: 'type', header: 'Machine', render: (row: PartnerDetail['machines'][number]) => row.machineType },

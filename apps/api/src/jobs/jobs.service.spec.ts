@@ -58,6 +58,9 @@ function build(overrides: PrismaMock = {}): { service: JobsService } & Mocks {
   const audit = { record: jest.fn() };
   const sequence = { next: jest.fn().mockResolvedValue('JOB-00001') };
   const ims = { pushInBackground: jest.fn() };
+  // Module 3 — the acknowledgement gate. Satisfied by default so milestone tests exercise the
+  // milestone rules; the gate itself is covered where it is enforced.
+  const drawings = { assertRevisionAcknowledged: jest.fn().mockResolvedValue(undefined) };
 
   const service = new JobsService(
     prisma as never,
@@ -67,6 +70,7 @@ function build(overrides: PrismaMock = {}): { service: JobsService } & Mocks {
     notifications as never,
     capacity as never,
     ims as never,
+    drawings as never,
   );
   return { service, prisma, capacity, files, notifications };
 }

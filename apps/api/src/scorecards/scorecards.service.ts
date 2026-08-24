@@ -11,6 +11,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettingsService } from '../common/settings.service';
 import { RequestUser } from '../common/request-user';
 import { allowedCompanyIds, assertCompanyScope } from '../common/company-scope';
 
@@ -32,6 +33,7 @@ export class ScorecardsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly settings: SettingsService,
   ) {}
 
   /** Scores hang off a partner, so company scope is applied one relation deep. */
@@ -270,6 +272,14 @@ export class ScorecardsService {
       return saved;
     });
 
+    // Module 12 — a Suspended verdict used to change the category and nothing else. Allocation
+    // reads `approvalStatus` and `isActive`, so a partner the system had just judged as critically
+    // non-compliant kept taking jobs while every screen showed them as suspended.
+    const suspension =
+      result.hasSufficientData && result.category === 'SUSPENDED'
+        ? await this.applySuspensionVerdict(partnerId, result, period)
+        : null;
+
     await this.notifications.notify({
       event: 'SCORECARD_PUBLISHED',
       title: result.hasSufficientData
@@ -317,10 +327,92 @@ export class ScorecardsService {
         totalScore: result.totalScore,
         category: result.category,
         period: `${period.periodMonth}/${period.periodYear}`,
+        suspended: suspension?.suspended ?? false,
       },
     });
 
-    return { ...score, kpis: result.kpis };
+    return { ...score, kpis: result.kpis, suspension };
+  }
+
+  /**
+   * Module 12 — acts on a Suspended verdict.
+   *
+   * Whether this suspends the partner outright or escalates for a person to decide is a
+   * `governance.autoSuspendOnCriticalViolation` setting, because the blueprint says the system
+   * should *recommend* — but leaving the partner allocatable while every screen calls them
+   * suspended is not a defensible middle ground, so one of the two has to actually happen.
+   *
+   * Existing jobs are deliberately left alone. Work in progress at a suspended partner still has
+   * OSWAR's material in it and has to be finished or formally recovered, not silently abandoned.
+   */
+  private async applySuspensionVerdict(
+    partnerId: string,
+    result: { totalScore: number; recommendation: string },
+    period: Period,
+  ): Promise<{ suspended: boolean; reason: string } | null> {
+    const autoSuspend = await this.settings.get('governance.autoSuspendOnCriticalViolation');
+    const partner = await this.prisma.partner.findUniqueOrThrow({
+      where: { id: partnerId },
+      select: { id: true, businessName: true, approvalStatus: true, isActive: true },
+    });
+
+    const reason =
+      `Scorecard ${period.periodMonth}/${period.periodYear} returned a critical violation ` +
+      `(score ${result.totalScore}).`;
+
+    if (!autoSuspend) {
+      // Escalate instead: someone has to look at this, and it must not just sit in a table.
+      await this.notifications.notify({
+        event: 'PARTNER_RATING_REDUCED',
+        title: `${partner.businessName} has hit a critical violation`,
+        body: `${reason} Automatic suspension is switched off, so this needs a decision. The partner can still be allocated work until someone acts.`,
+        link: `/app/partners/${partnerId}`,
+        entityType: 'Partner',
+        entityId: partnerId,
+        roleCodes: ['GROUP_ADMIN', 'GRIDX_HEAD'],
+      });
+      return { suspended: false, reason };
+    }
+
+    if (partner.approvalStatus === 'SUSPENDED' && !partner.isActive) {
+      return { suspended: true, reason };
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.partner.update({
+        where: { id: partnerId },
+        data: { approvalStatus: 'SUSPENDED', isActive: false, suspendedReason: reason },
+      }),
+      this.prisma.partnerStatusHistory.create({
+        data: {
+          partnerId,
+          fromStatus: partner.approvalStatus,
+          toStatus: 'SUSPENDED',
+          reason: `${reason} Suspended automatically by the monthly scorecard.`,
+        },
+      }),
+    ]);
+
+    await this.notifications.notify({
+      event: 'PARTNER_STATUS_CHANGED',
+      title: `${partner.businessName} has been suspended`,
+      body: `${reason} No new work can be allocated to this partner until the suspension is lifted. Jobs already in progress are unaffected.`,
+      link: `/app/partners/${partnerId}`,
+      entityType: 'Partner',
+      entityId: partnerId,
+      roleCodes: ['GROUP_ADMIN', 'GRIDX_HEAD', 'OPERATIONS_HEAD'],
+    });
+    await this.notifications.notify({
+      event: 'PARTNER_STATUS_CHANGED',
+      title: 'Your GRID-X account has been suspended',
+      body: `${reason} Please contact your GRID-X coordinator. Jobs already with you should be completed as normal.`,
+      link: '/partner/scorecard',
+      entityType: 'Partner',
+      entityId: partnerId,
+      partnerId,
+    });
+
+    return { suspended: true, reason };
   }
 
   /** Network view used by the management dashboard: category mix and ranking. */

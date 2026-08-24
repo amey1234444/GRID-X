@@ -25,6 +25,11 @@ export default function LoginPage({
       ) : null}
       <LoginForm />
       <p className="text-sm text-muted-foreground">
+        <Link href="/forgot-password" className="font-medium text-primary hover:underline">
+          Forgotten your password?
+        </Link>
+      </p>
+      <p className="text-sm text-muted-foreground">
         Partner unit?{' '}
         <Link href="/partner/login" className="font-medium text-primary hover:underline">
           Sign in with your mobile number

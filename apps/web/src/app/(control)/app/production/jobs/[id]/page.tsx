@@ -3,10 +3,12 @@ import { notFound } from 'next/navigation';
 import {
   DELAY_REASONS,
   JOB_PRIORITIES,
+  MANUAL_TRANSACTION_TYPES,
   MATERIAL_RESPONSIBILITIES,
   MILESTONE_TYPES,
   PERMISSIONS,
   RESPONSIBLE_PARTIES,
+  TRANSACTION_TYPE_LABELS,
 } from '@gridx/shared';
 
 import {
@@ -16,6 +18,7 @@ import {
   closeJobAction,
   createMaterialIssueAction,
   jobMilestoneAction,
+  recordMaterialTransactionAction,
   reportDelayAction,
   requestInspectionAction,
   updateJobAction,
@@ -29,27 +32,31 @@ import { StatCard } from '@/components/app/stat-card';
 import { StatusBadge } from '@/components/app/status-badge';
 import { Timeline } from '@/components/app/timeline';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatDate, formatDateTime, formatNumber, humanise } from '@/lib/format';
 import { optionsFrom } from '@/lib/options';
 import { inspectorOptions, itemOptions, partnerOptions } from '@/lib/reference';
-import { apiFetch, currentUser } from '@/lib/session';
+import { apiFetch, apiGet, currentUser } from '@/lib/session';
 import type { PartnerRecommendation } from '@gridx/shared';
 
-import type { JobDetail } from '@/lib/types';
+import type { JobDetail, MaterialRequirement, MaterialTransactionRow } from '@/lib/types';
 
 export default async function JobDetailPage({
   params,
 }: {
   params: { id: string };
 }): Promise<React.JSX.Element> {
-  const [result, partners, items, inspectors, user] = await Promise.all([
+  const [result, partners, items, inspectors, user, requirement, ledger] = await Promise.all([
     apiFetch<JobDetail>(`/jobs/${params.id}`),
     partnerOptions(),
     itemOptions(),
     inspectorOptions(),
     currentUser(),
+    // Module 6 step 2 - what the bill of material says stores should issue, and the ledger of
+    // everything that has actually moved. Both are read-only here; neither blocks the page.
+    apiGet<MaterialRequirement | null>(`/materials/jobs/${params.id}/requirement`, null),
+    apiGet<MaterialTransactionRow[]>(`/materials/transactions?jobId=${params.id}`, []),
   ]);
   const job = result.data;
   if (!job) notFound();
@@ -586,6 +593,80 @@ export default async function JobDetailPage({
             rowHref={(row) => `/app/materials/issues/${row.id}`}
             empty={{ title: 'No material issued', description: 'Issue material once the partner accepts the job.' }}
           />
+          {requirement && requirement.hasBillOfMaterial ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Material requirement</CardTitle>
+                <CardDescription>
+                  From the bill of material for {requirement.componentCode}:{' '}
+                  {formatNumber(requirement.quantity)} off, plus a{' '}
+                  {formatNumber(requirement.scrapAllowancePercent, 1)}% scrap allowance. Issue the
+                  outstanding column.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DataTable
+                  columns={[
+                    {
+                      key: 'item',
+                      header: 'Item',
+                      render: (row: MaterialRequirement['lines'][number]) =>
+                        [row.itemCode, row.itemName].filter(Boolean).join(' — '),
+                    },
+                    {
+                      key: 'perUnit',
+                      header: 'Per unit',
+                      align: 'right',
+                      render: (row: MaterialRequirement['lines'][number]) =>
+                        `${formatNumber(row.quantityPerUnit, 3)} ${row.uom}`,
+                    },
+                    {
+                      key: 'net',
+                      header: 'Net',
+                      align: 'right',
+                      render: (row: MaterialRequirement['lines'][number]) =>
+                        formatNumber(row.netQuantity, 3),
+                    },
+                    {
+                      key: 'allowance',
+                      header: 'Scrap allowance',
+                      align: 'right',
+                      render: (row: MaterialRequirement['lines'][number]) =>
+                        formatNumber(row.scrapAllowanceQuantity, 3),
+                    },
+                    {
+                      key: 'gross',
+                      header: 'Required',
+                      align: 'right',
+                      render: (row: MaterialRequirement['lines'][number]) => (
+                        <span className="font-medium">{formatNumber(row.grossQuantity, 3)}</span>
+                      ),
+                    },
+                    {
+                      key: 'issued',
+                      header: 'Issued',
+                      align: 'right',
+                      render: (row: MaterialRequirement['lines'][number]) =>
+                        formatNumber(row.alreadyIssued, 3),
+                    },
+                    {
+                      key: 'outstanding',
+                      header: 'Outstanding',
+                      align: 'right',
+                      render: (row: MaterialRequirement['lines'][number]) => (
+                        <span className={row.outstanding > 0 ? 'font-medium text-warning' : undefined}>
+                          {formatNumber(row.outstanding, 3)}
+                        </span>
+                      ),
+                    },
+                  ]}
+                  rows={requirement.lines}
+                  empty={{ title: 'No bill of material' }}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
+
           <Card>
             <CardHeader>
               <CardTitle>Reconciliation</CardTitle>
@@ -618,6 +699,128 @@ export default async function JobDetailPage({
                 ]}
                 rows={job.reconciliations}
                 empty={{ title: 'Not reconciled', description: 'Reconcile material before payment approval.' }}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Material ledger</CardTitle>
+              <CardDescription>
+                Every movement of OSWAR material for this job. Issues, consumption and scrap are
+                written here automatically; returns and replacements are recorded by hand.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex justify-end">
+                <ActionDialog
+                  title="Record a material movement"
+                  description="For material the documented flows do not cover: a rejected batch going back, a replacement going out, unused stock returned, or a shortage or excess found at the partner."
+                  triggerLabel="Record movement"
+                  triggerSize="sm"
+                  triggerVariant="outline"
+                  action={recordMaterialTransactionAction}
+                  hidden={{ jobId: job.id }}
+                  fields={[
+                    { name: 'itemId', label: 'Item', type: 'select', options: items, required: true },
+                    {
+                      name: 'type',
+                      label: 'Movement',
+                      type: 'select',
+                      required: true,
+                      options: MANUAL_TRANSACTION_TYPES.map((value) => ({
+                        value,
+                        label: TRANSACTION_TYPE_LABELS[value],
+                      })),
+                    },
+                    {
+                      name: 'quantityKg',
+                      label: 'Weight (kg)',
+                      type: 'number',
+                      step: '0.001',
+                      required: true,
+                    },
+                    { name: 'reference', label: 'Challan or reference' },
+                    { name: 'batchNumber', label: 'Batch number' },
+                    { name: 'heatNumber', label: 'Heat number' },
+                    {
+                      name: 'replacesTransactionId',
+                      label: 'Replaces which rejection?',
+                      type: 'select',
+                      options: ledger
+                        .filter((row) => row.type === 'REJECTED_MATERIAL')
+                        .map((row) => ({
+                          value: row.id,
+                          label: `${row.item.code} · ${formatNumber(row.quantityKg, 3)} kg · ${formatDate(row.occurredAt)}`,
+                        })),
+                      help: 'Required when recording replacement material, so the two can be traced together.',
+                      span: 2,
+                    },
+                    { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
+                    {
+                      name: 'photographFileIds',
+                      label: 'Photographs',
+                      type: 'files',
+                      category: 'PHOTOGRAPH',
+                      accept: 'image/*',
+                      span: 2,
+                    },
+                  ]}
+                />
+              </div>
+
+              <DataTable
+                columns={[
+                  {
+                    key: 'occurredAt',
+                    header: 'When',
+                    render: (row: MaterialTransactionRow) => formatDate(row.occurredAt),
+                  },
+                  {
+                    key: 'type',
+                    header: 'Movement',
+                    render: (row: MaterialTransactionRow) => humanise(row.type),
+                  },
+                  {
+                    key: 'item',
+                    header: 'Item',
+                    render: (row: MaterialTransactionRow) => `${row.item.code} — ${row.item.name}`,
+                  },
+                  {
+                    key: 'quantity',
+                    header: 'Weight (kg)',
+                    align: 'right',
+                    render: (row: MaterialTransactionRow) => formatNumber(row.quantityKg, 3),
+                  },
+                  {
+                    key: 'direction',
+                    header: 'Custody',
+                    render: (row: MaterialTransactionRow) =>
+                      row.directionKg > 0 ? (
+                        <span className="text-warning">to partner</span>
+                      ) : row.directionKg < 0 ? (
+                        <span className="text-emerald-600 dark:text-emerald-400">back to OSWAR</span>
+                      ) : (
+                        <span className="text-muted-foreground">at partner</span>
+                      ),
+                  },
+                  {
+                    key: 'reference',
+                    header: 'Reference',
+                    render: (row: MaterialTransactionRow) => row.reference ?? '—',
+                  },
+                  {
+                    key: 'by',
+                    header: 'Recorded by',
+                    render: (row: MaterialTransactionRow) => row.recordedBy?.name ?? 'System',
+                  },
+                ]}
+                rows={ledger}
+                empty={{
+                  title: 'Nothing has moved yet',
+                  description:
+                    'Movements appear here as material is issued, consumed, scrapped or returned.',
+                }}
               />
             </CardContent>
           </Card>
