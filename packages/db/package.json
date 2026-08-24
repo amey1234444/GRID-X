@@ -20,6 +20,8 @@
     "seed:ci": "tsx prisma/seed.ts",
     "reset": "dotenv -e ../../.env -- prisma migrate reset --force",
     "seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "reset-admin": "dotenv -e ../../.env -- tsx prisma/reset-admin.ts",
+    "reset-admin:ci": "tsx prisma/reset-admin.ts",
     "studio": "dotenv -e ../../.env -- prisma studio",
     "build": "dotenv -e ../../.env -- prisma generate && tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.seed.json",

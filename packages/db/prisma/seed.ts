@@ -1247,23 +1247,32 @@ async function main(): Promise<void> {
     update: {},
   });
 
+  // Section 7 — settings the platform actually reads. The old `gridx.defaults` blob held four
+  // keys under one row that no rule ever consulted; the catalogue in @gridx/shared replaced it.
+  await prisma.systemSetting.deleteMany({ where: { key: 'gridx.defaults' } });
+
+  /**
+   * Section 18 — two-factor is required for senior roles by default, and this demo dataset turns
+   * that off.
+   *
+   * The seeded admin has no authenticator enrolled, so leaving the default in force would issue an
+   * enrolment-only session and make the demo login look broken. Production does not run the seed
+   * and therefore keeps the secure default; a pilot turns it back on from Administration →
+   * Settings once the real admins have enrolled.
+   */
   await prisma.systemSetting.upsert({
-    where: { key: 'gridx.defaults' },
-    create: {
-      key: 'gridx.defaults',
-      value: {
-        paymentTermsDays: 30,
-        scrapAllowancePercent: 5,
-        classAOutsourcingRequiresApproval: true,
-        drawingAccessExpiryDays: 30,
-      },
-    },
-    update: {},
+    where: { key: 'security.twoFactorRequiredRoles' },
+    create: { key: 'security.twoFactorRequiredRoles', value: [] },
+    update: { value: [] },
   });
 
   console.log('Seed complete.');
   console.log(`Internal login: admin@oswar.example / ${DEMO_PASSWORD}`);
   console.log(`Partner login (phone): 98111000 + role index, password ${DEMO_PASSWORD}`);
+  console.log(
+    'Two-factor enforcement is OFF in seeded data. Turn it on in Administration -> Settings ' +
+      'before the pilot goes live.',
+  );
 }
 
 main()
