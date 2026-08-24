@@ -1,5 +1,7 @@
 # Deploying GRID-X on Render
 
+> Part of the [GRID-X documentation](README.md). See also [10 — Operations](10-operations.md).
+
 GRID-X ships a Render Blueprint (`render.yaml`) that provisions three resources:
 
 | Resource | Type | Purpose |

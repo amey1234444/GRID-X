@@ -13,6 +13,13 @@ The platform is a pnpm monorepo:
 | `apps/api` | NestJS REST API with JWT auth, RBAC and Swagger |
 | `apps/web` | Next.js 14 web app: marketing site, GRID-X Control, Partner PWA and Inspector |
 
+## Documentation
+
+Full platform documentation lives in [docs/](docs/README.md) — architecture, the data
+model, security and RBAC, every functional module in depth, the API reference, the web
+applications, background jobs and the IMS boundary, dashboards and reports, blueprint
+coverage, and operations.
+
 ## Getting started
 
 ```bash
