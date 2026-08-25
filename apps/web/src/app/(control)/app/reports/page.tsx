@@ -68,6 +68,7 @@ export default async function ReportsPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="BarChart3"
         title="Reports"
         description="The full Section 21 report catalogue. Every report respects partner scoping and can be exported to CSV."
       />

@@ -34,6 +34,7 @@ export default async function PartnerMaterialPage({
   return (
     <div className="space-y-5">
       <PageHeader
+        icon="Boxes"
         title={hindi ? 'माल' : 'Material'}
         description={
           hindi

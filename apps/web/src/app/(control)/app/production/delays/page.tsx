@@ -133,6 +133,7 @@ export default async function DelaysPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Cog"
         title="Delays"
         description="Every job currently held up, and whose side the hold-up is on. Recorded from the partner's milestone updates."
       />

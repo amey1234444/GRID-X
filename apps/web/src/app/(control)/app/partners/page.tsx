@@ -91,6 +91,7 @@ export default async function PartnersPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Factory"
         title="Partner network"
         description="Every registered manufacturing partner, their approval state, audits and live capacity."
         actions={

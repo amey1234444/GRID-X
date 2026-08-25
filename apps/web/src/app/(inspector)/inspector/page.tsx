@@ -39,6 +39,7 @@ export default async function InspectorQueuePage({
   return (
     <div className="space-y-5">
       <PageHeader
+        icon="ClipboardCheck"
         title="Inspection queue"
         description="Batches offered by partners, waiting for first article, in-process or final inspection."
       />

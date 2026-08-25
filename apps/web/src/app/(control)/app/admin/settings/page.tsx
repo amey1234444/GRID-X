@@ -104,6 +104,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Settings"
         title="System settings"
         description="The rules GRID-X applies when it enforces the blueprint. Every change is written to the audit log and takes effect within a minute."
       />

@@ -28,6 +28,7 @@ export default async function PartnerHomePage(): Promise<React.JSX.Element> {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="LayoutDashboard"
         title={dashboard.businessName || (user?.partnerName ?? 'Partner')}
         description={
           language === 'HI'

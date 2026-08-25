@@ -62,6 +62,7 @@ export default async function CapacityPage(): Promise<React.JSX.Element> {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Cog"
         title="Capacity planning"
         description="Capacity declared by each partner per process versus the hours GRID-X has already committed."
         actions={

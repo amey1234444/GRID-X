@@ -19,6 +19,7 @@ export default async function RolesPage(): Promise<React.JSX.Element> {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Settings"
         title="Roles and permissions"
         description="Role-based access control. Permissions are fixed in code so that every environment enforces the same matrix."
       />

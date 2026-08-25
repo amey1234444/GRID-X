@@ -79,6 +79,7 @@ export default async function PartnerJobDetailPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="ClipboardList"
         title={job.component.name}
         description={`${job.jobNumber} · ${job.component.componentCode} · ${humanise(job.priority)}`}
         actions={

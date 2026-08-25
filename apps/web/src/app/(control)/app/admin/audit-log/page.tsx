@@ -58,6 +58,7 @@ export default async function AuditLogPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Settings"
         title="Audit log"
         description="Append-only trail of every approval, drawing access, material movement and financial decision."
       />

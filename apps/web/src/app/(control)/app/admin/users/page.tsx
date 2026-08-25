@@ -163,6 +163,7 @@ export default async function UsersPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Settings"
         title="Users"
         description="Internal and partner users, their roles and session security posture."
         actions={

@@ -106,6 +106,7 @@ export default async function PickupsPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Truck"
         title="Pickups"
         description="Collections planned but not yet made. Module 10's scheduled collection runs."
       />

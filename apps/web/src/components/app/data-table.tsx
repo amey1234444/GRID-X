@@ -18,6 +18,13 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+import {
+  extractText,
+  formatAggregate,
+  inferColumnType,
+  parseNumeric,
+  sumColumn,
+} from '@/components/app/column-intel';
 import { EmptyState } from '@/components/app/empty-state';
 import { ToolbarChip } from '@/components/app/toolbar';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -66,6 +73,44 @@ export interface Column<T> {
 
 type SortState = { key: string; direction: 'asc' | 'desc' } | null;
 
+/**
+ * A column enriched with everything the grid needs but the screen did not
+ * have to spell out: its type glyph, a sort key derived from the rendered
+ * text, and a footer aggregate for numeric columns.
+ */
+interface ResolvedColumn<T> extends Column<T> {
+  resolvedType: ColumnType;
+  resolvedSort: (row: T) => string | number | null;
+  resolvedFooter: ((rows: T[]) => React.ReactNode) | null;
+}
+
+function resolveColumns<T>(columns: Column<T>[], showAggregates: boolean): ResolvedColumn<T>[] {
+  return columns.map((column) => {
+    const resolvedType = column.type ?? inferColumnType(column.key, column.header);
+    const numeric = resolvedType === 'number';
+
+    const explicitSort = column.sortValue;
+    const resolvedSort = (row: T): string | number | null => {
+      if (explicitSort) return explicitSort(row) ?? null;
+      const text = extractText(column.render(row)).trim();
+      if (!text) return null;
+      return numeric ? parseNumeric(text) : text.toLowerCase();
+    };
+
+    let resolvedFooter: ((rows: T[]) => React.ReactNode) | null = column.footer ?? null;
+    if (!resolvedFooter && showAggregates && numeric) {
+      resolvedFooter = (rows: T[]) => {
+        const total = sumColumn(rows, column.render);
+        return total === null ? null : (
+          <span title={`Sum of ${column.header}`}>{formatAggregate(total)}</span>
+        );
+      };
+    }
+
+    return { ...column, resolvedType, resolvedSort, resolvedFooter };
+  });
+}
+
 function compare(a: unknown, b: unknown): number {
   if (a === b) return 0;
   if (a === null || a === undefined) return 1;
@@ -85,6 +130,7 @@ export function DataTable<T>({
   onSelectionChange,
   selectionActions,
   rowKey,
+  aggregates = true,
 }: {
   columns: Column<T>[];
   rows: T[];
@@ -98,6 +144,8 @@ export function DataTable<T>({
   /** Rendered in the bar that replaces the footer while rows are selected. */
   selectionActions?: (rows: T[]) => React.ReactNode;
   rowKey?: (row: T, index: number) => string;
+  /** Set false for tables where a column sum would be nonsense (rates, IDs). */
+  aggregates?: boolean;
 }): React.JSX.Element {
   const [density, setDensity] = React.useState<TableDensity>(densityProp ?? 'comfortable');
   const [sort, setSort] = React.useState<SortState>(null);
@@ -109,13 +157,19 @@ export function DataTable<T>({
     setSelected(new Set());
   }, [rows]);
 
+  const resolved = React.useMemo(
+    () => resolveColumns(columns, aggregates),
+    [columns, aggregates],
+  );
+
   const sorted = React.useMemo(() => {
     if (!sort) return rows;
-    const column = columns.find((item) => item.key === sort.key);
-    if (!column?.sortValue) return rows;
+    const column = resolved.find((item) => item.key === sort.key);
+    if (!column) return rows;
     const factor = sort.direction === 'asc' ? 1 : -1;
-    return [...rows].sort((a, b) => factor * compare(column.sortValue?.(a), column.sortValue?.(b)));
-  }, [rows, sort, columns]);
+    // Sort keys are derived per comparison; pages here are <= 100 rows.
+    return [...rows].sort((a, b) => factor * compare(column.resolvedSort(a), column.resolvedSort(b)));
+  }, [rows, sort, resolved]);
 
   const selectedRows = React.useMemo(
     () => [...selected].map((index) => sorted[index]).filter((row): row is T => row !== undefined),
@@ -142,8 +196,7 @@ export function DataTable<T>({
     setSelected(allSelected ? new Set() : new Set(sorted.map((_, index) => index)));
   };
 
-  const toggleSort = (column: Column<T>): void => {
-    if (!column.sortValue) return;
+  const toggleSort = (column: ResolvedColumn<T>): void => {
     setSort((current) => {
       if (current?.key !== column.key) return { key: column.key, direction: 'asc' };
       if (current.direction === 'asc') return { key: column.key, direction: 'desc' };
@@ -161,7 +214,7 @@ export function DataTable<T>({
     );
   }
 
-  const hasFooter = columns.some((column) => column.footer);
+  const hasFooter = resolved.some((column) => column.resolvedFooter);
   const showSelectionBar = selectable && selected.size > 0;
 
   return (
@@ -180,10 +233,10 @@ export function DataTable<T>({
                 </div>
               </TableHead>
             ) : null}
-            {columns.map((column) => {
-              const Icon = TYPE_ICON[column.type ?? 'text'];
+            {resolved.map((column) => {
+              const Icon = TYPE_ICON[column.resolvedType];
               const isSorted = sort?.key === column.key;
-              const sortable = Boolean(column.sortValue);
+              const sortable = true;
               return (
                 <TableHead
                   key={column.key}
@@ -250,12 +303,12 @@ export function DataTable<T>({
                     </div>
                   </TableCell>
                 ) : null}
-                {columns.map((column, columnIndex) => (
+                {resolved.map((column, columnIndex) => (
                   <TableCell
                     key={column.key}
                     className={cn(
                       column.align === 'right' && 'text-right',
-                      column.type === 'number' && 'tabular-nums',
+                      column.resolvedType === 'number' && 'tabular-nums',
                       column.className,
                     )}
                   >
@@ -282,7 +335,7 @@ export function DataTable<T>({
           <TableFooter className="sticky bottom-0 z-10 [&_td]:bg-surface-elevated">
             <TableRow className="[&>td]:border-b-0">
               {selectable ? <TableCell className="w-10 px-0" /> : null}
-              {columns.map((column, index) => (
+              {resolved.map((column, index) => (
                 <TableCell
                   key={column.key}
                   className={cn(
@@ -290,8 +343,8 @@ export function DataTable<T>({
                     column.align === 'right' && 'text-right tabular-nums',
                   )}
                 >
-                  {column.footer
-                    ? column.footer(sorted)
+                  {column.resolvedFooter
+                    ? column.resolvedFooter(sorted)
                     : index === 0
                       ? `${sorted.length} ${sorted.length === 1 ? 'record' : 'records'}`
                       : null}

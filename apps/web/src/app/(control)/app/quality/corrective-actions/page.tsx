@@ -128,6 +128,7 @@ export default async function CorrectiveActionsPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="ShieldCheck"
         title="Corrective actions"
         description="Module 8's containment-to-closure workflow, across every non-conformance in the network."
       />

@@ -124,6 +124,7 @@ export default async function DeliveriesPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Truck"
         title="Deliveries"
         description="Shipments collected and on their way, and whether they arrived when they were meant to."
       />

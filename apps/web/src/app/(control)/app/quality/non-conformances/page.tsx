@@ -135,6 +135,7 @@ export default async function NonConformancesPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="ShieldCheck"
         title="Non-conformances"
         description="Every rejection with defect type, responsibility, cost impact and corrective action tracking."
       />

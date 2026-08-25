@@ -47,6 +47,7 @@ export default async function ImsPage(): Promise<React.JSX.Element> {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Network"
         title="IMS integration"
         description="GRID-X never duplicates IMS-owned data. Masters flow in; outsourcing facts flow back out."
         actions={

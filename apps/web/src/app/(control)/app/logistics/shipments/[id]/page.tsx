@@ -61,6 +61,7 @@ export default async function ShipmentDetailPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Truck"
         title={shipment.shipmentNumber}
         description={`${humanise(shipment.direction)} · ${shipment.pickupLocation} → ${shipment.deliveryLocation}`}
         actions={

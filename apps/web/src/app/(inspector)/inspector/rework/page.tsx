@@ -36,6 +36,7 @@ export default async function InspectorReworkPage({
   return (
     <div className="space-y-5">
       <PageHeader
+        icon="Hammer"
         title="Rework"
         description="Rework orders raised from rejections, tracked to completion or scrap with cost responsibility."
       />

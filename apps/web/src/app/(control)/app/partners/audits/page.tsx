@@ -89,6 +89,7 @@ export default async function PartnerAuditsPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Factory"
         title="Partner audits"
         description="Capability and quality audits across the network, and which partners are due another."
       />

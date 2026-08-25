@@ -123,6 +123,7 @@ export default async function ShipmentsPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Truck"
         title="Shipments"
         description="Inbound and outbound movements between OSWAR plants and partners, with freight cost and proof of delivery."
         actions={

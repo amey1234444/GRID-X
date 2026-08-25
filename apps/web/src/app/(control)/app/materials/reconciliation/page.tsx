@@ -35,6 +35,7 @@ export default async function ReconciliationPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Boxes"
         title="Material reconciliation"
         description="Issued versus consumed, scrap returned and unused material — the gate before payment approval."
         actions={

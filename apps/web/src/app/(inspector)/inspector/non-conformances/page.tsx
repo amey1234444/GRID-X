@@ -42,6 +42,7 @@ export default async function InspectorNonConformancesPage({
   return (
     <div className="space-y-5">
       <PageHeader
+        icon="ShieldCheck"
         title="Non-conformances"
         description="Every rejection raises a non-conformance with defect type, responsibility and cost so repeat defects are visible."
       />

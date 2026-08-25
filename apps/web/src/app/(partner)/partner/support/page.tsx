@@ -18,6 +18,7 @@ export default async function PartnerSupportPage(): Promise<React.JSX.Element> {
   return (
     <div className="space-y-5">
       <PageHeader
+        icon="LifeBuoy"
         title={hindi ? 'मदद' : 'Support'}
         description={
           hindi

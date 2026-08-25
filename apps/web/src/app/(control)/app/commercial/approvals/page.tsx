@@ -99,6 +99,7 @@ export default async function ApprovalsPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Wallet"
         title="Approvals"
         description="Who signed off each stage of every partner invoice, and what they said."
       />

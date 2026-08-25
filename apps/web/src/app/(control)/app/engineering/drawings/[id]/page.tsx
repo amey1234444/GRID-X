@@ -40,6 +40,7 @@ export default async function DrawingDetailPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Ruler"
         title={drawing.drawingNumber}
         description={drawing.title}
         actions={

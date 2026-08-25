@@ -39,6 +39,7 @@ export default async function PartnerInvoicesPage({
   return (
     <div className="space-y-5">
       <PageHeader
+        icon="Wallet"
         title={hindi ? 'बिल' : 'Invoices'}
         description={
           hindi

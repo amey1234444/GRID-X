@@ -64,6 +64,7 @@ export default async function RatesPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Wallet"
         title="Conversion rates"
         description="Partner and component rate cards with revision history — invoices are always computed from the active rate."
         actions={

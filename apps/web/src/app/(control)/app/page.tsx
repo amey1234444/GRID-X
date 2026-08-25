@@ -6,15 +6,14 @@ import type {
   OperationsDashboard,
   QualityDashboard,
 } from '@gridx/shared';
-import { ArrowRight } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, PackageCheck, ShieldCheck, TrendingUp, Wallet } from 'lucide-react';
 
 import { CategoryBarChart, DistributionPieChart, TrendAreaChart } from '@/components/app/charts';
+import { InsightBanner, MetricItem, MetricStrip, Panel, PanelEmpty } from '@/components/app/dashboard';
 import { DataTable, type Column } from '@/components/app/data-table';
 import { PageHeader } from '@/components/app/page-header';
-import { StatCard } from '@/components/app/stat-card';
 import { StatusBadge } from '@/components/app/status-badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatNumber, formatPercent, humanise, relativeDays } from '@/lib/format';
 import { apiGet, currentUser } from '@/lib/session';
@@ -78,49 +77,46 @@ const jobColumns: Column<JobSummary>[] = [
     key: 'component',
     header: 'Component',
     render: (job) => (
-      <div>
-        <p className="font-medium">{job.componentName}</p>
-        <p className="text-xs text-muted-foreground">{job.componentCode}</p>
-      </div>
+      <span className="block min-w-0">
+        <span className="block truncate font-medium">{job.componentName}</span>
+        <span className="block truncate text-[0.75rem] text-subtle">{job.componentCode}</span>
+      </span>
     ),
   },
-  { key: 'partner', header: 'Partner', render: (job) => job.partnerName ?? 'Unallocated' },
+  { key: 'partner', header: 'Partner', render: (job) => job.partnerName ?? <span className="text-subtle">Unallocated</span> },
   { key: 'quantity', header: 'Qty', align: 'right', render: (job) => formatNumber(job.quantity) },
   { key: 'status', header: 'Status', render: (job) => <StatusBadge status={job.status} /> },
   { key: 'due', header: 'Due', render: (job) => relativeDays(job.dueDate) },
 ];
 
-function JobPanel({
+/** A queue panel: the six most urgent rows, with a link to the full list. */
+function JobQueue({
   title,
   description,
   jobs,
+  emptyText,
 }: {
   title: string;
   description: string;
   jobs: JobSummary[];
+  emptyText: string;
 }): React.JSX.Element {
   return (
-    <Card>
-      <CardHeader className="flex-row items-center justify-between space-y-0">
-        <div>
-          <CardTitle className="text-base">{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
-        </div>
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/app/production/jobs">
-            All jobs <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </Button>
-      </CardHeader>
-      <CardContent>
-        <DataTable
-          columns={jobColumns}
-          rows={jobs.slice(0, 6)}
-          rowHref={(job) => `/app/production/jobs/${job.id}`}
-          empty={{ title: 'Nothing pending here', description: 'This queue is clear.' }}
-        />
-      </CardContent>
-    </Card>
+    <Panel
+      title={title}
+      description={description}
+      action={jobs.length > 6 ? { label: `All ${jobs.length}`, href: '/app/production/jobs' } : undefined}
+      bodyClassName="px-0 pb-0"
+    >
+      <DataTable
+        columns={jobColumns}
+        rows={jobs.slice(0, 6)}
+        rowHref={(job) => `/app/production/jobs/${job.id}`}
+        density="compact"
+        aggregates={false}
+        empty={{ title: emptyText, description: 'This queue is clear.' }}
+      />
+    </Panel>
   );
 }
 
@@ -145,9 +141,44 @@ export default async function ControlDashboardPage(): Promise<React.JSX.Element>
     OTD: entry.otd,
   }));
 
+  // The lead statement escalates: money overdue outranks late jobs, which
+  // outrank "everything is fine".
+  const atRisk = management.jobsAtRisk;
+  const overduePayments = management.overduePayments;
+
+  const insight =
+    atRisk > 0
+      ? {
+          eyebrow: 'Needs attention',
+          headline: `${formatNumber(atRisk)} ${atRisk === 1 ? 'job is' : 'jobs are'} at risk`,
+          detail:
+            'Overdue or flagged as delayed by the partner. Clear these before they cascade into the delivery schedule.',
+          tone: 'warning' as const,
+          icon: 'Cog',
+          action: { label: 'Review delayed jobs', href: '/app/production/delays' },
+        }
+      : overduePayments > 0
+        ? {
+            eyebrow: 'Needs attention',
+            headline: `${formatCurrency(overduePayments)} overdue to partners`,
+            detail: 'Payments beyond agreed terms erode partner capacity commitments.',
+            tone: 'destructive' as const,
+            icon: 'Wallet',
+            action: { label: 'Open payments', href: '/app/commercial/payments' },
+          }
+        : {
+            eyebrow: 'Network status',
+            headline: 'The network is running clean',
+            detail: `${formatNumber(management.jobsInProgress)} jobs in progress across ${formatNumber(management.activePartners)} active partners, none flagged at risk.`,
+            tone: 'success' as const,
+            icon: 'ShieldCheck',
+            action: { label: 'Open planning board', href: '/app/production/planning-board' },
+          };
+
   return (
     <>
       <PageHeader
+        icon="LayoutDashboard"
         title={`Good to see you, ${user?.name.split(' ')[0] ?? 'there'}`}
         description="Network-wide view of the outsourced manufacturing pipeline, quality and money."
         actions={
@@ -162,272 +193,323 @@ export default async function ControlDashboardPage(): Promise<React.JSX.Element>
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Active partners" value={formatNumber(management.activePartners)} hint="Approved and above" />
-        <StatCard label="Jobs in progress" value={formatNumber(management.jobsInProgress)} hint="Across the network" />
-        <StatCard
-          label="Jobs at risk"
-          value={formatNumber(management.jobsAtRisk)}
-          tone={management.jobsAtRisk > 0 ? 'warning' : 'default'}
-          hint="Overdue or delayed"
+      {/* 1 — the single thing that decides whether you keep reading. */}
+      <InsightBanner
+        {...insight}
+        aside={
+          <div className="flex items-center gap-6 sm:gap-8">
+            <div>
+              <p className="type-label">Acceptance</p>
+              <p className="type-metric mt-1.5 text-success" data-numeric>
+                {formatPercent(management.qualityAcceptanceRate)}
+              </p>
+            </div>
+            <div className="h-10 w-px bg-border-subtle" aria-hidden />
+            <div>
+              <p className="type-label">On-time</p>
+              <p className="type-metric mt-1.5" data-numeric>
+                {formatPercent(management.onTimeDeliveryRate)}
+              </p>
+            </div>
+          </div>
+        }
+      />
+
+      {/* 2 — supporting figures, dense and unboxed. */}
+      <MetricStrip>
+        <MetricItem
+          label="Jobs in progress"
+          value={formatNumber(management.jobsInProgress)}
+          hint="Across the network"
+          href="/app/production/jobs"
         />
-        <StatCard label="Outsourced value" value={formatCurrency(management.totalOutsourcedValue)} hint="Open jobs" />
-        <StatCard
-          label="Quality acceptance"
-          value={formatPercent(management.qualityAcceptanceRate)}
-          tone="success"
-          hint="Accepted vs inspected"
+        <MetricItem
+          label="Active partners"
+          value={formatNumber(management.activePartners)}
+          hint="Approved and above"
+          href="/app/partners"
         />
-        <StatCard label="On-time delivery" value={formatPercent(management.onTimeDeliveryRate)} hint="Closed jobs" />
-        <StatCard
+        <MetricItem
+          label="Outsourced value"
+          value={formatCurrency(management.totalOutsourcedValue)}
+          hint="Open jobs"
+        />
+        <MetricItem
           label="Material with partners"
           value={`${formatNumber(management.materialUnderPartnerCustodyKg)} kg`}
           hint={formatCurrency(management.materialUnderPartnerCustodyValue)}
+          href="/app/materials/partner-stock"
         />
-        <StatCard
-          label="Overdue payments"
-          value={formatCurrency(management.overduePayments)}
-          tone={management.overduePayments > 0 ? 'destructive' : 'default'}
-          hint="Beyond agreed terms"
-        />
+      </MetricStrip>
+
+      {/* 3 — trend, weighted asymmetrically against the distribution. */}
+      <div className="grid gap-4 lg:grid-cols-[1.75fr_1fr]">
+        <Panel
+          title="Outsourcing trend"
+          description="Monthly outsourced value against acceptance and on-time delivery."
+          icon={TrendingUp}
+        >
+          {trendData.length > 0 ? (
+            <TrendAreaChart
+              data={trendData}
+              xKey="month"
+              series={[
+                { key: 'Outsourced value', label: 'Outsourced value (₹)' },
+                { key: 'Acceptance', label: 'Acceptance %' },
+                { key: 'OTD', label: 'On-time %' },
+              ]}
+            />
+          ) : (
+            <PanelEmpty>Trend data appears once jobs have been closed.</PanelEmpty>
+          )}
+        </Panel>
+
+        <Panel title="Jobs by status" description="Live pipeline distribution." icon={PackageCheck}>
+          {statusData.length > 0 ? (
+            <DistributionPieChart data={statusData} nameKey="status" valueKey="count" />
+          ) : (
+            <PanelEmpty>No jobs yet.</PanelEmpty>
+          )}
+        </Panel>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Outsourcing trend</CardTitle>
-            <CardDescription>Monthly outsourced value with acceptance and on-time delivery.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {trendData.length > 0 ? (
-              <TrendAreaChart
-                data={trendData}
-                xKey="month"
-                series={[
-                  { key: 'Outsourced value', label: 'Outsourced value (₹)' },
-                  { key: 'Acceptance', label: 'Acceptance %' },
-                  { key: 'OTD', label: 'On-time %' },
-                ]}
-              />
-            ) : (
-              <p className="py-16 text-center text-sm text-muted-foreground">
-                Trend data appears once jobs have been closed.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Jobs by status</CardTitle>
-            <CardDescription>Live distribution of the job pipeline.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {statusData.length > 0 ? (
-              <DistributionPieChart data={statusData} nameKey="status" valueKey="count" />
-            ) : (
-              <p className="py-16 text-center text-sm text-muted-foreground">No jobs yet.</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
+      {/* 4 — detailed operational data, by discipline. */}
       <Tabs defaultValue="operations">
         <TabsList>
-          <TabsTrigger value="operations">Operations</TabsTrigger>
-          <TabsTrigger value="quality">Quality</TabsTrigger>
-          <TabsTrigger value="finance">Finance</TabsTrigger>
+          <TabsTrigger value="operations">
+            <Clock /> Operations
+          </TabsTrigger>
+          <TabsTrigger value="quality">
+            <ShieldCheck /> Quality
+          </TabsTrigger>
+          <TabsTrigger value="finance">
+            <Wallet /> Finance
+          </TabsTrigger>
           <TabsTrigger value="partners">Partners</TabsTrigger>
         </TabsList>
 
         <TabsContent value="operations" className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <JobPanel title="Due today" description="Jobs promised for today." jobs={operations.dueToday} />
-            <JobPanel title="Delayed" description="Past the promised date." jobs={operations.delayedJobs} />
-            <JobPanel
-              title="Awaiting inspection"
-              description="Partner has offered quantity for inspection."
-              jobs={operations.awaitingInspection}
+          <div className="grid gap-4 xl:grid-cols-2">
+            <JobQueue
+              title="Due today"
+              description="Promised for today."
+              jobs={operations.dueToday}
+              emptyText="Nothing due today"
             />
-            <JobPanel
+            <JobQueue
+              title="Delayed"
+              description="Past the promised date."
+              jobs={operations.delayedJobs}
+              emptyText="No delayed jobs"
+            />
+            <JobQueue
+              title="Awaiting inspection"
+              description="Partner has offered quantity."
+              jobs={operations.awaitingInspection}
+              emptyText="Inspection queue is clear"
+            />
+            <JobQueue
               title="Material pending"
-              description="Allocated but material not yet issued or acknowledged."
+              description="Allocated but material not issued or acknowledged."
               jobs={operations.materialPending}
+              emptyText="No material pending"
             />
           </div>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Partner workload</CardTitle>
-              <CardDescription>Committed against declared capacity.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <DataTable
-                columns={[
-                  { key: 'partner', header: 'Partner', render: (row) => row.businessName },
-                  { key: 'openJobs', header: 'Open jobs', align: 'right', render: (row) => formatNumber(row.openJobs) },
-                  {
-                    key: 'committed',
-                    header: 'Committed hrs',
-                    align: 'right',
-                    render: (row) => formatNumber(row.committedHours),
-                  },
-                  {
-                    key: 'available',
-                    header: 'Available hrs',
-                    align: 'right',
-                    render: (row) => formatNumber(row.availableHours),
-                  },
-                  {
-                    key: 'utilisation',
-                    header: 'Utilisation',
-                    align: 'right',
-                    render: (row) => formatPercent(row.utilisationPercent),
-                  },
-                ]}
-                rows={operations.partnerWorkload}
-                empty={{ title: 'No workload declared yet' }}
-              />
-            </CardContent>
-          </Card>
+
+          <Panel
+            title="Partner workload"
+            description="Committed against declared capacity."
+            action={{ label: 'Capacity', href: '/app/production/capacity' }}
+            bodyClassName="px-0 pb-0"
+          >
+            <DataTable
+              density="compact"
+              columns={[
+                { key: 'partner', header: 'Partner', render: (row) => row.businessName },
+                { key: 'openJobs', header: 'Open jobs', align: 'right', render: (row) => formatNumber(row.openJobs) },
+                {
+                  key: 'committed',
+                  header: 'Committed hrs',
+                  align: 'right',
+                  render: (row) => formatNumber(row.committedHours),
+                },
+                {
+                  key: 'available',
+                  header: 'Available hrs',
+                  align: 'right',
+                  render: (row) => formatNumber(row.availableHours),
+                },
+                {
+                  key: 'utilisation',
+                  header: 'Utilisation',
+                  align: 'right',
+                  // A sum of percentages is meaningless — suppress the aggregate.
+                  footer: () => null,
+                  render: (row) => formatPercent(row.utilisationPercent),
+                },
+              ]}
+              rows={operations.partnerWorkload}
+              empty={{ title: 'No workload declared yet' }}
+            />
+          </Panel>
         </TabsContent>
 
         <TabsContent value="quality" className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="First articles pending" value={formatNumber(quality.firstArticlesPending)} />
-            <StatCard
+          <MetricStrip>
+            <MetricItem
+              label="First articles pending"
+              value={formatNumber(quality.firstArticlesPending)}
+              href="/app/quality/inspections"
+            />
+            <MetricItem
               label="Rejection rate"
               value={formatPercent(quality.rejectionRate)}
               tone={quality.rejectionRate > 5 ? 'warning' : 'success'}
+              hint={quality.rejectionRate > 5 ? 'Above the 5% threshold' : 'Within threshold'}
             />
-            <StatCard label="Open corrective actions" value={formatNumber(quality.openCorrectiveActions)} />
-            <StatCard label="Inspectors engaged" value={formatNumber(quality.inspectionWorkload.length)} />
-          </div>
+            <MetricItem
+              label="Open corrective actions"
+              value={formatNumber(quality.openCorrectiveActions)}
+              href="/app/quality/corrective-actions"
+            />
+            <MetricItem label="Inspectors engaged" value={formatNumber(quality.inspectionWorkload.length)} />
+          </MetricStrip>
+
           <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Rework ageing</CardTitle>
-                <CardDescription>How long rework has been open.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {quality.reworkAgeingDays.length > 0 ? (
-                  <CategoryBarChart data={quality.reworkAgeingDays} xKey="bucket" valueKey="count" label="Rework orders" />
-                ) : (
-                  <p className="py-16 text-center text-sm text-muted-foreground">No open rework.</p>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Repeat defects</CardTitle>
-                <CardDescription>Defect types recurring across partners.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <DataTable
-                  columns={[
-                    { key: 'defect', header: 'Defect', render: (row) => humanise(row.defectType) },
-                    { key: 'count', header: 'Occurrences', align: 'right', render: (row) => formatNumber(row.count) },
-                    { key: 'partners', header: 'Partners', align: 'right', render: (row) => formatNumber(row.partners) },
-                  ]}
-                  rows={quality.repeatDefects}
-                  empty={{ title: 'No repeat defects recorded' }}
+            <Panel title="Rework ageing" description="How long rework has been open." icon={AlertTriangle}>
+              {quality.reworkAgeingDays.length > 0 ? (
+                <CategoryBarChart
+                  data={quality.reworkAgeingDays}
+                  xKey="bucket"
+                  valueKey="count"
+                  label="Rework orders"
+                  monochrome
                 />
-              </CardContent>
-            </Card>
+              ) : (
+                <PanelEmpty>No open rework.</PanelEmpty>
+              )}
+            </Panel>
+
+            <Panel
+              title="Repeat defects"
+              description="Defect types recurring across partners."
+              bodyClassName="px-0 pb-0"
+            >
+              <DataTable
+                density="compact"
+                columns={[
+                  { key: 'defect', header: 'Defect', render: (row) => humanise(row.defectType) },
+                  { key: 'count', header: 'Occurrences', align: 'right', render: (row) => formatNumber(row.count) },
+                  { key: 'partners', header: 'Partners', align: 'right', render: (row) => formatNumber(row.partners) },
+                ]}
+                rows={quality.repeatDefects}
+                empty={{ title: 'No repeat defects recorded' }}
+              />
+            </Panel>
           </div>
         </TabsContent>
 
         <TabsContent value="finance" className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard
+          <MetricStrip>
+            <MetricItem
               label="Invoices pending"
               value={formatNumber(finance.invoicesPending)}
               hint={formatCurrency(finance.invoicesPendingValue)}
+              href="/app/commercial/invoices"
             />
-            <StatCard label="Accepted value" value={formatCurrency(finance.acceptedValue)} />
-            <StatCard label="Payments due" value={formatCurrency(finance.paymentsDue)} />
-            <StatCard
+            <MetricItem label="Accepted value" value={formatCurrency(finance.acceptedValue)} />
+            <MetricItem
+              label="Payments due"
+              value={formatCurrency(finance.paymentsDue)}
+              href="/app/commercial/payments"
+            />
+            <MetricItem
               label="Reconciliation pending"
               value={formatNumber(finance.materialReconciliationPending)}
               tone={finance.materialReconciliationPending > 0 ? 'warning' : 'default'}
+              href="/app/materials/reconciliation"
             />
-          </div>
+          </MetricStrip>
+
           <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Invoice ageing</CardTitle>
-                <CardDescription>Value awaiting approval or payment.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {finance.invoiceAgeing.length > 0 ? (
-                  <CategoryBarChart data={finance.invoiceAgeing} xKey="bucket" valueKey="value" label="Value (₹)" />
-                ) : (
-                  <p className="py-16 text-center text-sm text-muted-foreground">No open invoices.</p>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Partner outstanding</CardTitle>
-                <CardDescription>Amounts payable by partner.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <DataTable
-                  columns={[
-                    { key: 'partner', header: 'Partner', render: (row) => row.businessName },
-                    {
-                      key: 'outstanding',
-                      header: 'Outstanding',
-                      align: 'right',
-                      render: (row) => formatCurrency(row.outstanding),
-                    },
-                  ]}
-                  rows={finance.partnerOutstanding}
-                  empty={{ title: 'Nothing outstanding' }}
+            <Panel title="Invoice ageing" description="Value awaiting approval or payment." icon={Wallet}>
+              {finance.invoiceAgeing.length > 0 ? (
+                <CategoryBarChart
+                  data={finance.invoiceAgeing}
+                  xKey="bucket"
+                  valueKey="value"
+                  label="Value (₹)"
+                  monochrome
                 />
-              </CardContent>
-            </Card>
+              ) : (
+                <PanelEmpty>No open invoices.</PanelEmpty>
+              )}
+            </Panel>
+
+            <Panel title="Partner outstanding" description="Amounts payable by partner." bodyClassName="px-0 pb-0">
+              <DataTable
+                density="compact"
+                columns={[
+                  { key: 'partner', header: 'Partner', render: (row) => row.businessName },
+                  {
+                    key: 'outstanding',
+                    header: 'Outstanding',
+                    align: 'right',
+                    render: (row) => formatCurrency(row.outstanding),
+                  },
+                ]}
+                rows={finance.partnerOutstanding}
+                empty={{ title: 'Nothing outstanding' }}
+              />
+            </Panel>
           </div>
         </TabsContent>
 
         <TabsContent value="partners" className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Top partners</CardTitle>
-                <CardDescription>Highest scorecard results this period.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <DataTable
-                  columns={[
-                    { key: 'partner', header: 'Partner', render: (row) => row.businessName },
-                    { key: 'city', header: 'City', render: (row) => row.city },
-                    { key: 'category', header: 'Category', render: (row) => row.category },
-                    { key: 'score', header: 'Score', align: 'right', render: (row) => formatNumber(row.score, 1) },
-                  ]}
-                  rows={management.topPartners}
-                  rowHref={(row) => `/app/partners/${row.partnerId}`}
-                  empty={{ title: 'No scorecards computed yet' }}
-                />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Needs attention</CardTitle>
-                <CardDescription>Lowest scoring partners.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <DataTable
-                  columns={[
-                    { key: 'partner', header: 'Partner', render: (row) => row.businessName },
-                    { key: 'city', header: 'City', render: (row) => row.city },
-                    { key: 'category', header: 'Category', render: (row) => row.category },
-                    { key: 'score', header: 'Score', align: 'right', render: (row) => formatNumber(row.score, 1) },
-                  ]}
-                  rows={management.bottomPartners}
-                  rowHref={(row) => `/app/partners/${row.partnerId}`}
-                  empty={{ title: 'No scorecards computed yet' }}
-                />
-              </CardContent>
-            </Card>
+            <Panel
+              title="Top partners"
+              description="Highest scorecard results this period."
+              icon={CheckCircle2}
+              action={{ label: 'Scorecards', href: '/app/partners/scorecards' }}
+              bodyClassName="px-0 pb-0"
+            >
+              <DataTable
+                density="compact"
+                aggregates={false}
+                columns={[
+                  { key: 'partner', header: 'Partner', render: (row) => row.businessName },
+                  { key: 'city', header: 'City', render: (row) => row.city },
+                  { key: 'category', header: 'Category', render: (row) => row.category },
+                  { key: 'score', header: 'Score', align: 'right', render: (row) => formatNumber(row.score, 1) },
+                ]}
+                rows={management.topPartners}
+                rowHref={(row) => `/app/partners/${row.partnerId}`}
+                empty={{ title: 'No scorecards computed yet' }}
+              />
+            </Panel>
+
+            <Panel
+              title="Needs attention"
+              description="Lowest scoring partners."
+              icon={AlertTriangle}
+              action={{ label: 'Audits', href: '/app/partners/audits' }}
+              bodyClassName="px-0 pb-0"
+            >
+              <DataTable
+                density="compact"
+                aggregates={false}
+                columns={[
+                  { key: 'partner', header: 'Partner', render: (row) => row.businessName },
+                  { key: 'city', header: 'City', render: (row) => row.city },
+                  { key: 'category', header: 'Category', render: (row) => row.category },
+                  { key: 'score', header: 'Score', align: 'right', render: (row) => formatNumber(row.score, 1) },
+                ]}
+                rows={management.bottomPartners}
+                rowHref={(row) => `/app/partners/${row.partnerId}`}
+                empty={{ title: 'No scorecards computed yet' }}
+              />
+            </Panel>
           </div>
         </TabsContent>
       </Tabs>

@@ -114,6 +114,7 @@ export default async function PartnerStockPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Boxes"
         title="Partner stock"
         description="OSWAR material currently sitting in partner workshops, by job and item."
       />

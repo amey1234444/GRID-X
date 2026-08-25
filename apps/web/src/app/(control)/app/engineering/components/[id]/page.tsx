@@ -40,6 +40,7 @@ export default async function ComponentDetailPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Ruler"
         title={component.name}
         description={`${component.componentCode}${component.product ? ` · ${component.product.name}` : ''}`}
         actions={

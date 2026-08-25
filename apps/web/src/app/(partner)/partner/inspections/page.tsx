@@ -36,6 +36,7 @@ export default async function PartnerInspectionsPage({
   return (
     <div className="space-y-5">
       <PageHeader
+        icon="ShieldCheck"
         title={hindi ? 'जाँच' : 'Inspections'}
         description={
           hindi

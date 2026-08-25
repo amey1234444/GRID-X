@@ -41,6 +41,7 @@ export default async function PartnerReworkPage({
   return (
     <div className="space-y-5">
       <PageHeader
+        icon="Hammer"
         title={hindi ? 'दोबारा काम' : 'Rework'}
         description={
           hindi

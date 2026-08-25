@@ -25,6 +25,7 @@ export default async function NewJobPage(): Promise<React.JSX.Element> {
   return (
     <div className="mx-auto w-full max-w-4xl space-y-6">
       <PageHeader
+        icon="Cog"
         title="Create job"
         description="Jobs start in draft. Allocation checks partner approval, capability, capacity and Class A authorisation."
       />

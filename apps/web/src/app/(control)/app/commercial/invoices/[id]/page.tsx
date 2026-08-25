@@ -39,6 +39,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Wallet"
         title={invoice.invoiceNumber}
         description={`${invoice.partner.businessName} · ${formatDate(invoice.periodFrom)} → ${formatDate(invoice.periodTo)}`}
         actions={

@@ -42,6 +42,7 @@ export default async function ScorecardsPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Factory"
         title="Partner scorecards"
         description="Monthly scorecard across quality, delivery, quantity, material discipline, responsiveness and cost."
         actions={

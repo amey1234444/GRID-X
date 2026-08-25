@@ -41,6 +41,7 @@ export default async function PartnerScorecardPage(): Promise<React.JSX.Element>
   return (
     <div className="space-y-5">
       <PageHeader
+        icon="Gauge"
         title={hindi ? 'स्कोरकार्ड' : 'Scorecard'}
         description={
           hindi

@@ -26,22 +26,43 @@ function visibleSections(user: AuthUser): NavSection[] {
   }));
 }
 
-/** Derives the current screen's name from the nav tree for the header. */
-function activeLabel(sections: NavSection[], pathname: string): string {
-  let best: { label: string; length: number } | null = null;
+interface Crumb {
+  label: string;
+  href?: string;
+}
+
+/**
+ * Derives the header breadcrumb from the nav tree, so every screen gets a
+ * trail without any page having to declare one. A trailing record segment
+ * (`/jobs/abc123`) becomes a final, unlinked "Detail" crumb.
+ */
+function breadcrumbFor(sections: NavSection[], pathname: string): Crumb[] {
+  let best: { crumbs: Crumb[]; length: number } | null = null;
+
+  const consider = (crumbs: Crumb[], href: string): void => {
+    if (!(pathname === href || pathname.startsWith(`${href}/`))) return;
+    if (!best || href.length > best.length) best = { crumbs, length: href.length };
+  };
+
   for (const section of sections) {
-    if (section.href && pathname.startsWith(section.href)) {
-      if (!best || section.href.length > best.length) {
-        best = { label: section.label, length: section.href.length };
-      }
-    }
+    if (section.href) consider([{ label: section.label, href: section.href }], section.href);
     for (const item of section.items ?? []) {
-      if (pathname.startsWith(item.href) && (!best || item.href.length > best.length)) {
-        best = { label: item.label, length: item.href.length };
-      }
+      consider([{ label: section.label }, { label: item.label, href: item.href }], item.href);
     }
   }
-  return best?.label ?? 'Dashboard';
+
+  if (!best) return [{ label: 'Dashboard', href: '/app' }];
+
+  const matched = best as { crumbs: Crumb[]; length: number };
+  const crumbs = [...matched.crumbs];
+  const remainder = pathname.slice(matched.length).replace(/^\//, '');
+  if (remainder) {
+    crumbs.push({ label: remainder === 'new' ? 'New' : 'Detail' });
+  }
+  // The last crumb is where you already are — never a link.
+  const last = crumbs[crumbs.length - 1];
+  if (last) delete last.href;
+  return crumbs;
 }
 
 /* ---------------------------------------------------------------------- */
@@ -340,9 +361,34 @@ export function ControlShell({
             <Menu className="h-4 w-4" />
           </button>
 
-          <span className="truncate text-[0.8125rem] font-medium text-foreground">
-            {activeLabel(sections, pathname)}
-          </span>
+          <nav aria-label="Breadcrumb" className="min-w-0">
+            <ol className="flex items-center gap-1 text-[0.8125rem]">
+              {breadcrumbFor(sections, pathname).map((crumb, index, all) => (
+                <li key={`${crumb.label}-${index}`} className="flex min-w-0 items-center gap-1">
+                  {index > 0 ? (
+                    <ChevronRight className="h-3 w-3 shrink-0 text-subtle" aria-hidden />
+                  ) : null}
+                  {crumb.href ? (
+                    <Link
+                      href={crumb.href}
+                      className="truncate rounded-control px-1 py-0.5 text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
+                    >
+                      {crumb.label}
+                    </Link>
+                  ) : (
+                    <span
+                      className={cn(
+                        'truncate px-1 py-0.5',
+                        index === all.length - 1 ? 'font-medium text-foreground' : 'text-subtle',
+                      )}
+                    >
+                      {crumb.label}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </nav>
 
           <div className="flex-1" />
 

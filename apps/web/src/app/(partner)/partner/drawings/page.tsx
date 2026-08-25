@@ -34,6 +34,7 @@ export default async function PartnerDrawingsPage({
   return (
     <div className="space-y-5">
       <PageHeader
+        icon="FileText"
         title={hindi ? 'ड्रॉइंग' : 'Drawings'}
         description={
           hindi

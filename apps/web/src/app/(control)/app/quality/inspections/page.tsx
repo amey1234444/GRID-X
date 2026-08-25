@@ -72,6 +72,7 @@ export default async function InspectionsPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="ShieldCheck"
         title="Inspections"
         description="First article, in-process, final and pre-dispatch inspections with accept, reject and rework decisions."
         actions={

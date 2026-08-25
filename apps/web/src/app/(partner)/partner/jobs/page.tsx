@@ -44,6 +44,7 @@ export default async function PartnerJobsPage({
   return (
     <div className="space-y-5">
       <PageHeader
+        icon="ClipboardList"
         title={hindi ? 'काम' : 'Jobs'}
         description={
           hindi

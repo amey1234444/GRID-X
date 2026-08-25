@@ -38,6 +38,7 @@ export default async function IncentivesPage(): Promise<React.JSX.Element> {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Wallet"
         title="Incentives & deductions"
         description="Standing rules applied when partner invoices are built, plus one-off adjustments raised against a partner."
         actions={

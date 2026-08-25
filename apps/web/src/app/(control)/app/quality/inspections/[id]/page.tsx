@@ -40,6 +40,7 @@ export default async function InspectionDetailPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="ShieldCheck"
         title={inspection.inspectionNumber}
         description={`${humanise(inspection.type)} inspection${inspection.job ? ` · job ${inspection.job.jobNumber}` : ''}`}
         actions={

@@ -78,6 +78,7 @@ export default async function JobDetailPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Cog"
         title={job.jobNumber}
         description={`${job.component.componentCode} · ${job.component.name} · ${formatNumber(job.quantity)} pcs due ${formatDate(job.dueDate)}`}
         actions={

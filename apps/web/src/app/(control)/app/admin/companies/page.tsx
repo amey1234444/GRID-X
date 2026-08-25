@@ -42,6 +42,7 @@ export default async function CompaniesPage(): Promise<React.JSX.Element> {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Settings"
         title="Companies and plants"
         description="GRID-X is multi-company and multi-plant. Every job, material issue and invoice belongs to one company."
         actions={

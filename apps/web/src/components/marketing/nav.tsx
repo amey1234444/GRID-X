@@ -20,7 +20,7 @@ export function MarketingNav(): React.JSX.Element {
 
   return (
     <header className="sticky top-0 z-40 border-b border-border-subtle glass">
-      <div className="container flex h-16 items-center justify-between gap-6">
+      <div className="container flex h-14 items-center justify-between gap-6">
         <div className="flex items-center gap-8">
           <Wordmark />
           <nav className="hidden items-center gap-1 md:flex">
@@ -28,7 +28,7 @@ export function MarketingNav(): React.JSX.Element {
               <Link
                 key={link.href}
                 href={link.href}
-                className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors duration-200 hover:bg-surface-hover hover:text-foreground"
+                className="rounded-input px-2.5 py-1.5 text-[0.875rem] text-muted-foreground transition-colors duration-150 hover:bg-surface-hover hover:text-foreground"
               >
                 {link.label}
               </Link>
@@ -37,17 +37,17 @@ export function MarketingNav(): React.JSX.Element {
         </div>
 
         <div className="hidden items-center gap-2 md:flex">
-          <Button variant="ghost" asChild>
+          <Button variant="ghost" size="sm" asChild>
             <Link href="/partner/login">Partner sign in</Link>
           </Button>
-          <Button asChild>
-            <Link href="/login">Sign in to GRID-X</Link>
+          <Button size="sm" asChild>
+            <Link href="/login">Sign in</Link>
           </Button>
         </div>
 
         <button
           type="button"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border md:hidden"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-input text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground md:hidden"
           onClick={() => setOpen((value) => !value)}
           aria-label="Toggle navigation"
         >
@@ -55,13 +55,13 @@ export function MarketingNav(): React.JSX.Element {
         </button>
       </div>
 
-      <div className={cn('border-t md:hidden', open ? 'block' : 'hidden')}>
+      <div className={cn('border-t border-border-subtle md:hidden', open ? 'block' : 'hidden')}>
         <div className="container flex flex-col gap-1 py-4">
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="rounded-md px-3 py-2.5 text-sm text-muted-foreground hover:bg-secondary"
+              className="rounded-input px-3 py-2.5 text-[0.875rem] text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
               onClick={() => setOpen(false)}
             >
               {link.label}

@@ -24,6 +24,7 @@ export default async function MaterialIssueDetailPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Boxes"
         title={issue.challanNumber}
         description={`Issued ${formatDate(issue.issueDate)}${issue.partner ? ` to ${issue.partner.businessName}` : ''}`}
         actions={

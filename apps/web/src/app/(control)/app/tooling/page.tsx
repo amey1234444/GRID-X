@@ -150,6 +150,7 @@ export default async function ToolingPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Wrench"
         title="Tooling & gauges"
         description="OSWAR-owned tools, fixtures and gauges issued to partners, with calibration control."
         actions={

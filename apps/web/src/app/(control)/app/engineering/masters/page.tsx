@@ -23,6 +23,7 @@ export default async function MastersPage(): Promise<React.JSX.Element> {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Ruler"
         title="Engineering masters"
         description="Raw material items, finished products and the process catalogue with standard hourly rates."
       />

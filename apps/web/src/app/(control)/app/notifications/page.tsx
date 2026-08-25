@@ -27,6 +27,7 @@ export default async function NotificationsPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Bell"
         title="Notifications"
         description="Everything GRID-X has raised for you — job acceptance, material acknowledgement, inspection results, invoice approvals and escalations."
       />

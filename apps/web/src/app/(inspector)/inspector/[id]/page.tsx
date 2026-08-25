@@ -49,6 +49,7 @@ export default async function InspectorInspectionPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="ClipboardCheck"
         title={inspection.inspectionNumber}
         description={`${humanise(inspection.type)} inspection${inspection.job ? ` · job ${inspection.job.jobNumber}` : ''}${inspection.partner ? ` · ${inspection.partner.businessName}` : ''}`}
         actions={

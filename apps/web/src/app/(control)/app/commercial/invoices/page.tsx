@@ -73,6 +73,7 @@ export default async function InvoicesPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Wallet"
         title="Partner invoices"
         description="Invoices are built from accepted quantity only and move through quantity, quality, material and finance verification."
         actions={

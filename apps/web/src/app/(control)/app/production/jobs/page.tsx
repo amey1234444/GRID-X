@@ -87,6 +87,7 @@ export default async function JobsPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Cog"
         title="Jobs"
         description="Every outsourced job from creation through allocation, production, inspection and closure."
         actions={

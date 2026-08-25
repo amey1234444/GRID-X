@@ -28,6 +28,7 @@ export default async function AccountPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Settings"
         title="Account & security"
         description="Your profile, the permissions your role carries, and your sign-in credentials."
       />

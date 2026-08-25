@@ -29,6 +29,7 @@ export default async function InspectionPlansPage(): Promise<React.JSX.Element> 
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Ruler"
         title="Inspection plans"
         description="Component-wise characteristics, specifications and instruments used for first article and final inspection."
         actions={

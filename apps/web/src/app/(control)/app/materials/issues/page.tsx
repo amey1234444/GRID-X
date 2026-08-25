@@ -83,6 +83,7 @@ export default async function MaterialIssuesPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Boxes"
         title="Material issues"
         description="Delivery challans for material issued to partners, with partner acknowledgement and shortage tracking."
         actions={

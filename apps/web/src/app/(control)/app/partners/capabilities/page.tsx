@@ -28,6 +28,7 @@ export default async function CapabilityMatrixPage(): Promise<React.JSX.Element>
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Factory"
         title="Capability matrix"
         description="Which processes the network can actually run, and how many partners stand behind each one."
       />

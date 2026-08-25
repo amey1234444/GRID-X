@@ -85,6 +85,7 @@ export default async function MachinesPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Factory"
         title="Machines"
         description="Every machine registered across the partner network — what the network can physically make."
       />

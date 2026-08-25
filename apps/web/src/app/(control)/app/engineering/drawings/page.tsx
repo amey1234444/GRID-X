@@ -69,6 +69,7 @@ export default async function DrawingsPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Ruler"
         title="Drawings &amp; revision control"
         description="Controlled drawings: only released revisions reach partners, every view is logged and acknowledgements are tracked."
         actions={

@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   logoMark: {
     width: 56,
     height: 56,
-    borderRadius: radius.lg,
+    borderRadius: radius.card,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
   switcher: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.input,
     borderWidth: 1,
     borderColor: colors.borderSubtle,
     padding: 4,
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   switchItem: {
     flex: 1,
     paddingVertical: spacing.md,
-    borderRadius: radius.sm,
+    borderRadius: radius.control,
     alignItems: 'center',
   },
   switchItemActive: { backgroundColor: colors.surfaceActive },

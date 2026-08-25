@@ -52,6 +52,7 @@ export default async function PartnerDetailPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Factory"
         title={partner.businessName}
         description={`${partner.partnerCode} · ${partner.city}, ${partner.state} · ${partner.company.name}`}
         actions={

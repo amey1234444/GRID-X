@@ -106,6 +106,7 @@ export default async function ScrapPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Boxes"
         title="Scrap"
         description="Scrap generated at partners and what has come back. Unreturned scrap is OSWAR material that has left the network."
       />

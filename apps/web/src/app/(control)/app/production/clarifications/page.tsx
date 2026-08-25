@@ -129,6 +129,7 @@ export default async function ClarificationsPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Cog"
         title="Clarifications"
         description="Questions raised by partners against live jobs. A question left unanswered is usually a job that has stopped."
       />
