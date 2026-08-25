@@ -1,11 +1,12 @@
 'use client';
 
 import { useFormState, useFormStatus } from 'react-dom';
-import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 import type { ActionState } from '@/app/actions/control';
 import { FieldRow, type FieldDefinition } from '@/components/app/field-control';
 import { Button } from '@/components/ui/button';
+import { Alert } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export interface ActionFormSection {
@@ -54,14 +55,14 @@ export function ActionForm({
       {sections.map((section, index) => (
         <Card key={section.title ?? `section-${index}`}>
           {section.title ? (
-            <CardHeader>
-              <CardTitle className="text-base">{section.title}</CardTitle>
+            <CardHeader className="pb-4">
+              <CardTitle>{section.title}</CardTitle>
               {section.description ? (
                 <CardDescription>{section.description}</CardDescription>
               ) : null}
             </CardHeader>
           ) : null}
-          <CardContent className="grid gap-4 pt-6 sm:grid-cols-2">
+          <CardContent className="grid gap-4 sm:grid-cols-2">
             {section.fields.map((field) => (
               <FieldRow key={field.name} field={field} />
             ))}
@@ -69,20 +70,10 @@ export function ActionForm({
         </Card>
       ))}
 
-      {state.error ? (
-        <p className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          {state.error}
-        </p>
-      ) : null}
-      {state.success ? (
-        <p className="flex items-start gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400">
-          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-          {state.success}
-        </p>
-      ) : null}
+      {state.error ? <Alert variant="destructive">{state.error}</Alert> : null}
+      {state.success ? <Alert variant="success">{state.success}</Alert> : null}
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         <SubmitButton label={submitLabel} />
         {cancel}
       </div>

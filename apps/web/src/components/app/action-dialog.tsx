@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 import type { ActionState } from '@/app/actions/control';
 import { FieldRow, type FieldDefinition, type FieldOption } from '@/components/app/field-control';
+import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -70,12 +71,12 @@ export function ActionDialog({
           {triggerLabel}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="max-h-[88vh] gap-0 overflow-y-auto p-0 sm:max-w-2xl">
+        <DialogHeader className="sticky top-0 z-10 border-b border-border-subtle bg-surface px-5 py-4">
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
-        <form action={formAction} className="space-y-4">
+        <form action={formAction} className="space-y-4 px-5 py-5">
           {Object.entries(hidden).map(([name, value]) =>
             value === undefined ? null : <input key={name} type="hidden" name={name} value={value} />,
           )}
@@ -84,13 +85,8 @@ export function ActionDialog({
               <FieldRow key={field.name} field={field} />
             ))}
           </div>
-          {state.error ? (
-            <p className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-              {state.error}
-            </p>
-          ) : null}
-          <DialogFooter>
+          {state.error ? <Alert variant="destructive">{state.error}</Alert> : null}
+          <DialogFooter className="sticky bottom-0 -mx-5 -mb-5 border-t border-border-subtle bg-surface px-5 py-3">
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
               Cancel
             </Button>

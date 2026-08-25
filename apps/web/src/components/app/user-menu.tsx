@@ -30,18 +30,26 @@ export function UserMenu({ user }: { user: AuthUser }): React.JSX.Element {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" className="rounded-full outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-ring">
+        <button
+          type="button"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full outline-none transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          aria-label="Account menu"
+        >
           <Avatar>
             <AvatarFallback>{initials(user.name)}</AvatarFallback>
           </Avatar>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
-        <DropdownMenuLabel>{user.name}</DropdownMenuLabel>
-        <div className="px-2 pb-2 text-xs text-muted-foreground">
-          <p className="truncate">{user.email ?? user.phone}</p>
-          <p className="mt-0.5">{user.roleCode.replace(/_/g, ' ')}</p>
-          {user.partnerName ? <p className="mt-0.5">{user.partnerName}</p> : null}
+        <div className="px-2 py-1.5">
+          <p className="truncate text-[0.8125rem] font-medium text-foreground">{user.name}</p>
+          <p className="truncate text-[11px] text-subtle">{user.email ?? user.phone}</p>
+          <p className="mt-1 text-[11px] capitalize text-muted-foreground">
+            {user.roleCode.replace(/_/g, ' ').toLowerCase()}
+          </p>
+          {user.partnerName ? (
+            <p className="mt-0.5 truncate text-[11px] text-subtle">{user.partnerName}</p>
+          ) : null}
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>

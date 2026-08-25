@@ -15,6 +15,7 @@ const config: Config = {
         border: {
           DEFAULT: 'hsl(var(--border))',
           subtle: 'hsl(var(--border-subtle))',
+          strong: 'hsl(var(--border-strong))',
         },
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
@@ -51,6 +52,16 @@ const config: Config = {
           DEFAULT: 'hsl(var(--info))',
           foreground: 'hsl(var(--info-foreground))',
         },
+        subtle: {
+          foreground: 'hsl(var(--subtle-foreground))',
+        },
+        state: {
+          operational: 'hsl(var(--state-operational))',
+          warning: 'hsl(var(--state-warning))',
+          critical: 'hsl(var(--state-critical))',
+          offline: 'hsl(var(--state-offline))',
+          maintenance: 'hsl(var(--state-maintenance))',
+        },
         chart: {
           1: 'hsl(var(--chart-1))',
           2: 'hsl(var(--chart-2))',
@@ -79,14 +90,24 @@ const config: Config = {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        control: 'var(--radius-control)',
+        input: 'var(--radius-input)',
+        card: 'var(--radius-card)',
+        modal: 'var(--radius-modal)',
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
+        hairline: 'inset 0 0 0 1px hsl(240 6% 15% / 0.7)',
+        popover: '0 12px 32px -8px rgb(0 0 0 / 0.7), 0 0 0 1px hsl(240 6% 18% / 0.8)',
         subtle: '0 1px 2px 0 rgb(0 0 0 / 0.3), 0 0 0 1px hsl(240 6% 15.5% / 0.5)',
         elevated: '0 16px 40px -16px rgb(0 0 0 / 0.6), 0 0 0 1px hsl(240 6% 17% / 0.7)',
         glow: '0 0 0 1px rgb(255 255 255 / 0.06), 0 24px 64px -24px rgb(99 91 255 / 0.35)',
+      },
+      transitionTimingFunction: {
+        'out-expo': 'cubic-bezier(0.16, 1, 0.3, 1)',
+        spring: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
       },
       keyframes: {
         'accordion-down': {
@@ -112,6 +133,10 @@ const config: Config = {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.35' },
         },
+        'ping-ring': {
+          '0%': { transform: 'scale(1)', opacity: '0.55' },
+          '70%, 100%': { transform: 'scale(2.4)', opacity: '0' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
@@ -120,6 +145,7 @@ const config: Config = {
         marquee: 'marquee 32s linear infinite',
         shimmer: 'shimmer 1.6s infinite',
         'pulse-dot': 'pulse-dot 2.2s ease-in-out infinite',
+        'ping-ring': 'ping-ring 2s cubic-bezier(0, 0, 0.2, 1) infinite',
       },
     },
   },

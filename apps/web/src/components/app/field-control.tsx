@@ -107,17 +107,20 @@ export function FieldControl({ field }: { field: FieldDefinition }): React.JSX.E
   }
   if (field.type === 'multiselect') {
     return (
-      <div className="max-h-48 space-y-2 overflow-y-auto rounded-md border p-3">
+      <div className="max-h-48 space-y-0.5 overflow-y-auto rounded-input bg-surface-elevated p-1.5 shadow-hairline">
         {(field.options ?? []).length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nothing available to select.</p>
+          <p className="px-1.5 py-2 text-[0.8125rem] text-subtle">Nothing available to select.</p>
         ) : (
           (field.options ?? []).map((option) => (
-            <label key={option.value} className="flex items-center gap-2 text-sm">
+            <label
+              key={option.value}
+              className="flex cursor-pointer items-center gap-2.5 rounded-control px-1.5 py-1.5 text-[0.8125rem] text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
+            >
               <input
                 type="checkbox"
                 name={field.name}
                 value={option.value}
-                className="h-4 w-4 rounded border-input accent-primary"
+                className="peer h-[15px] w-[15px] shrink-0 cursor-pointer rounded-[4px] border-0 bg-surface-active accent-primary"
               />
               {option.label}
             </label>
@@ -128,13 +131,13 @@ export function FieldControl({ field }: { field: FieldDefinition }): React.JSX.E
   }
   if (field.type === 'checkbox') {
     return (
-      <label className="flex items-center gap-2 text-sm text-muted-foreground">
+      <label className="flex cursor-pointer items-center gap-2.5 rounded-control py-1 text-[0.8125rem] text-muted-foreground transition-colors hover:text-foreground">
         <input
           id={field.name}
           type="checkbox"
           name={field.name}
           defaultChecked={field.defaultValue === 'on'}
-          className="h-4 w-4 rounded border-input accent-primary"
+          className="h-[15px] w-[15px] shrink-0 cursor-pointer rounded-[4px] border-0 bg-surface-active accent-primary"
         />
         {field.placeholder ?? 'Enable'}
       </label>
@@ -156,13 +159,17 @@ export function FieldControl({ field }: { field: FieldDefinition }): React.JSX.E
 /** Label + control + help text, shared by the dialog and full-page form layouts. */
 export function FieldRow({ field }: { field: FieldDefinition }): React.JSX.Element {
   return (
-    <div className={cn('space-y-2', (field.span ?? 1) === 2 && 'sm:col-span-2')}>
-      <Label htmlFor={field.name}>
+    <div className={cn('space-y-1.5', (field.span ?? 1) === 2 && 'sm:col-span-2')}>
+      <Label htmlFor={field.name} className="flex items-center gap-1">
         {field.label}
-        {field.required ? <span className="ml-1 text-destructive">*</span> : null}
+        {field.required ? (
+          <span className="text-destructive" aria-hidden>
+            *
+          </span>
+        ) : null}
       </Label>
       <FieldControl field={field} />
-      {field.help ? <p className="text-xs text-muted-foreground">{field.help}</p> : null}
+      {field.help ? <p className="text-[0.75rem] leading-snug text-subtle">{field.help}</p> : null}
     </div>
   );
 }
