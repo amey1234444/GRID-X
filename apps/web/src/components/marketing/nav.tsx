@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 
 import { Wordmark } from '@/components/brand';
-import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -38,7 +37,6 @@ export function MarketingNav(): React.JSX.Element {
         </div>
 
         <div className="hidden items-center gap-2 md:flex">
-          <ThemeToggle />
           <Button variant="ghost" asChild>
             <Link href="/partner/login">Partner sign in</Link>
           </Button>

@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 
 import { Wordmark } from '@/components/brand';
-import { ThemeToggle } from '@/components/theme-toggle';
 import { currentUser } from '@/lib/session';
 
 export const metadata = { title: 'Account · GRID-X' };
@@ -27,7 +26,6 @@ export default async function AccountLayout({
       <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b glass px-4 sm:px-6">
         <Wordmark href={home} />
         <div className="flex-1" />
-        <ThemeToggle />
         <Link
           href={home}
           className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm hover:bg-secondary"

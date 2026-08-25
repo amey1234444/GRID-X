@@ -8,7 +8,6 @@ import { NavIcon } from '@/components/app/nav-icon';
 import { NotificationBell } from '@/components/app/notification-bell';
 import { UserMenu } from '@/components/app/user-menu';
 import { Wordmark } from '@/components/brand';
-import { ThemeToggle } from '@/components/theme-toggle';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -31,7 +30,6 @@ export function InspectorShell({
           </Badge>
           <div className="ml-auto flex items-center gap-1">
             <NotificationBell inboxHref="/app/notifications" />
-            <ThemeToggle />
             <UserMenu user={user} />
           </div>
         </div>

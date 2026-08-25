@@ -27,21 +27,18 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#0b0f1a' },
-  ],
+  themeColor: '#0b0b0d',
   width: 'device-width',
   initialScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans`}>
         <ThemeProvider>
           <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
-          <Toaster position="top-right" richColors closeButton />
+          <Toaster position="top-right" theme="dark" richColors closeButton />
         </ThemeProvider>
       </body>
     </html>

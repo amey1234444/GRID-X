@@ -10,7 +10,6 @@ import { Wordmark } from '@/components/brand';
 import { NavIcon } from '@/components/app/nav-icon';
 import { UserMenu } from '@/components/app/user-menu';
 import { NotificationBell } from '@/components/app/notification-bell';
-import { ThemeToggle } from '@/components/theme-toggle';
 import { Badge } from '@/components/ui/badge';
 import { ScrollableNav } from '@/components/app/scrollable-nav';
 import { cn } from '@/lib/utils';
@@ -152,7 +151,6 @@ export function ControlShell({
           </button>
           <div className="flex-1" />
           <NotificationBell inboxHref="/app/notifications" />
-          <ThemeToggle />
           <UserMenu user={user} />
         </header>
 

@@ -10,7 +10,6 @@ import { NotificationBell } from '@/components/app/notification-bell';
 import { OfflineBanner } from '@/components/partner/offline-banner';
 import { ServiceWorkerRegistration } from '@/components/partner/service-worker-registration';
 import { Wordmark } from '@/components/brand';
-import { ThemeToggle } from '@/components/theme-toggle';
 import { PARTNER_STRINGS, type Language, type PartnerStringKey } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
@@ -51,7 +50,6 @@ export function PartnerShell({
           <span className="hidden truncate text-sm text-muted-foreground sm:block">{user.partnerName ?? user.name}</span>
           <div className="ml-auto flex items-center gap-1">
             <NotificationBell />
-            <ThemeToggle />
             <UserMenu user={user} />
           </div>
         </div>
