@@ -12,13 +12,23 @@ const config: Config = {
     },
     extend: {
       colors: {
-        border: 'hsl(var(--border))',
+        border: {
+          DEFAULT: 'hsl(var(--border))',
+          subtle: 'hsl(var(--border-subtle))',
+        },
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
+        surface: {
+          DEFAULT: 'hsl(var(--surface))',
+          elevated: 'hsl(var(--surface-elevated))',
+          hover: 'hsl(var(--surface-hover))',
+          active: 'hsl(var(--surface-active))',
+        },
         primary: {
           DEFAULT: 'hsl(var(--primary))',
+          hover: 'hsl(var(--primary-hover))',
           foreground: 'hsl(var(--primary-foreground))',
         },
         secondary: {
@@ -36,6 +46,17 @@ const config: Config = {
         warning: {
           DEFAULT: 'hsl(var(--warning))',
           foreground: 'hsl(var(--warning-foreground))',
+        },
+        info: {
+          DEFAULT: 'hsl(var(--info))',
+          foreground: 'hsl(var(--info-foreground))',
+        },
+        chart: {
+          1: 'hsl(var(--chart-1))',
+          2: 'hsl(var(--chart-2))',
+          3: 'hsl(var(--chart-3))',
+          4: 'hsl(var(--chart-4))',
+          5: 'hsl(var(--chart-5))',
         },
         muted: {
           DEFAULT: 'hsl(var(--muted))',
@@ -63,9 +84,9 @@ const config: Config = {
         sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        subtle: '0 1px 2px 0 rgb(16 24 40 / 0.04), 0 1px 3px 0 rgb(16 24 40 / 0.06)',
-        elevated: '0 12px 32px -12px rgb(16 24 40 / 0.18), 0 4px 8px -4px rgb(16 24 40 / 0.06)',
-        glow: '0 0 0 1px rgb(255 255 255 / 0.06), 0 24px 64px -24px rgb(79 70 229 / 0.45)',
+        subtle: '0 1px 2px 0 rgb(0 0 0 / 0.3), 0 0 0 1px hsl(240 6% 15.5% / 0.5)',
+        elevated: '0 16px 40px -16px rgb(0 0 0 / 0.6), 0 0 0 1px hsl(240 6% 17% / 0.7)',
+        glow: '0 0 0 1px rgb(255 255 255 / 0.06), 0 24px 64px -24px rgb(99 91 255 / 0.35)',
       },
       keyframes: {
         'accordion-down': {
@@ -87,12 +108,18 @@ const config: Config = {
         shimmer: {
           '100%': { transform: 'translateX(100%)' },
         },
+        'pulse-dot': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.35' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'fade-up': 'fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both',
         marquee: 'marquee 32s linear infinite',
+        shimmer: 'shimmer 1.6s infinite',
+        'pulse-dot': 'pulse-dot 2.2s ease-in-out infinite',
       },
     },
   },

@@ -2,71 +2,107 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * GRID-X dark design system.
+ * The product ships dark-only: :root carries the full token set and the
+ * `.dark` class exists purely so Radix/next-themes class toggling stays a no-op.
+ *
+ * Surfaces are layered, not flat:
+ *   background → surface → surface-elevated → surface-hover → surface-active → popover
+ */
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 224 32% 12%;
-    --card: 0 0% 100%;
-    --card-foreground: 224 32% 12%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 224 32% 12%;
-    --primary: 243 75% 59%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 220 20% 97%;
-    --secondary-foreground: 224 28% 20%;
-    --muted: 220 20% 97%;
-    --muted-foreground: 220 12% 46%;
-    --accent: 243 100% 97%;
-    --accent-foreground: 243 60% 40%;
-    --destructive: 0 74% 52%;
-    --destructive-foreground: 0 0% 100%;
-    --success: 152 62% 36%;
-    --success-foreground: 0 0% 100%;
-    --warning: 32 95% 44%;
-    --warning-foreground: 0 0% 100%;
-    --border: 220 16% 91%;
-    --input: 220 16% 91%;
-    --ring: 243 75% 59%;
-    --radius: 0.75rem;
-  }
-
+  :root,
   .dark {
-    --background: 226 32% 7%;
-    --foreground: 220 20% 96%;
-    --card: 226 28% 10%;
-    --card-foreground: 220 20% 96%;
-    --popover: 226 28% 10%;
-    --popover-foreground: 220 20% 96%;
-    --primary: 243 90% 68%;
-    --primary-foreground: 226 40% 8%;
-    --secondary: 226 20% 15%;
-    --secondary-foreground: 220 20% 96%;
-    --muted: 226 20% 15%;
-    --muted-foreground: 220 12% 65%;
-    --accent: 243 40% 20%;
+    --background: 240 7% 4.5%;
+    --foreground: 220 14% 96%;
+
+    --surface: 240 6% 7%;
+    --surface-elevated: 240 6% 9.5%;
+    --surface-hover: 240 6% 12%;
+    --surface-active: 240 6% 14.5%;
+
+    --card: 240 6% 7%;
+    --card-foreground: 220 14% 96%;
+    --popover: 240 6% 9%;
+    --popover-foreground: 220 14% 96%;
+
+    --primary: 243 82% 67%;
+    --primary-hover: 243 82% 72%;
+    --primary-foreground: 240 30% 6%;
+
+    --secondary: 240 5% 12%;
+    --secondary-foreground: 220 14% 92%;
+    --muted: 240 5% 12%;
+    --muted-foreground: 220 8% 63%;
+    --accent: 243 45% 18%;
     --accent-foreground: 243 90% 88%;
-    --destructive: 0 70% 55%;
+
+    --destructive: 0 72% 58%;
     --destructive-foreground: 0 0% 100%;
-    --success: 152 55% 45%;
-    --success-foreground: 226 40% 8%;
-    --warning: 32 90% 55%;
-    --warning-foreground: 226 40% 8%;
-    --border: 226 18% 20%;
-    --input: 226 18% 22%;
-    --ring: 243 90% 68%;
+    --success: 152 55% 48%;
+    --success-foreground: 240 30% 6%;
+    --warning: 36 92% 58%;
+    --warning-foreground: 240 30% 6%;
+    --info: 205 90% 62%;
+    --info-foreground: 240 30% 6%;
+
+    --border: 240 6% 15.5%;
+    --border-subtle: 240 6% 11%;
+    --input: 240 6% 16%;
+    --ring: 243 82% 67%;
+    --radius: 0.625rem;
+
+    --chart-1: 243 82% 67%;
+    --chart-2: 172 60% 48%;
+    --chart-3: 36 92% 58%;
+    --chart-4: 205 90% 62%;
+    --chart-5: 320 65% 62%;
   }
 
   * {
     @apply border-border;
   }
 
+  html {
+    color-scheme: dark;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'ss01';
+    text-rendering: optimizeLegibility;
   }
 
   ::selection {
-    @apply bg-primary/20;
+    @apply bg-primary/25;
+  }
+
+  /* Restrained scrollbars that match the dark surfaces. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--surface-active));
+    border-radius: 999px;
+    border: 2px solid hsl(var(--background));
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.4);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
@@ -77,8 +113,8 @@
 
   .grid-pattern {
     background-image:
-      linear-gradient(to right, hsl(var(--border) / 0.6) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--border) / 0.6) 1px, transparent 1px);
+      linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.5) 1px, transparent 1px);
     background-size: 56px 56px;
   }
 
@@ -87,6 +123,24 @@
   }
 
   .glass {
-    @apply bg-background/70 backdrop-blur-xl;
+    @apply bg-background/75 backdrop-blur-xl;
+  }
+
+  /* Hairline ring used instead of heavy borders on elevated cards. */
+  .ring-hairline {
+    box-shadow: inset 0 0 0 1px hsl(var(--border) / 0.7);
+  }
+
+  /* Subtle top light — gives dark cards a machined, premium edge. */
+  .surface-sheen {
+    background-image: linear-gradient(180deg, hsl(0 0% 100% / 0.03), transparent 32%);
+  }
+
+  .text-gradient {
+    @apply bg-gradient-to-r from-foreground via-foreground to-muted-foreground bg-clip-text text-transparent;
+  }
+
+  .text-gradient-primary {
+    @apply bg-gradient-to-r from-primary via-indigo-400 to-sky-400 bg-clip-text text-transparent;
   }
 }

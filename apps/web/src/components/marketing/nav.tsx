@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 
 import { Wordmark } from '@/components/brand';
-import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -20,7 +19,7 @@ export function MarketingNav(): React.JSX.Element {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 glass">
+    <header className="sticky top-0 z-40 border-b border-border-subtle glass">
       <div className="container flex h-16 items-center justify-between gap-6">
         <div className="flex items-center gap-8">
           <Wordmark />
@@ -29,7 +28,7 @@ export function MarketingNav(): React.JSX.Element {
               <Link
                 key={link.href}
                 href={link.href}
-                className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                className="rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors duration-200 hover:bg-surface-hover hover:text-foreground"
               >
                 {link.label}
               </Link>
@@ -38,7 +37,6 @@ export function MarketingNav(): React.JSX.Element {
         </div>
 
         <div className="hidden items-center gap-2 md:flex">
-          <ThemeToggle />
           <Button variant="ghost" asChild>
             <Link href="/partner/login">Partner sign in</Link>
           </Button>

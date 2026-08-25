@@ -68,10 +68,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
       });
     }
 
+    const incoming = request.headers['x-request-id'];
+    const requestId = Array.isArray(incoming) ? incoming[0] : incoming;
+
     response.status(status).json({
       statusCode: status,
       message,
       ...(errors ? { errors } : {}),
+      ...(requestId ? { requestId } : {}),
       path: request.url,
       timestamp: new Date().toISOString(),
     });

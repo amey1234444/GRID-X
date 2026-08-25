@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
@@ -12,6 +12,7 @@ import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { PermissionsGuard } from './auth/permissions.guard';
 import { RateLimitGuard } from './common/rate-limit.guard';
+import { RequestLoggerMiddleware } from './common/request-logger.middleware';
 import { SchedulerLockService } from './common/scheduler-lock.service';
 import { SentryService } from './common/sentry.service';
 import { PartnersModule } from './partners/partners.module';
@@ -71,4 +72,8 @@ import { HealthModule } from './health/health.module';
   ],
   exports: [SentryService, SchedulerLockService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(RequestLoggerMiddleware).forRoutes('*');
+  }
+}

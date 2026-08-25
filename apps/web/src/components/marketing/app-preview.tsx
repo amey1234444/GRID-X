@@ -46,15 +46,15 @@ const stats = [
 
 export function AppPreview(): React.JSX.Element {
   return (
-    <div className="relative rounded-2xl border bg-card p-2 shadow-elevated">
-      <div className="rounded-xl border bg-background">
+    <div className="relative rounded-2xl border border-border-subtle bg-surface-elevated p-2 shadow-glow surface-sheen">
+      <div className="rounded-xl border border-border-subtle bg-background">
         <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
           <div className="flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-full bg-destructive/70" />
             <span className="h-2.5 w-2.5 rounded-full bg-warning/70" />
             <span className="h-2.5 w-2.5 rounded-full bg-success/70" />
           </div>
-          <div className="rounded-md bg-secondary px-3 py-1 text-xs text-muted-foreground">
+          <div className="rounded-md bg-surface-hover px-3 py-1 font-mono text-xs text-muted-foreground">
             control.gridx.oswar.in/app
           </div>
           <Badge variant="success" className="gap-1">
@@ -64,7 +64,7 @@ export function AppPreview(): React.JSX.Element {
 
         <div className="grid gap-4 p-4 sm:grid-cols-3">
           {stats.map((stat) => (
-            <div key={stat.label} className="rounded-lg border bg-card p-4">
+            <div key={stat.label} className="rounded-lg border border-border-subtle bg-surface p-4 surface-sheen">
               <div className="flex items-center justify-between">
                 <p className="text-xs text-muted-foreground">{stat.label}</p>
                 <stat.icon className="h-4 w-4 text-muted-foreground" />
@@ -92,7 +92,7 @@ export function AppPreview(): React.JSX.Element {
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.job} className="border-t">
+                  <tr key={row.job} className="border-t border-border-subtle transition-colors hover:bg-surface-hover/50">
                     <td className="px-4 py-3 font-medium">{row.job}</td>
                     <td className="px-4 py-3 text-muted-foreground">{row.component}</td>
                     <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{row.partner}</td>
