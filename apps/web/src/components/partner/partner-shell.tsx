@@ -10,6 +10,7 @@ import { NotificationBell } from '@/components/app/notification-bell';
 import { OfflineBanner } from '@/components/partner/offline-banner';
 import { ServiceWorkerRegistration } from '@/components/partner/service-worker-registration';
 import { Wordmark } from '@/components/brand';
+import { PageTransition } from '@/components/motion';
 import { PARTNER_STRINGS, type Language, type PartnerStringKey } from '@/lib/i18n';
 import { cn } from '@/lib/utils';
 
@@ -42,9 +43,9 @@ export function PartnerShell({
   const language: Language = user.language === 'HI' ? 'HI' : 'EN';
 
   return (
-    <div className="flex min-h-screen flex-col bg-secondary/30 pb-16 lg:pb-0">
+    <div className="flex min-h-screen flex-col bg-background pb-16 lg:pb-0">
       <ServiceWorkerRegistration />
-      <header className="sticky top-0 z-30 border-b bg-background">
+      <header className="sticky top-0 z-30 border-b border-border-subtle glass">
         <div className="flex h-14 items-center gap-3 px-4">
           <Wordmark href="/partner" />
           <span className="hidden truncate text-sm text-muted-foreground sm:block">{user.partnerName ?? user.name}</span>
@@ -53,7 +54,7 @@ export function PartnerShell({
             <UserMenu user={user} />
           </div>
         </div>
-        <nav className="hidden gap-1 overflow-x-auto border-t px-4 py-2 lg:flex">
+        <nav className="hidden gap-1 overflow-x-auto border-t border-border-subtle px-4 py-2 lg:flex">
           {PARTNER_NAVIGATION.map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
@@ -61,10 +62,10 @@ export function PartnerShell({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors',
+                  'flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors duration-200',
                   active
                     ? 'bg-primary/10 font-medium text-primary'
-                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                    : 'text-muted-foreground hover:bg-surface-hover hover:text-foreground',
                 )}
               >
                 <NavIcon name={item.icon} className="h-4 w-4" />
@@ -76,9 +77,11 @@ export function PartnerShell({
         <OfflineBanner language={language} />
       </header>
 
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-5">{children}</main>
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-5">
+        <PageTransition>{children}</PageTransition>
+      </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t bg-background lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-border-subtle bg-surface/95 backdrop-blur-lg lg:hidden">
         {PARTNER_TABS.map((tab) => {
           const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
           return (
@@ -86,7 +89,7 @@ export function PartnerShell({
               key={tab.href}
               href={tab.href}
               className={cn(
-                'flex flex-col items-center gap-1 py-2.5 text-[11px] transition-colors',
+                'flex flex-col items-center gap-1 py-2.5 text-[11px] transition-colors duration-200',
                 active ? 'text-primary' : 'text-muted-foreground',
               )}
             >
