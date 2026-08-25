@@ -44,7 +44,8 @@ services:
       pnpm install --frozen-lockfile --prod=false &&
       pnpm --filter @gridx/shared build &&
       pnpm --filter @gridx/db build:ci &&
-      pnpm --filter @gridx/api build &&
+      pnpm --filter @gridx/api build
+    preDeployCommand: >-
       pnpm --filter @gridx/db deploy:ci &&
       if [ "$RUN_SEED" = "true" ];
       then echo "--- RUN_SEED=true, seeding database ---";
