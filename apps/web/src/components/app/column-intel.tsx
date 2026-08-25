@@ -1,6 +1,13 @@
 import * as React from 'react';
 
-import type { ColumnType } from '@/components/app/data-table';
+/**
+ * The semantic shape of a column. Drives the glyph in the header, numeric
+ * alignment, and whether a footer aggregate makes sense.
+ *
+ * Declared here rather than in `data-table` so both the server orchestrator
+ * and the client grid can import it without a cycle.
+ */
+export type ColumnType = 'text' | 'number' | 'date' | 'status' | 'person' | 'location' | 'link';
 
 /**
  * Column intelligence.

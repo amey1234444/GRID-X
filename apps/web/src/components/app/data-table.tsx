@@ -1,62 +1,16 @@
-'use client';
-
-import * as React from 'react';
-import Link from 'next/link';
-import {
-  AlignLeft,
-  ArrowDown,
-  ArrowUp,
-  Calendar,
-  ChevronsUpDown,
-  CircleDot,
-  Hash,
-  Link2,
-  MapPin,
-  Rows2,
-  Rows3,
-  User,
-  type LucideIcon,
-} from 'lucide-react';
-
 import {
   extractText,
   formatAggregate,
   inferColumnType,
   parseNumeric,
   sumColumn,
+  type ColumnType,
 } from '@/components/app/column-intel';
+import { DataGrid, type GridHeader, type GridRow } from '@/components/app/data-grid';
 import { EmptyState } from '@/components/app/empty-state';
-import { ToolbarChip } from '@/components/app/toolbar';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-  type TableDensity,
-} from '@/components/ui/table';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
+import type { TableDensity } from '@/components/ui/table';
 
-/**
- * Column "type" drives the small glyph in the header. It is the cheapest
- * way to make a dense grid legible: you learn a column's shape before you
- * read its name.
- */
-export type ColumnType = 'text' | 'number' | 'date' | 'status' | 'person' | 'location' | 'link';
-
-const TYPE_ICON: Record<ColumnType, LucideIcon> = {
-  text: AlignLeft,
-  number: Hash,
-  date: Calendar,
-  status: CircleDot,
-  person: User,
-  location: MapPin,
-  link: Link2,
-};
+export type { ColumnType };
 
 export interface Column<T> {
   key: string;
@@ -64,61 +18,26 @@ export interface Column<T> {
   render: (row: T) => React.ReactNode;
   className?: string;
   align?: 'left' | 'right';
+  /** Omit to let the column's name decide — see `inferColumnType`. */
   type?: ColumnType;
-  /** Sorts client-side on the current page when provided. */
+  /** Overrides the sort key derived from the rendered text. */
   sortValue?: (row: T) => string | number | null | undefined;
-  /** Renders an aggregate in the footer rail, mirroring the column. */
+  /** Overrides the footer aggregate. Return null to suppress it. */
   footer?: (rows: T[]) => React.ReactNode;
 }
 
-type SortState = { key: string; direction: 'asc' | 'desc' } | null;
-
 /**
- * A column enriched with everything the grid needs but the screen did not
- * have to spell out: its type glyph, a sort key derived from the rendered
- * text, and a footer aggregate for numeric columns.
+ * The data table — a **Server Component** by design.
+ *
+ * Column definitions carry `render` callbacks, and functions cannot be passed
+ * across the RSC boundary into a Client Component. So every callback is
+ * invoked here, on the server: cells become React elements, sort keys become
+ * strings and numbers, aggregates become text. Only that serialisable result
+ * is handed to `DataGrid`, which owns sorting, density and selection.
+ *
+ * Keeping this component on the server is what lets ~44 pages carry on
+ * declaring `{ key, header, render }` with no ceremony.
  */
-interface ResolvedColumn<T> extends Column<T> {
-  resolvedType: ColumnType;
-  resolvedSort: (row: T) => string | number | null;
-  resolvedFooter: ((rows: T[]) => React.ReactNode) | null;
-}
-
-function resolveColumns<T>(columns: Column<T>[], showAggregates: boolean): ResolvedColumn<T>[] {
-  return columns.map((column) => {
-    const resolvedType = column.type ?? inferColumnType(column.key, column.header);
-    const numeric = resolvedType === 'number';
-
-    const explicitSort = column.sortValue;
-    const resolvedSort = (row: T): string | number | null => {
-      if (explicitSort) return explicitSort(row) ?? null;
-      const text = extractText(column.render(row)).trim();
-      if (!text) return null;
-      return numeric ? parseNumeric(text) : text.toLowerCase();
-    };
-
-    let resolvedFooter: ((rows: T[]) => React.ReactNode) | null = column.footer ?? null;
-    if (!resolvedFooter && showAggregates && numeric) {
-      resolvedFooter = (rows: T[]) => {
-        const total = sumColumn(rows, column.render);
-        return total === null ? null : (
-          <span title={`Sum of ${column.header}`}>{formatAggregate(total)}</span>
-        );
-      };
-    }
-
-    return { ...column, resolvedType, resolvedSort, resolvedFooter };
-  });
-}
-
-function compare(a: unknown, b: unknown): number {
-  if (a === b) return 0;
-  if (a === null || a === undefined) return 1;
-  if (b === null || b === undefined) return -1;
-  if (typeof a === 'number' && typeof b === 'number') return a - b;
-  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' });
-}
-
 export function DataTable<T>({
   columns,
   rows,
@@ -126,9 +45,7 @@ export function DataTable<T>({
   empty,
   caption,
   selectable = false,
-  density: densityProp,
-  onSelectionChange,
-  selectionActions,
+  density = 'comfortable',
   rowKey,
   aggregates = true,
 }: {
@@ -137,73 +54,12 @@ export function DataTable<T>({
   rowHref?: (row: T) => string;
   empty?: { title: string; description?: string; action?: React.ReactNode };
   caption?: string;
-  /** Adds the leading checkbox column and the selection action bar. */
   selectable?: boolean;
   density?: TableDensity;
-  onSelectionChange?: (rows: T[]) => void;
-  /** Rendered in the bar that replaces the footer while rows are selected. */
-  selectionActions?: (rows: T[]) => React.ReactNode;
   rowKey?: (row: T, index: number) => string;
-  /** Set false for tables where a column sum would be nonsense (rates, IDs). */
+  /** Set false where a column sum would be nonsense (rates, scores, IDs). */
   aggregates?: boolean;
 }): React.JSX.Element {
-  const [density, setDensity] = React.useState<TableDensity>(densityProp ?? 'comfortable');
-  const [sort, setSort] = React.useState<SortState>(null);
-  const [selected, setSelected] = React.useState<Set<number>>(new Set());
-
-  // Row identity is positional, so any change to the underlying page must
-  // drop the selection rather than silently re-point it at different rows.
-  React.useEffect(() => {
-    setSelected(new Set());
-  }, [rows]);
-
-  const resolved = React.useMemo(
-    () => resolveColumns(columns, aggregates),
-    [columns, aggregates],
-  );
-
-  const sorted = React.useMemo(() => {
-    if (!sort) return rows;
-    const column = resolved.find((item) => item.key === sort.key);
-    if (!column) return rows;
-    const factor = sort.direction === 'asc' ? 1 : -1;
-    // Sort keys are derived per comparison; pages here are <= 100 rows.
-    return [...rows].sort((a, b) => factor * compare(column.resolvedSort(a), column.resolvedSort(b)));
-  }, [rows, sort, resolved]);
-
-  const selectedRows = React.useMemo(
-    () => [...selected].map((index) => sorted[index]).filter((row): row is T => row !== undefined),
-    [selected, sorted],
-  );
-
-  React.useEffect(() => {
-    onSelectionChange?.(selectedRows);
-  }, [selectedRows, onSelectionChange]);
-
-  const toggleRow = (index: number): void => {
-    setSelected((current) => {
-      const next = new Set(current);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
-  };
-
-  const allSelected = sorted.length > 0 && selected.size === sorted.length;
-  const someSelected = selected.size > 0 && !allSelected;
-
-  const toggleAll = (): void => {
-    setSelected(allSelected ? new Set() : new Set(sorted.map((_, index) => index)));
-  };
-
-  const toggleSort = (column: ResolvedColumn<T>): void => {
-    setSort((current) => {
-      if (current?.key !== column.key) return { key: column.key, direction: 'asc' };
-      if (current.direction === 'asc') return { key: column.key, direction: 'desc' };
-      return null;
-    });
-  };
-
   if (rows.length === 0) {
     return (
       <EmptyState
@@ -214,181 +70,65 @@ export function DataTable<T>({
     );
   }
 
-  const hasFooter = resolved.some((column) => column.resolvedFooter);
-  const showSelectionBar = selectable && selected.size > 0;
+  const resolved = columns.map((column) => ({
+    column,
+    type: column.type ?? inferColumnType(column.key, column.header),
+  }));
+
+  const headers: GridHeader[] = resolved.map(({ column, type }) => ({
+    key: column.key,
+    label: column.header,
+    type,
+    align: column.align ?? 'left',
+    className: column.className,
+    sortable: true,
+  }));
+
+  const gridRows: GridRow[] = rows.map((row, rowIndex) => {
+    const cells: React.ReactNode[] = [];
+    const sortKeys: (string | number | null)[] = [];
+
+    for (const { column, type } of resolved) {
+      const cell = column.render(row);
+      cells.push(cell);
+
+      if (column.sortValue) {
+        sortKeys.push(column.sortValue(row) ?? null);
+        continue;
+      }
+      // Flatten the rendered cell so JSX columns still sort sensibly.
+      const text = extractText(cell).trim();
+      if (!text) sortKeys.push(null);
+      else sortKeys.push(type === 'number' ? parseNumeric(text) : text.toLowerCase());
+    }
+
+    return {
+      key: rowKey?.(row, rowIndex) ?? String(rowIndex),
+      href: rowHref?.(row),
+      cells,
+      sortKeys,
+    };
+  });
+
+  const footerCells: React.ReactNode[] = resolved.map(({ column, type }) => {
+    if (column.footer) return column.footer(rows);
+    if (!aggregates || type !== 'number') return null;
+    const total = sumColumn(rows, column.render);
+    return total === null ? null : (
+      <span title={`Sum of ${column.header}`}>{formatAggregate(total)}</span>
+    );
+  });
+
+  const hasAggregate = footerCells.some((cell) => cell !== null);
 
   return (
-    <div className="overflow-hidden rounded-card bg-card shadow-hairline">
-      <Table density={density} containerClassName="max-h-[calc(100vh-19rem)]">
-        <TableHeader>
-          <TableRow className="[&>td]:border-b-0">
-            {selectable ? (
-              <TableHead className="w-10 px-0">
-                <div className="flex items-center justify-center">
-                  <Checkbox
-                    checked={allSelected ? true : someSelected ? 'indeterminate' : false}
-                    onCheckedChange={toggleAll}
-                    aria-label="Select all rows on this page"
-                  />
-                </div>
-              </TableHead>
-            ) : null}
-            {resolved.map((column) => {
-              const Icon = TYPE_ICON[column.resolvedType];
-              const isSorted = sort?.key === column.key;
-              const sortable = true;
-              return (
-                <TableHead
-                  key={column.key}
-                  aria-sort={isSorted ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
-                  className={cn(column.className)}
-                >
-                  <button
-                    type="button"
-                    onClick={() => toggleSort(column)}
-                    disabled={!sortable}
-                    className={cn(
-                      'group/head -mx-1 flex w-[calc(100%+0.5rem)] items-center gap-1.5 rounded-control px-1 py-1',
-                      'text-left transition-colors duration-100',
-                      column.align === 'right' && 'flex-row-reverse text-right',
-                      sortable ? 'hover:bg-surface-hover hover:text-foreground' : 'cursor-default',
-                      isSorted && 'text-foreground',
-                    )}
-                  >
-                    <Icon className="h-3.5 w-3.5 shrink-0 opacity-45" />
-                    <span className="truncate">{column.header}</span>
-                    {sortable ? (
-                      <span className="ml-auto shrink-0">
-                        {isSorted ? (
-                          sort.direction === 'asc' ? (
-                            <ArrowUp className="h-3 w-3" />
-                          ) : (
-                            <ArrowDown className="h-3 w-3" />
-                          )
-                        ) : (
-                          <ChevronsUpDown className="h-3 w-3 opacity-0 transition-opacity group-hover/head:opacity-40" />
-                        )}
-                      </span>
-                    ) : null}
-                  </button>
-                </TableHead>
-              );
-            })}
-          </TableRow>
-        </TableHeader>
-
-        <TableBody>
-          {sorted.map((row, index) => {
-            const href = rowHref?.(row);
-            const isSelected = selected.has(index);
-            return (
-              <TableRow
-                key={rowKey?.(row, index) ?? index}
-                interactive={Boolean(href)}
-                data-state={isSelected ? 'selected' : undefined}
-              >
-                {selectable ? (
-                  <TableCell className="w-10 px-0">
-                    <div className="flex items-center justify-center">
-                      <Checkbox
-                        checked={isSelected}
-                        onCheckedChange={() => toggleRow(index)}
-                        aria-label="Select row"
-                        className={cn(
-                          // Opacity reveal keeps the grid calm until you reach for it.
-                          'transition-opacity duration-100',
-                          !isSelected && 'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100',
-                        )}
-                      />
-                    </div>
-                  </TableCell>
-                ) : null}
-                {resolved.map((column, columnIndex) => (
-                  <TableCell
-                    key={column.key}
-                    className={cn(
-                      column.align === 'right' && 'text-right',
-                      column.resolvedType === 'number' && 'tabular-nums',
-                      column.className,
-                    )}
-                  >
-                    {href && columnIndex === 0 ? (
-                      // The whole row is hoverable, but only the primary cell
-                      // carries the link so text stays selectable elsewhere.
-                      <Link
-                        href={href}
-                        className="-mx-1 block truncate rounded-control px-1 font-medium text-foreground underline-offset-4 transition-colors hover:text-primary hover:underline"
-                      >
-                        {column.render(row)}
-                      </Link>
-                    ) : (
-                      column.render(row)
-                    )}
-                  </TableCell>
-                ))}
-              </TableRow>
-            );
-          })}
-        </TableBody>
-
-        {hasFooter && !showSelectionBar ? (
-          <TableFooter className="sticky bottom-0 z-10 [&_td]:bg-surface-elevated">
-            <TableRow className="[&>td]:border-b-0">
-              {selectable ? <TableCell className="w-10 px-0" /> : null}
-              {resolved.map((column, index) => (
-                <TableCell
-                  key={column.key}
-                  className={cn(
-                    'text-[0.75rem] text-subtle',
-                    column.align === 'right' && 'text-right tabular-nums',
-                  )}
-                >
-                  {column.resolvedFooter
-                    ? column.resolvedFooter(sorted)
-                    : index === 0
-                      ? `${sorted.length} ${sorted.length === 1 ? 'record' : 'records'}`
-                      : null}
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableFooter>
-        ) : null}
-      </Table>
-
-      {showSelectionBar ? (
-        <div className="flex items-center gap-3 border-t border-border-subtle bg-primary/[0.06] px-3 py-2 duration-200 animate-in fade-in-0 slide-in-from-bottom-1">
-          <span className="text-[0.8125rem] font-medium text-foreground">{selected.size} selected</span>
-          <button
-            type="button"
-            onClick={() => setSelected(new Set())}
-            className="text-[0.8125rem] text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
-          >
-            Clear
-          </button>
-          <div className="ml-auto flex items-center gap-2">{selectionActions?.(selectedRows)}</div>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 border-t border-border-subtle px-3 py-1.5">
-          <span className="text-[0.75rem] text-subtle">
-            {sorted.length} {sorted.length === 1 ? 'record' : 'records'}
-            {caption ? <span className="ml-2 text-subtle">· {caption}</span> : null}
-          </span>
-          <div className="ml-auto">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <ToolbarChip
-                  tone="ghost"
-                  icon={density === 'compact' ? Rows3 : Rows2}
-                  onClick={() => setDensity((value) => (value === 'compact' ? 'comfortable' : 'compact'))}
-                  aria-label="Toggle row density"
-                  className="h-7"
-                />
-              </TooltipTrigger>
-              <TooltipContent>{density === 'compact' ? 'Comfortable rows' : 'Compact rows'}</TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
-      )}
-    </div>
+    <DataGrid
+      headers={headers}
+      rows={gridRows}
+      footerCells={hasAggregate ? footerCells : null}
+      density={density}
+      caption={caption}
+      selectable={selectable}
+    />
   );
 }
