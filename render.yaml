@@ -173,9 +173,15 @@ services:
         value: production
       - key: NEXT_PUBLIC_APP_NAME
         value: GRID-X
-      # Points at the API service. This must include the /api suffix to match
-      # API_GLOBAL_PREFIX, and Render cannot concatenate a path onto a
-      # fromService value — so fill it in the dashboard once gridx-api has a
-      # URL, e.g. https://gridx-api.onrender.com/api
+      # Points at the API service root. The web app appends /api itself, so
+      # Render can wire this automatically from the API service URL.
+      - key: API_URL
+        fromService:
+          type: web
+          name: gridx-api
+          envVarKey: RENDER_EXTERNAL_URL
       - key: NEXT_PUBLIC_API_URL
-        sync: false
+        fromService:
+          type: web
+          name: gridx-api
+          envVarKey: RENDER_EXTERNAL_URL

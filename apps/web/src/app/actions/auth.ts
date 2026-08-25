@@ -31,19 +31,37 @@ function landingFor(user: AuthUser): string {
 }
 
 async function post(path: string, body: unknown): Promise<{ ok: boolean; status: number; payload: unknown }> {
-  const response = await fetch(`${API_URL}${path}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-    cache: 'no-store',
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      cache: 'no-store',
+    });
+  } catch {
+    return {
+      ok: false,
+      status: 503,
+      payload: { message: 'GRID-X API is not reachable. Check the Render API service and API URL.' },
+    };
+  }
   const text = await response.text();
-  return { ok: response.ok, status: response.status, payload: text ? JSON.parse(text) : null };
+  try {
+    return { ok: response.ok, status: response.status, payload: text ? JSON.parse(text) : null };
+  } catch {
+    return {
+      ok: response.ok,
+      status: response.status,
+      payload: response.ok ? null : { message: text.trim() || `Request failed with status ${response.status}` },
+    };
+  }
 }
 
 function messageOf(payload: unknown, fallback: string): string {
   if (payload && typeof payload === 'object' && 'message' in payload) {
     const message = (payload as { message: unknown }).message;
+    if (Array.isArray(message)) return message.map(String).join(', ');
     if (typeof message === 'string') return message;
   }
   return fallback;

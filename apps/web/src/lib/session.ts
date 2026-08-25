@@ -51,17 +51,72 @@ export function clearTokens(): void {
   }
 }
 
+function messageFromPayload(payload: unknown, fallback: string): string {
+  if (payload && typeof payload === 'object' && 'message' in payload) {
+    const message = (payload as { message: unknown }).message;
+    if (Array.isArray(message)) return message.map(String).join(', ');
+    if (typeof message === 'string' && message.trim() !== '') return message;
+  }
+  return fallback;
+}
+
+function parseJson(text: string): unknown {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+async function readPayload(response: Response): Promise<{ text: string; payload: unknown }> {
+  const text = await response.text();
+  return { text, payload: parseJson(text) };
+}
+
+async function safeFetch(
+  input: string,
+  init: RequestInit,
+  context: Record<string, unknown>,
+): Promise<Response | null> {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    log.error('api request could not be reached', {
+      ...context,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+function unreachableResult<T>(): ApiCallResult<T> {
+  return {
+    status: 503,
+    data: null,
+    error: 'GRID-X API is not reachable. Check the Render API service and API URL.',
+  };
+}
+
 /** Exchanges the refresh token for a new session; returns null when the session is dead. */
 export async function refreshSession(refreshToken: string): Promise<SessionTokens | null> {
-  const response = await fetch(`${API_URL}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ refreshToken }),
-    cache: 'no-store',
-  });
+  const response = await safeFetch(
+    `${API_URL}/auth/refresh`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+      cache: 'no-store',
+    },
+    { method: 'POST', path: '/auth/refresh' },
+  );
+  if (!response) return null;
   if (!response.ok) return null;
-  const payload = (await response.json()) as { accessToken: string; refreshToken: string };
-  return { accessToken: payload.accessToken, refreshToken: payload.refreshToken };
+  const { payload } = await readPayload(response);
+  if (!payload || typeof payload !== 'object') return null;
+  const tokens = payload as Partial<SessionTokens>;
+  if (!tokens.accessToken || !tokens.refreshToken) return null;
+  return { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken };
 }
 
 export interface ApiCallResult<T> {
@@ -84,16 +139,22 @@ export async function apiFetch<T>(
 
   const requestId = newRequestId();
   const startedAt = Date.now();
-  const response = await fetch(`${API_URL}${path.startsWith('/') ? path : `/${path}`}`, {
-    ...init,
-    headers: {
-      'content-type': 'application/json',
-      'x-request-id': requestId,
-      ...(init.headers ?? {}),
-      authorization: `Bearer ${tokens.accessToken}`,
+  const response = await safeFetch(
+    `${API_URL}${path.startsWith('/') ? path : `/${path}`}`,
+    {
+      ...init,
+      headers: {
+        'content-type': 'application/json',
+        'x-request-id': requestId,
+        ...(init.headers ?? {}),
+        authorization: `Bearer ${tokens.accessToken}`,
+      },
+      cache: 'no-store',
     },
-    cache: 'no-store',
-  });
+    { requestId, method: init.method ?? 'GET', path },
+  );
+
+  if (!response) return unreachableResult<T>();
 
   if (!response.ok && response.status !== 401) {
     log.warn('api request failed', {
@@ -115,14 +176,13 @@ export async function apiFetch<T>(
     return apiFetchWithToken<T>(path, init, refreshed.accessToken);
   }
 
-  const text = await response.text();
-  const payload: unknown = text ? JSON.parse(text) : null;
+  const { text, payload } = await readPayload(response);
 
   if (!response.ok) {
-    const message =
-      payload && typeof payload === 'object' && 'message' in payload
-        ? String((payload as { message: unknown }).message)
-        : `Request failed with status ${response.status}`;
+    const message = messageFromPayload(
+      payload,
+      text.trim() || `Request failed with status ${response.status}`,
+    );
     return { status: response.status, data: null, error: message };
   }
 
@@ -135,16 +195,22 @@ async function apiFetchWithToken<T>(
   accessToken: string,
 ): Promise<ApiCallResult<T>> {
   const requestId = newRequestId();
-  const response = await fetch(`${API_URL}${path.startsWith('/') ? path : `/${path}`}`, {
-    ...init,
-    headers: {
-      'content-type': 'application/json',
-      'x-request-id': requestId,
-      ...(init.headers ?? {}),
-      authorization: `Bearer ${accessToken}`,
+  const response = await safeFetch(
+    `${API_URL}${path.startsWith('/') ? path : `/${path}`}`,
+    {
+      ...init,
+      headers: {
+        'content-type': 'application/json',
+        'x-request-id': requestId,
+        ...(init.headers ?? {}),
+        authorization: `Bearer ${accessToken}`,
+      },
+      cache: 'no-store',
     },
-    cache: 'no-store',
-  });
+    { requestId, method: init.method ?? 'GET', path },
+  );
+
+  if (!response) return unreachableResult<T>();
 
   if (!response.ok) {
     log.warn('api request failed after refresh', {
@@ -154,13 +220,12 @@ async function apiFetchWithToken<T>(
       status: response.status,
     });
   }
-  const text = await response.text();
-  const payload: unknown = text ? JSON.parse(text) : null;
+  const { text, payload } = await readPayload(response);
   if (!response.ok) {
-    const message =
-      payload && typeof payload === 'object' && 'message' in payload
-        ? String((payload as { message: unknown }).message)
-        : `Request failed with status ${response.status}`;
+    const message = messageFromPayload(
+      payload,
+      text.trim() || `Request failed with status ${response.status}`,
+    );
     return { status: response.status, data: null, error: message };
   }
   return { status: response.status, data: payload as T, error: null };
@@ -180,17 +245,22 @@ export async function apiFetchForm<T>(
   if (!tokens) return { status: 401, data: null, error: 'Not authenticated' };
 
   const request = async (accessToken: string) =>
-    fetch(`${API_URL}${path.startsWith('/') ? path : `/${path}`}`, {
-      method: 'POST',
-      headers: {
-        ...(contentType ? { 'content-type': contentType } : {}),
-        authorization: `Bearer ${accessToken}`,
+    safeFetch(
+      `${API_URL}${path.startsWith('/') ? path : `/${path}`}`,
+      {
+        method: 'POST',
+        headers: {
+          ...(contentType ? { 'content-type': contentType } : {}),
+          authorization: `Bearer ${accessToken}`,
+        },
+        body,
+        cache: 'no-store',
       },
-      body,
-      cache: 'no-store',
-    });
+      { method: 'POST', path },
+    );
 
   let response = await request(tokens.accessToken);
+  if (!response) return unreachableResult<T>();
   if (response.status === 401) {
     const refreshed = await refreshSession(tokens.refreshToken);
     if (!refreshed) {
@@ -199,15 +269,15 @@ export async function apiFetchForm<T>(
     }
     writeTokens(refreshed);
     response = await request(refreshed.accessToken);
+    if (!response) return unreachableResult<T>();
   }
 
-  const text = await response.text();
-  const payload: unknown = text ? JSON.parse(text) : null;
+  const { text, payload } = await readPayload(response);
   if (!response.ok) {
-    const message =
-      payload && typeof payload === 'object' && 'message' in payload
-        ? String((payload as { message: unknown }).message)
-        : `Upload failed with status ${response.status}`;
+    const message = messageFromPayload(
+      payload,
+      text.trim() || `Upload failed with status ${response.status}`,
+    );
     return { status: response.status, data: null, error: message };
   }
   return { status: response.status, data: payload as T, error: null };
@@ -221,12 +291,24 @@ export async function apiFetchText(
   if (!tokens) return { status: 401, body: null, contentType: 'text/plain', error: 'Not authenticated' };
 
   const request = async (accessToken: string) =>
-    fetch(`${API_URL}${path.startsWith('/') ? path : `/${path}`}`, {
-      headers: { authorization: `Bearer ${accessToken}` },
-      cache: 'no-store',
-    });
+    safeFetch(
+      `${API_URL}${path.startsWith('/') ? path : `/${path}`}`,
+      {
+        headers: { authorization: `Bearer ${accessToken}` },
+        cache: 'no-store',
+      },
+      { method: 'GET', path },
+    );
 
   let response = await request(tokens.accessToken);
+  if (!response) {
+    return {
+      status: 503,
+      body: null,
+      contentType: 'text/plain',
+      error: 'GRID-X API is not reachable. Check the Render API service and API URL.',
+    };
+  }
   if (response.status === 401) {
     const refreshed = await refreshSession(tokens.refreshToken);
     if (!refreshed) {
@@ -235,6 +317,14 @@ export async function apiFetchText(
     }
     writeTokens(refreshed);
     response = await request(refreshed.accessToken);
+    if (!response) {
+      return {
+        status: 503,
+        body: null,
+        contentType: 'text/plain',
+        error: 'GRID-X API is not reachable. Check the Render API service and API URL.',
+      };
+    }
   }
 
   const body = await response.text();

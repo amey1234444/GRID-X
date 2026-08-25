@@ -92,12 +92,18 @@ export function FileUpload({
           method: 'POST',
           body,
         });
-        const payload: unknown = await response.json();
+        const text = await response.text();
+        let payload: unknown = null;
+        try {
+          payload = text ? JSON.parse(text) : null;
+        } catch {
+          payload = null;
+        }
         if (!response.ok) {
           const message =
             payload && typeof payload === 'object' && 'message' in payload
               ? String((payload as { message: unknown }).message)
-              : `Upload failed (${response.status})`;
+              : text.trim() || `Upload failed (${response.status})`;
           setError(message);
           break;
         }

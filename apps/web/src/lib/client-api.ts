@@ -24,11 +24,18 @@ export class ApiRequestError extends Error {
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const requestId = newRequestId();
   const startedAt = Date.now();
-  const response = await fetch(`/api/gridx${path.startsWith('/') ? path : `/${path}`}`, {
-    method,
-    headers: { 'content-type': 'application/json', 'x-request-id': requestId },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`/api/gridx${path.startsWith('/') ? path : `/${path}`}`, {
+      method,
+      headers: { 'content-type': 'application/json', 'x-request-id': requestId },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiRequestError(503, {
+      message: 'GRID-X API is not reachable. Check the Render API service and API URL.',
+    });
+  }
 
   if (!response.ok) {
     log.warn('api request failed', {
@@ -41,13 +48,18 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   }
 
   const text = await response.text();
-  const payload: unknown = text ? JSON.parse(text) : null;
+  let payload: unknown = null;
+  try {
+    payload = text ? JSON.parse(text) : null;
+  } catch {
+    payload = null;
+  }
 
   if (!response.ok) {
     const error =
-      payload && typeof payload === 'object'
+      payload && typeof payload === 'object' && 'message' in payload
         ? (payload as ApiError)
-        : { message: `Request failed with status ${response.status}` };
+        : { message: text.trim() || `Request failed with status ${response.status}` };
     throw new ApiRequestError(response.status, error);
   }
 
