@@ -1,5 +1,9 @@
 'use client';
 
+import { createLogger, newRequestId } from './logger';
+
+const log = createLogger('client-api');
+
 export interface ApiError {
   message: string;
   errors?: Record<string, string[]>;
@@ -18,11 +22,23 @@ export class ApiRequestError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const requestId = newRequestId();
+  const startedAt = Date.now();
   const response = await fetch(`/api/gridx${path.startsWith('/') ? path : `/${path}`}`, {
     method,
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'x-request-id': requestId },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+
+  if (!response.ok) {
+    log.warn('api request failed', {
+      requestId,
+      method,
+      path,
+      status: response.status,
+      durationMs: Date.now() - startedAt,
+    });
+  }
 
   const text = await response.text();
   const payload: unknown = text ? JSON.parse(text) : null;

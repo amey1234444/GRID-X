@@ -2,6 +2,9 @@ import { cookies } from 'next/headers';
 import type { AuthUser } from '@gridx/shared';
 
 import { API_URL, REFRESH_COOKIE, SESSION_COOKIE } from './config';
+import { createLogger, newRequestId } from './logger';
+
+const log = createLogger('api');
 
 export interface SessionTokens {
   accessToken: string;
@@ -79,15 +82,28 @@ export async function apiFetch<T>(
   const tokens = readTokens();
   if (!tokens) return { status: 401, data: null, error: 'Not authenticated' };
 
+  const requestId = newRequestId();
+  const startedAt = Date.now();
   const response = await fetch(`${API_URL}${path.startsWith('/') ? path : `/${path}`}`, {
     ...init,
     headers: {
       'content-type': 'application/json',
+      'x-request-id': requestId,
       ...(init.headers ?? {}),
       authorization: `Bearer ${tokens.accessToken}`,
     },
     cache: 'no-store',
   });
+
+  if (!response.ok && response.status !== 401) {
+    log.warn('api request failed', {
+      requestId,
+      method: init.method ?? 'GET',
+      path,
+      status: response.status,
+      durationMs: Date.now() - startedAt,
+    });
+  }
 
   if (response.status === 401 && options.retryOnUnauthorised !== false) {
     const refreshed = await refreshSession(tokens.refreshToken);
@@ -118,15 +134,26 @@ async function apiFetchWithToken<T>(
   init: RequestInit,
   accessToken: string,
 ): Promise<ApiCallResult<T>> {
+  const requestId = newRequestId();
   const response = await fetch(`${API_URL}${path.startsWith('/') ? path : `/${path}`}`, {
     ...init,
     headers: {
       'content-type': 'application/json',
+      'x-request-id': requestId,
       ...(init.headers ?? {}),
       authorization: `Bearer ${accessToken}`,
     },
     cache: 'no-store',
   });
+
+  if (!response.ok) {
+    log.warn('api request failed after refresh', {
+      requestId,
+      method: init.method ?? 'GET',
+      path,
+      status: response.status,
+    });
+  }
   const text = await response.text();
   const payload: unknown = text ? JSON.parse(text) : null;
   if (!response.ok) {
