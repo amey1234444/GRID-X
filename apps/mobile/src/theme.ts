@@ -121,22 +121,55 @@ export const elevation = {
 export type StatusTone = 'default' | 'success' | 'warning' | 'destructive' | 'info' | 'muted';
 
 const STATUS_TONES: Record<string, StatusTone> = {
+  // Inspections
   REQUESTED: 'warning',
   ASSIGNED: 'info',
   IN_PROGRESS: 'info',
   COMPLETED: 'success',
   ACCEPTED: 'success',
+  ACCEPTED_WITH_DEVIATION: 'warning',
+  REWORK_REQUIRED: 'warning',
   REJECTED: 'destructive',
-  ON_HOLD: 'warning',
-  OPEN: 'warning',
-  CLOSED: 'muted',
+  HOLD_FOR_ENGINEERING_REVIEW: 'warning',
+  // Jobs
+  CREATED: 'muted',
+  ALLOCATED: 'info',
+  PARTNER_ACCEPTED: 'info',
+  PARTNER_DECLINED: 'destructive',
+  MATERIAL_ISSUED: 'info',
+  IN_PRODUCTION: 'info',
+  READY_FOR_INSPECTION: 'warning',
+  DISPATCHED: 'info',
+  RECEIVED: 'success',
+  CANCELLED: 'muted',
+  // Rework / non-conformance
+  ISSUED: 'info',
+  READY_FOR_REINSPECTION: 'warning',
+  SCRAPPED: 'destructive',
+  // Material
+  ACKNOWLEDGED: 'success',
+  PARTIALLY_ACKNOWLEDGED: 'warning',
+  RECONCILED: 'success',
+  SHORTAGE: 'destructive',
+  // Drawings
+  SUBMITTED: 'info',
+  RELEASED: 'success',
+  OBSOLETE: 'muted',
+  // Commercials
+  VERIFIED: 'info',
+  SCHEDULED: 'info',
+  HELD: 'destructive',
   PAID: 'success',
   APPROVED: 'success',
+  // Generic
+  ON_HOLD: 'warning',
+  OPEN: 'warning',
+  ANSWERED: 'success',
+  CLOSED: 'muted',
   PENDING: 'warning',
   OVERDUE: 'destructive',
   DELAYED: 'destructive',
   NEW: 'info',
-  ISSUED: 'info',
   DRAFT: 'muted',
 };
 

@@ -1,24 +1,27 @@
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { DarkTheme, NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '@/context/auth';
 import { LoginScreen } from '@/screens/login';
-import {
-  InspectionDetailScreen,
-  InspectionQueueScreen,
-  ReworkScreen,
-  type InspectorStackParamList,
-} from '@/screens/inspector';
-import {
-  PartnerHomeScreen,
-  PartnerInvoicesScreen,
-  PartnerJobDetailScreen,
-  PartnerJobsScreen,
-  type PartnerStackParamList,
-} from '@/screens/partner';
-import { ProfileScreen } from '@/screens/shared';
+import { NotificationsScreen } from '@/screens/common/notifications';
+import { ProfileScreen } from '@/screens/common/profile';
+import { InspectionDetailScreen } from '@/screens/inspector/inspection-detail';
+import { NonConformancesScreen } from '@/screens/inspector/non-conformances';
+import { InspectionQueueScreen, InspectorTodayScreen } from '@/screens/inspector/queue';
+import { InspectionResultsScreen } from '@/screens/inspector/results';
+import { ReworkDetailScreen, ReworkListScreen } from '@/screens/inspector/rework';
+import { PartnerInvoicesScreen, PartnerScorecardScreen } from '@/screens/partner/commercials';
+import { PartnerHomeScreen } from '@/screens/partner/dashboard';
+import { PartnerDrawingsScreen } from '@/screens/partner/drawings';
+import { PartnerInspectionsScreen, PartnerReworkScreen } from '@/screens/partner/inspections';
+import { PartnerJobDetailScreen } from '@/screens/partner/job-detail';
+import { PartnerJobsScreen } from '@/screens/partner/jobs';
+import { PartnerMaterialDetailScreen, PartnerMaterialsScreen } from '@/screens/partner/materials';
+import { PartnerMoreScreen } from '@/screens/partner/more';
+import type { InspectorStackParamList, PartnerStackParamList } from '@/navigation/types';
 import { colors } from '@/theme';
 
 const theme = {
@@ -33,10 +36,11 @@ const theme = {
   },
 };
 
-const screenOptions = {
+const stackOptions = {
   headerStyle: { backgroundColor: colors.surface },
   headerTintColor: colors.foreground,
   headerTitleStyle: { fontWeight: '600' as const },
+  headerShadowVisible: false,
   contentStyle: { backgroundColor: colors.background },
 };
 
@@ -45,99 +49,166 @@ const tabOptions = {
   tabBarStyle: {
     backgroundColor: colors.surface,
     borderTopColor: colors.borderSubtle,
+    height: 62,
+    paddingBottom: 8,
+    paddingTop: 8,
   },
+  tabBarLabelStyle: { fontSize: 11, fontWeight: '500' as const },
   tabBarActiveTintColor: colors.primary,
   tabBarInactiveTintColor: colors.mutedForeground,
 };
 
-function TabGlyph({ glyph, color }: { glyph: string; color: string }): React.JSX.Element {
-  return <Text style={{ color, fontSize: 18 }}>{glyph}</Text>;
+function tabIcon(
+  name: keyof typeof Ionicons.glyphMap,
+): (props: { color: string; size: number }) => React.JSX.Element {
+  const Icon = ({ color, size }: { color: string; size: number }): React.JSX.Element => (
+    <Ionicons name={name} size={size - 2} color={color} />
+  );
+  Icon.displayName = `TabIcon(${name})`;
+  return Icon;
+}
+
+// ---------------------------------------------------------------- Inspector
+
+const InspectorTab = createBottomTabNavigator<InspectorStackParamList>();
+
+function InspectorTabs(): React.JSX.Element {
+  return (
+    <InspectorTab.Navigator screenOptions={tabOptions}>
+      <InspectorTab.Screen
+        name="InspectorToday"
+        component={InspectorTodayScreen}
+        options={{ title: 'Today', tabBarIcon: tabIcon('today-outline') }}
+      />
+      <InspectorTab.Screen
+        name="InspectionQueue"
+        component={InspectionQueueScreen}
+        options={{ title: 'Queue', tabBarIcon: tabIcon('list-outline') }}
+      />
+      <InspectorTab.Screen
+        name="NonConformances"
+        component={NonConformancesScreen}
+        options={{ title: 'Defects', tabBarIcon: tabIcon('warning-outline') }}
+      />
+      <InspectorTab.Screen
+        name="ReworkList"
+        component={ReworkListScreen}
+        options={{ title: 'Rework', tabBarIcon: tabIcon('repeat-outline') }}
+      />
+      <InspectorTab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{ title: 'Profile', tabBarIcon: tabIcon('person-outline') }}
+      />
+    </InspectorTab.Navigator>
+  );
 }
 
 const InspectorStack = createNativeStackNavigator<InspectorStackParamList>();
 
-function InspectorQueueStack(): React.JSX.Element {
+function InspectorApp(): React.JSX.Element {
   return (
-    <InspectorStack.Navigator screenOptions={screenOptions}>
-      <InspectorStack.Screen
-        name="InspectionQueue"
-        component={InspectionQueueScreen}
-        options={{ headerShown: false }}
-      />
+    <InspectorStack.Navigator screenOptions={stackOptions}>
+      <InspectorStack.Screen name="InspectorTabs" component={InspectorTabs} options={{ headerShown: false }} />
       <InspectorStack.Screen
         name="InspectionDetail"
         component={InspectionDetailScreen}
         options={({ route }) => ({ title: route.params.inspectionNumber })}
       />
+      <InspectorStack.Screen
+        name="InspectionResults"
+        component={InspectionResultsScreen}
+        options={({ route }) => ({ title: `Measurements · ${route.params.inspectionNumber}` })}
+      />
+      <InspectorStack.Screen
+        name="ReworkDetail"
+        component={ReworkDetailScreen}
+        options={({ route }) => ({ title: route.params.reworkNumber })}
+      />
+      <InspectorStack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{ title: 'Alerts' }}
+      />
     </InspectorStack.Navigator>
   );
 }
 
-const InspectorTabs = createBottomTabNavigator();
+// ------------------------------------------------------------------ Partner
 
-function InspectorApp(): React.JSX.Element {
+const PartnerTab = createBottomTabNavigator<PartnerStackParamList>();
+
+function PartnerTabs(): React.JSX.Element {
   return (
-    <InspectorTabs.Navigator screenOptions={tabOptions}>
-      <InspectorTabs.Screen
-        name="Queue"
-        component={InspectorQueueStack}
-        options={{ tabBarIcon: ({ color }) => <TabGlyph glyph="☰" color={color} /> }}
+    <PartnerTab.Navigator screenOptions={tabOptions}>
+      <PartnerTab.Screen
+        name="PartnerHome"
+        component={PartnerHomeScreen}
+        options={{ title: 'Home', tabBarIcon: tabIcon('home-outline') }}
       />
-      <InspectorTabs.Screen
-        name="Rework"
-        component={ReworkScreen}
-        options={{ tabBarIcon: ({ color }) => <TabGlyph glyph="↺" color={color} /> }}
+      <PartnerTab.Screen
+        name="PartnerJobs"
+        component={PartnerJobsScreen}
+        options={{ title: 'Jobs', tabBarIcon: tabIcon('briefcase-outline') }}
       />
-      <InspectorTabs.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{ tabBarIcon: ({ color }) => <TabGlyph glyph="◉" color={color} /> }}
+      <PartnerTab.Screen
+        name="PartnerMaterials"
+        component={PartnerMaterialsScreen}
+        options={{ title: 'Material', tabBarIcon: tabIcon('cube-outline') }}
       />
-    </InspectorTabs.Navigator>
+      <PartnerTab.Screen
+        name="PartnerInspections"
+        component={PartnerInspectionsScreen}
+        options={{ title: 'Quality', tabBarIcon: tabIcon('shield-checkmark-outline') }}
+      />
+      <PartnerTab.Screen
+        name="PartnerMore"
+        component={PartnerMoreScreen}
+        options={{ title: 'More', tabBarIcon: tabIcon('ellipsis-horizontal-outline') }}
+      />
+    </PartnerTab.Navigator>
   );
 }
 
 const PartnerStack = createNativeStackNavigator<PartnerStackParamList>();
 
-function PartnerJobsStack(): React.JSX.Element {
+function PartnerApp(): React.JSX.Element {
   return (
-    <PartnerStack.Navigator screenOptions={screenOptions}>
-      <PartnerStack.Screen name="PartnerJobs" component={PartnerJobsScreen} options={{ headerShown: false }} />
+    <PartnerStack.Navigator screenOptions={stackOptions}>
+      <PartnerStack.Screen name="PartnerTabs" component={PartnerTabs} options={{ headerShown: false }} />
       <PartnerStack.Screen
         name="PartnerJobDetail"
         component={PartnerJobDetailScreen}
         options={({ route }) => ({ title: route.params.jobNumber })}
       />
-    </PartnerStack.Navigator>
-  );
-}
-
-const PartnerTabs = createBottomTabNavigator();
-
-function PartnerApp(): React.JSX.Element {
-  return (
-    <PartnerTabs.Navigator screenOptions={tabOptions}>
-      <PartnerTabs.Screen
-        name="Home"
-        component={PartnerHomeScreen}
-        options={{ tabBarIcon: ({ color }) => <TabGlyph glyph="⌂" color={color} /> }}
+      <PartnerStack.Screen
+        name="PartnerMaterialDetail"
+        component={PartnerMaterialDetailScreen}
+        options={({ route }) => ({ title: route.params.challanNumber })}
       />
-      <PartnerTabs.Screen
-        name="Jobs"
-        component={PartnerJobsStack}
-        options={{ tabBarIcon: ({ color }) => <TabGlyph glyph="☰" color={color} /> }}
+      <PartnerStack.Screen
+        name="PartnerDrawings"
+        component={PartnerDrawingsScreen}
+        options={{ title: 'Drawings' }}
       />
-      <PartnerTabs.Screen
-        name="Invoices"
+      <PartnerStack.Screen name="PartnerRework" component={PartnerReworkScreen} options={{ title: 'Rework' }} />
+      <PartnerStack.Screen
+        name="PartnerInvoices"
         component={PartnerInvoicesScreen}
-        options={{ tabBarIcon: ({ color }) => <TabGlyph glyph="₹" color={color} /> }}
+        options={{ title: 'Payments' }}
       />
-      <PartnerTabs.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{ tabBarIcon: ({ color }) => <TabGlyph glyph="◉" color={color} /> }}
+      <PartnerStack.Screen
+        name="PartnerScorecard"
+        component={PartnerScorecardScreen}
+        options={{ title: 'Scorecard' }}
       />
-    </PartnerTabs.Navigator>
+      <PartnerStack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
+      <PartnerStack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{ title: 'Alerts' }}
+      />
+    </PartnerStack.Navigator>
   );
 }
 
@@ -146,7 +217,7 @@ export function RootNavigator(): React.JSX.Element {
 
   if (initializing) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
+      <View style={styles.boot}>
         <ActivityIndicator color={colors.primary} size="large" />
       </View>
     );
@@ -160,3 +231,12 @@ export function RootNavigator(): React.JSX.Element {
     </NavigationContainer>
   );
 }
+
+const styles = {
+  boot: {
+    flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    backgroundColor: colors.background,
+  },
+};
