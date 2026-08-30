@@ -160,8 +160,8 @@ export function ImportPanel({ targets }: { targets: ImportTarget[] }): React.JSX
 function ImportReport({ result }: { result: ImportResult }): React.JSX.Element {
   if (result.committed) {
     return (
-      <div className="flex items-start gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm">
-        <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none text-emerald-600" />
+      <div className="flex items-start gap-2 rounded-md border border-success/40 bg-success/10 p-3 text-sm">
+        <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none text-success" />
         <p>
           Imported {result.totalRows} row(s): <strong>{result.created} created</strong>,{' '}
           <strong>{result.updated} updated</strong>.
@@ -172,8 +172,8 @@ function ImportReport({ result }: { result: ImportResult }): React.JSX.Element {
 
   if (result.issues.length === 0) {
     return (
-      <div className="flex items-start gap-2 rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm">
-        <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none text-emerald-600" />
+      <div className="flex items-start gap-2 rounded-md border border-success/40 bg-success/10 p-3 text-sm">
+        <CheckCircle2 className="mt-0.5 h-4 w-4 flex-none text-success" />
         <p>
           All {result.valid} row(s) are valid. Nothing has been written yet — choose{' '}
           <strong>Import</strong> to apply them.

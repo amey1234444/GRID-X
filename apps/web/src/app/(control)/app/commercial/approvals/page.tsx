@@ -65,7 +65,7 @@ export default async function ApprovalsPage({
       header: 'Decision',
       render: (row) =>
         row.approved ? (
-          <span className="inline-flex items-center gap-1.5 text-emerald-600">
+          <span className="inline-flex items-center gap-1.5 text-success">
             <Check className="h-4 w-4" /> Passed
           </span>
         ) : (

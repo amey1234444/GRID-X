@@ -90,7 +90,7 @@ export default async function PartnerReworkPage({
 
                 {/* The instructions are the point of the screen, so they lead rather than sit in a
                     detail list below the metadata. */}
-                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+                <div className="rounded-lg border border-warning/40 bg-warning/10 p-3">
                   <p className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide">
                     <AlertTriangle className="h-3.5 w-3.5" />
                     {hindi ? 'क्या ठीक करना है' : 'What to correct'}

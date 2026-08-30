@@ -91,7 +91,7 @@ export default async function ScrapPage({
         <span
           className={
             row.scrapPercent >= HIGH_SCRAP_PERCENT
-              ? 'font-medium tabular-nums text-amber-600'
+              ? 'font-medium tabular-nums text-warning'
               : 'tabular-nums'
           }
         >

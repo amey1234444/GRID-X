@@ -131,7 +131,7 @@ export default async function PartnerInvoicesPage({
                         key={stage.label}
                         className={
                           stage.at
-                            ? 'rounded-full bg-emerald-500/10 px-2.5 py-1 text-emerald-600'
+                            ? 'rounded-full bg-success/10 px-2.5 py-1 text-success'
                             : 'rounded-full bg-secondary px-2.5 py-1 text-muted-foreground'
                         }
                       >

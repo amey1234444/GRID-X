@@ -38,7 +38,7 @@ export function ForgotPasswordForm(): React.JSX.Element {
   if (state.resetRequested) {
     return (
       <div className="space-y-4">
-        <p className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-3 text-sm text-emerald-700 dark:text-emerald-400">
+        <p className="flex items-start gap-2 rounded-lg border border-success/30 bg-success/5 px-3 py-3 text-sm text-success">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
           <span>
             If that email belongs to a GRID-X account, a reset link is on its way. It works once and

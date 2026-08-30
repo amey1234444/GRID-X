@@ -800,7 +800,7 @@ export default async function JobDetailPage({
                       row.directionKg > 0 ? (
                         <span className="text-warning">to partner</span>
                       ) : row.directionKg < 0 ? (
-                        <span className="text-emerald-600 dark:text-emerald-400">back to OSWAR</span>
+                        <span className="text-success">back to OSWAR</span>
                       ) : (
                         <span className="text-muted-foreground">at partner</span>
                       ),

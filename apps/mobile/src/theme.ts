@@ -10,39 +10,41 @@
  *   background → surface → surfaceElevated → surfaceHover → surfaceActive
  */
 export const colors = {
-  background: '#09090b',
-  surface: '#0f0f12',
-  surfaceElevated: '#151519',
-  surfaceHover: '#1c1c1f',
-  surfaceActive: '#222226',
-  popover: '#141417',
+  background: '#090909',
+  surface: '#0f0f0f',
+  surfaceElevated: '#161616',
+  surfaceHover: '#1c1c1c',
+  surfaceActive: '#242424',
+  popover: '#141414',
 
-  border: '#242429',
-  borderSubtle: '#19191c',
-  borderStrong: '#35353b',
+  border: '#262626',
+  borderSubtle: '#1b1b1b',
+  borderStrong: '#3d3d3d',
 
-  foreground: '#f3f4f6',
-  mutedForeground: '#9196a1',
+  foreground: '#f7f7f7',
+  mutedForeground: '#9e9e9e',
   /** Third text tier — captions, metadata, disabled labels. */
-  subtleForeground: '#686e78',
+  subtleForeground: '#737373',
 
-  primary: '#6d66f0',
-  primaryHover: '#837df2',
-  primaryForeground: '#0b0b14',
+  /* Monochrome brand: white is the action colour on a black canvas. */
+  primary: '#f7f7f7',
+  primaryHover: '#ffffff',
+  primaryForeground: '#0d0d0d',
 
-  success: '#37be7f',
-  warning: '#f6a831',
-  destructive: '#e14747',
-  info: '#47adf5',
+  /* Hue is reserved for operational state, never for chrome. */
+  success: '#479e76',
+  warning: '#dfa239',
+  destructive: '#d34b41',
+  info: '#77a1c5',
 } as const;
 
 /** Machine / site operating states — a different axis to workflow status. */
 export const stateColors = {
-  OPERATIONAL: '#37be7f',
-  WARNING: '#f6a831',
-  CRITICAL: '#e14747',
-  OFFLINE: '#6c727f',
-  MAINTENANCE: '#47adf5',
+  OPERATIONAL: '#479e76',
+  WARNING: '#dfa239',
+  CRITICAL: '#d34b41',
+  OFFLINE: '#757575',
+  MAINTENANCE: '#77a1c5',
 } as const;
 
 export type MachineState = keyof typeof stateColors;

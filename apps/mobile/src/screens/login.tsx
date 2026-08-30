@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { Banner, Button, Field, Input } from '@/components/ui';
+import { LogoTile } from '@/components/logo';
 import { Reveal } from '@/components/motion';
 import { ServerSheet } from '@/screens/server';
 import { useAuth } from '@/context/auth';
@@ -46,9 +47,7 @@ export function LoginScreen(): React.JSX.Element {
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <Reveal>
             <View style={styles.header}>
-              <View style={styles.logoMark}>
-                <Text style={styles.logoText}>GX</Text>
-              </View>
+              <LogoTile size={58} />
               <Text style={styles.title}>GRID-X</Text>
               <Text style={[typography.caption, styles.centered]}>
                 The operating system for distributed manufacturing
@@ -142,16 +141,6 @@ const styles = StyleSheet.create({
   container: { flexGrow: 1, justifyContent: 'center', padding: spacing.xl, gap: spacing.xl },
   header: { alignItems: 'center', gap: spacing.sm },
   centered: { textAlign: 'center' },
-  logoMark: {
-    width: 58,
-    height: 58,
-    borderRadius: radius.card,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-  },
-  logoText: { color: colors.primaryForeground, fontSize: 21, fontWeight: '700' },
   title: { ...typography.title, fontSize: 30 },
   switcher: {
     flexDirection: 'row',

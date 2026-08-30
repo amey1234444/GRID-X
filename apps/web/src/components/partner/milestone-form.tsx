@@ -141,13 +141,13 @@ export function MilestoneForm({
           {language === 'HI' ? 'भेजें' : 'Save update'}
         </Button>
         {outcome === 'sent' ? (
-          <span className="flex items-center gap-1.5 text-sm text-emerald-600">
+          <span className="flex items-center gap-1.5 text-sm text-success">
             <CheckCircle2 className="h-4 w-4" />
             {language === 'HI' ? 'भेज दिया' : 'Sent'}
           </span>
         ) : null}
         {outcome === 'queued' ? (
-          <span className="text-sm text-amber-600">
+          <span className="text-sm text-warning">
             {language === 'HI' ? 'ऑफ़लाइन सुरक्षित — बाद में सिंक होगा' : 'Saved offline — will sync automatically'}
           </span>
         ) : null}

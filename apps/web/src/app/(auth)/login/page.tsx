@@ -19,7 +19,7 @@ export default function LoginPage({
         </p>
       </div>
       {searchParams?.passwordChanged ? (
-        <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400">
+        <p className="rounded-lg border border-success/30 bg-success/5 px-3 py-2 text-sm text-success">
           Your password has been changed. Sign in with the new one.
         </p>
       ) : null}

@@ -63,7 +63,7 @@ export default async function CapabilityMatrixPage(): Promise<React.JSX.Element>
                 className={
                   row.allocatablePartners === 0
                     ? 'inline-flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-1 text-xs text-destructive'
-                    : 'inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs'
+                    : 'inline-flex items-center gap-1.5 rounded-md border border-warning/40 bg-warning/10 px-2.5 py-1 text-xs'
                 }
               >
                 <AlertTriangle className="h-3 w-3" />
@@ -120,7 +120,7 @@ export default async function CapabilityMatrixPage(): Promise<React.JSX.Element>
                             <Check
                               className={
                                 partner.allocatable
-                                  ? 'mx-auto h-4 w-4 text-emerald-600'
+                                  ? 'mx-auto h-4 w-4 text-success'
                                   : 'mx-auto h-4 w-4 text-muted-foreground'
                               }
                             />
