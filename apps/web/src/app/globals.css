@@ -90,13 +90,15 @@
     --duration-slow: 320ms;
 
     /* ---- Charts ------------------------------------------------------ */
-    /* Greyscale ramp first; status hues only where a series must be read
-     * as good/bad (acceptance, rejection). */
-    --chart-1: 0 0% 92%;
-    --chart-2: 0 0% 62%;
-    --chart-3: 0 0% 40%;
-    --chart-4: 152 38% 45%;
-    --chart-5: 4 62% 54%;
+    /* A greyscale ramp: categorical series stay neutral, and series that
+     * are read as good/bad use the semantic tokens directly. */
+    --chart-1: 0 0% 95%;
+    --chart-2: 0 0% 68%;
+    --chart-3: 0 0% 46%;
+    --chart-4: 0 0% 30%;
+    --chart-5: 0 0% 82%;
+    --chart-6: 0 0% 57%;
+    --chart-7: 0 0% 38%;
   }
 
   * {

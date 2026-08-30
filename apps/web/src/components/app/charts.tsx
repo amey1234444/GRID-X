@@ -34,6 +34,8 @@ const PALETTE = [
   'hsl(var(--chart-3))',
   'hsl(var(--chart-4))',
   'hsl(var(--chart-5))',
+  'hsl(var(--chart-6))',
+  'hsl(var(--chart-7))',
 ];
 
 const colorAt = (index: number): string => PALETTE[index % PALETTE.length] as string;
@@ -66,6 +68,20 @@ const tooltipShared = {
   cursor: { fill: 'hsl(var(--surface-hover))', opacity: 0.6 },
 } as const;
 
+/**
+ * Axis ticks are compacted in Indian units, because a ₹ value on a narrow axis
+ * would otherwise be clipped to a meaningless tail of zeros.
+ */
+function compactTick(value: number | string): string {
+  const num = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(num)) return String(value);
+  const abs = Math.abs(num);
+  if (abs >= 1e7) return `${(num / 1e7).toFixed(abs >= 1e8 ? 0 : 1)}Cr`;
+  if (abs >= 1e5) return `${(num / 1e5).toFixed(abs >= 1e6 ? 0 : 1)}L`;
+  if (abs >= 1e3) return `${(num / 1e3).toFixed(abs >= 1e4 ? 0 : 1)}k`;
+  return String(num);
+}
+
 const legendStyle = { fontSize: 12, color: 'hsl(var(--muted-foreground))', paddingTop: 8 } as const;
 
 const ANIMATION = { animationDuration: 700, animationEasing: 'ease-out' } as const;
@@ -94,7 +110,7 @@ export function TrendAreaChart({
         </defs>
         <CartesianGrid stroke={GRID} vertical={false} />
         <XAxis dataKey={xKey} {...axisProps} />
-        <YAxis width={44} {...axisProps} />
+        <YAxis width={46} tickFormatter={compactTick} {...axisProps} />
         <Tooltip {...tooltipShared} cursor={{ stroke: GRID, strokeWidth: 1 }} />
         {series.length > 1 ? <Legend wrapperStyle={legendStyle} iconType="circle" iconSize={7} /> : null}
         {series.map((entry, index) => (
@@ -143,13 +159,13 @@ export function CategoryBarChart({
         <CartesianGrid stroke={GRID} vertical={horizontal} horizontal={!horizontal} />
         {horizontal ? (
           <>
-            <XAxis type="number" {...axisProps} />
+            <XAxis type="number" tickFormatter={compactTick} {...axisProps} />
             <YAxis type="category" dataKey={xKey} width={140} {...axisProps} />
           </>
         ) : (
           <>
             <XAxis dataKey={xKey} {...axisProps} />
-            <YAxis width={44} {...axisProps} />
+            <YAxis width={46} tickFormatter={compactTick} {...axisProps} />
           </>
         )}
         <Tooltip {...tooltipShared} />
@@ -224,7 +240,7 @@ export function SimpleLineChart({
       <LineChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
         <CartesianGrid stroke={GRID} vertical={false} />
         <XAxis dataKey={xKey} {...axisProps} />
-        <YAxis width={44} {...axisProps} />
+        <YAxis width={46} tickFormatter={compactTick} {...axisProps} />
         <Tooltip {...tooltipShared} cursor={{ stroke: GRID, strokeWidth: 1 }} />
         <Line
           type="monotone"

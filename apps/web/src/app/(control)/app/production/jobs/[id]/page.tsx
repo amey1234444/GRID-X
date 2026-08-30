@@ -23,6 +23,7 @@ import {
   requestInspectionAction,
   updateJobAction,
 } from '@/app/actions/control';
+import { ActivityTrail } from '@/components/app/activity-trail';
 import { ActionDialog } from '@/components/app/action-dialog';
 import { DataTable } from '@/components/app/data-table';
 import { DetailList } from '@/components/app/detail-list';
@@ -883,6 +884,8 @@ export default async function JobDetailPage({
           />
         </TabsContent>
       </Tabs>
+
+      <ActivityTrail entityType="GridJob" entityId={job.id} />
     </div>
   );
 }
