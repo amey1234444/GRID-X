@@ -36,11 +36,11 @@ export default async function AccountPage({
       {enrolmentRequired ? (
         <div
           role="alert"
-          className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm"
+          className="flex items-start gap-3 rounded-lg border border-warning/40 bg-warning/5 px-4 py-3 text-sm"
         >
-          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-warning" />
           <div className="space-y-1">
-            <p className="font-medium text-amber-800 dark:text-amber-300">
+            <p className="font-medium text-warning">
               Set up two-factor authentication to continue
             </p>
             <p className="text-muted-foreground">

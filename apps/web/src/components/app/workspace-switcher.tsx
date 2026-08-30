@@ -6,6 +6,7 @@ import type { AuthUser } from '@gridx/shared';
 import { Check, ChevronsUpDown, LogOut, Settings, ShieldCheck, UserRound } from 'lucide-react';
 
 import { logoutAction } from '@/app/actions/auth';
+import { LogoMark } from '@/components/brand';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,10 +47,10 @@ export function WorkspaceSwitcher({
           )}
         >
           <span
-            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-control bg-gradient-to-br from-primary to-indigo-400 text-[11px] font-bold text-primary-foreground"
+            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] bg-surface-elevated text-foreground shadow-[inset_0_0_0_1px_hsl(var(--border-strong))]"
             aria-hidden
           >
-            GX
+            <LogoMark className="h-[15px] w-[15px]" />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[0.8125rem] font-medium leading-tight">{workspace}</span>
@@ -62,10 +63,10 @@ export function WorkspaceSwitcher({
         <DropdownMenuLabel className="text-subtle">Workspace</DropdownMenuLabel>
         <DropdownMenuItem className="gap-2.5">
           <span
-            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] bg-gradient-to-br from-primary to-indigo-400 text-[9px] font-bold text-primary-foreground"
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] bg-surface-elevated text-foreground shadow-[inset_0_0_0_1px_hsl(var(--border-strong))]"
             aria-hidden
           >
-            GX
+            <LogoMark className="h-3 w-3" />
           </span>
           <span className="flex-1 truncate">{workspace}</span>
           <Check className="h-3.5 w-3.5 text-primary" />

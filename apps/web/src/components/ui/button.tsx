@@ -17,9 +17,12 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        // Solid brand action. One per view — everything else is quieter.
+        /*
+         * The one solid action per view: white on black. The inset line is
+         * dark, not light — on a white fill a light sheen is invisible.
+         */
         default:
-          'bg-primary text-primary-foreground shadow-[0_1px_2px_rgb(0_0_0/0.4),inset_0_1px_0_hsl(0_0%_100%/0.12)] hover:bg-primary-hover',
+          'bg-primary text-primary-foreground shadow-[0_1px_2px_rgb(0_0_0/0.5),inset_0_-1px_0_hsl(0_0%_0%/0.08)] hover:bg-primary-hover',
         destructive:
           'bg-destructive text-destructive-foreground shadow-[0_1px_2px_rgb(0_0_0/0.4)] hover:bg-destructive/90',
         success: 'bg-success text-success-foreground shadow-[0_1px_2px_rgb(0_0_0/0.4)] hover:bg-success/90',
@@ -28,7 +31,7 @@ const buttonVariants = cva(
           'bg-surface-elevated text-foreground shadow-hairline hover:bg-surface-hover hover:shadow-[inset_0_0_0_1px_hsl(var(--border-strong))]',
         secondary: 'bg-surface-hover text-secondary-foreground hover:bg-surface-active',
         ghost: 'text-muted-foreground hover:bg-surface-hover hover:text-foreground',
-        link: 'text-primary underline-offset-4 hover:underline',
+        link: 'text-foreground underline-offset-4 hover:underline',
       },
       size: {
         default: 'h-9 px-3.5',

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
-import { api, restoreTokens, setSessionExpiredHandler, setTokens } from '@/lib/api';
+import { api, restoreBaseUrl, restoreTokens, setSessionExpiredHandler, setTokens } from '@/lib/api';
 import { createLogger } from '@/lib/logger';
 import { clearSession, saveSession } from '@/lib/storage';
 import type { AuthUser, LoginResponse } from '@/lib/types';
@@ -33,6 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     });
     void (async () => {
       try {
+        // The saved server address has to be in place before any request is made.
+        await restoreBaseUrl();
         const userJson = await restoreTokens();
         if (userJson) {
           setUser(JSON.parse(userJson) as AuthUser);

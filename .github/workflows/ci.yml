@@ -48,6 +48,33 @@ jobs:
       - name: Test
         run: pnpm -r test
 
+  # apps/mobile has its own npm tree (Metro and pnpm symlinks do not mix), so
+  # `pnpm -r` above never reaches it.
+  mobile:
+    name: Mobile lint and typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.18.1
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
   migrations:
     name: Migrations apply cleanly
     runs-on: ubuntu-latest

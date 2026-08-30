@@ -134,7 +134,7 @@ export function InspectionResultsForm({
           {state.error}
         </p>
       ) : null}
-      {state.success ? <p className="text-sm text-emerald-600">Measurements recorded.</p> : null}
+      {state.success ? <p className="text-sm text-success">Measurements recorded.</p> : null}
 
       <SubmitButton />
     </form>

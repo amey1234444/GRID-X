@@ -10,39 +10,41 @@
  *   background → surface → surfaceElevated → surfaceHover → surfaceActive
  */
 export const colors = {
-  background: '#09090b',
-  surface: '#0f0f12',
-  surfaceElevated: '#151519',
-  surfaceHover: '#1c1c1f',
-  surfaceActive: '#222226',
-  popover: '#141417',
+  background: '#090909',
+  surface: '#0f0f0f',
+  surfaceElevated: '#161616',
+  surfaceHover: '#1c1c1c',
+  surfaceActive: '#242424',
+  popover: '#141414',
 
-  border: '#242429',
-  borderSubtle: '#19191c',
-  borderStrong: '#35353b',
+  border: '#262626',
+  borderSubtle: '#1b1b1b',
+  borderStrong: '#3d3d3d',
 
-  foreground: '#f3f4f6',
-  mutedForeground: '#9196a1',
+  foreground: '#f7f7f7',
+  mutedForeground: '#9e9e9e',
   /** Third text tier — captions, metadata, disabled labels. */
-  subtleForeground: '#686e78',
+  subtleForeground: '#737373',
 
-  primary: '#6d66f0',
-  primaryHover: '#837df2',
-  primaryForeground: '#0b0b14',
+  /* Monochrome brand: white is the action colour on a black canvas. */
+  primary: '#f7f7f7',
+  primaryHover: '#ffffff',
+  primaryForeground: '#0d0d0d',
 
-  success: '#37be7f',
-  warning: '#f6a831',
-  destructive: '#e14747',
-  info: '#47adf5',
+  /* Hue is reserved for operational state, never for chrome. */
+  success: '#479e76',
+  warning: '#dfa239',
+  destructive: '#d34b41',
+  info: '#77a1c5',
 } as const;
 
 /** Machine / site operating states — a different axis to workflow status. */
 export const stateColors = {
-  OPERATIONAL: '#37be7f',
-  WARNING: '#f6a831',
-  CRITICAL: '#e14747',
-  OFFLINE: '#6c727f',
-  MAINTENANCE: '#47adf5',
+  OPERATIONAL: '#479e76',
+  WARNING: '#dfa239',
+  CRITICAL: '#d34b41',
+  OFFLINE: '#757575',
+  MAINTENANCE: '#77a1c5',
 } as const;
 
 export type MachineState = keyof typeof stateColors;
@@ -121,22 +123,55 @@ export const elevation = {
 export type StatusTone = 'default' | 'success' | 'warning' | 'destructive' | 'info' | 'muted';
 
 const STATUS_TONES: Record<string, StatusTone> = {
+  // Inspections
   REQUESTED: 'warning',
   ASSIGNED: 'info',
   IN_PROGRESS: 'info',
   COMPLETED: 'success',
   ACCEPTED: 'success',
+  ACCEPTED_WITH_DEVIATION: 'warning',
+  REWORK_REQUIRED: 'warning',
   REJECTED: 'destructive',
-  ON_HOLD: 'warning',
-  OPEN: 'warning',
-  CLOSED: 'muted',
+  HOLD_FOR_ENGINEERING_REVIEW: 'warning',
+  // Jobs
+  CREATED: 'muted',
+  ALLOCATED: 'info',
+  PARTNER_ACCEPTED: 'info',
+  PARTNER_DECLINED: 'destructive',
+  MATERIAL_ISSUED: 'info',
+  IN_PRODUCTION: 'info',
+  READY_FOR_INSPECTION: 'warning',
+  DISPATCHED: 'info',
+  RECEIVED: 'success',
+  CANCELLED: 'muted',
+  // Rework / non-conformance
+  ISSUED: 'info',
+  READY_FOR_REINSPECTION: 'warning',
+  SCRAPPED: 'destructive',
+  // Material
+  ACKNOWLEDGED: 'success',
+  PARTIALLY_ACKNOWLEDGED: 'warning',
+  RECONCILED: 'success',
+  SHORTAGE: 'destructive',
+  // Drawings
+  SUBMITTED: 'info',
+  RELEASED: 'success',
+  OBSOLETE: 'muted',
+  // Commercials
+  VERIFIED: 'info',
+  SCHEDULED: 'info',
+  HELD: 'destructive',
   PAID: 'success',
   APPROVED: 'success',
+  // Generic
+  ON_HOLD: 'warning',
+  OPEN: 'warning',
+  ANSWERED: 'success',
+  CLOSED: 'muted',
   PENDING: 'warning',
   OVERDUE: 'destructive',
   DELAYED: 'destructive',
   NEW: 'info',
-  ISSUED: 'info',
   DRAFT: 'muted',
 };
 

@@ -78,7 +78,7 @@ export function TwoFactorSetup({ enabled }: { enabled: boolean }): React.JSX.Ele
   if (recoveryCodes) {
     return (
       <div className="space-y-4">
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+        <div className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
           <p className="font-medium">Save these recovery codes now.</p>
           <p className="text-muted-foreground">
             Each one signs you in once if you lose your phone. They are not shown again — GRID-X
@@ -106,7 +106,7 @@ export function TwoFactorSetup({ enabled }: { enabled: boolean }): React.JSX.Ele
     return (
       <div className="space-y-4">
         <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <ShieldCheck className="h-4 w-4 text-emerald-600" />
+          <ShieldCheck className="h-4 w-4 text-success" />
           Two-factor authentication is active on this account.
         </p>
         <AuthError message={error} />

@@ -11,6 +11,7 @@ import { NavIcon } from '@/components/app/nav-icon';
 import { NotificationBell } from '@/components/app/notification-bell';
 import { UserMenu } from '@/components/app/user-menu';
 import { WorkspaceSwitcher } from '@/components/app/workspace-switcher';
+import { LogoMark } from '@/components/brand';
 import { PageTransition } from '@/components/motion';
 import { Kbd } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -273,9 +274,9 @@ export function ControlShell({
             <div className="flex flex-col items-center gap-2 px-2 pb-3 pt-3">
               <Link
                 href="/app"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-control bg-gradient-to-br from-primary to-indigo-400 text-[11px] font-bold text-primary-foreground"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-[9px] bg-surface-elevated text-foreground shadow-[inset_0_0_0_1px_hsl(var(--border-strong))]"
               >
-                GX
+                <LogoMark className="h-[17px] w-[17px]" />
               </Link>
               <Tooltip>
                 <TooltipTrigger asChild>

@@ -51,7 +51,7 @@ export function OfflineBanner({ language }: { language: 'EN' | 'HI' }): React.JS
       : `${pending} update${pending === 1 ? '' : 's'} waiting to sync`;
 
   return (
-    <div className="flex items-center gap-3 border-b bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+    <div className="flex items-center gap-3 border-b border-warning/25 bg-warning/10 px-4 py-2 text-sm text-warning">
       {online ? <Wifi className="h-4 w-4 shrink-0" /> : <CloudOff className="h-4 w-4 shrink-0" />}
       <span className="flex-1">{online ? pendingText : offlineText}</span>
       {pending > 0 ? (

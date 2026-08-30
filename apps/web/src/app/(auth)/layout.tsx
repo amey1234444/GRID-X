@@ -30,11 +30,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }):
       <div className="relative hidden overflow-hidden border-l border-border-subtle bg-surface/60 lg:block">
         <div className="pointer-events-none absolute inset-0 grid-pattern radial-fade opacity-60" aria-hidden />
         <div
-          className="pointer-events-none absolute -right-32 top-1/3 h-[28rem] w-[28rem] rounded-full bg-primary/20 blur-3xl"
+          className="pointer-events-none absolute -right-32 top-1/3 h-[28rem] w-[28rem] rounded-full bg-foreground/[0.06] blur-3xl"
           aria-hidden
         />
         <div className="relative flex h-full flex-col justify-center gap-10 px-16">
-          <Quote className="h-8 w-8 text-primary" />
+          <Quote className="h-8 w-8 text-subtle" />
           <p className="text-balance text-2xl font-medium leading-relaxed">
             &ldquo;One job, one revision, one recorded decision. GRID-X replaced the phone calls,
             WhatsApp photos and follow-up spreadsheets with a single controlled flow.&rdquo;

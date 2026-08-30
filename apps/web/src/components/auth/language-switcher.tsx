@@ -24,7 +24,7 @@ export function LanguageSwitcher({ current }: { current: 'EN' | 'HI' }): React.J
     <form action={formAction} className="space-y-3">
       <AuthError message={state.error} />
       {state.success ? (
-        <p className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400">
+        <p className="flex items-center gap-2 text-sm text-success">
           <Check className="h-4 w-4" />
           {state.success}
         </p>

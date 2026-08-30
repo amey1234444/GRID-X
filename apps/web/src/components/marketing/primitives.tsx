@@ -70,7 +70,7 @@ export function StatementBand({
     >
       {/* Horizon arc — the only decorative flourish on the page. */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-1/2 h-[42rem] rounded-[100%] bg-gradient-to-b from-primary/25 via-transparent to-transparent blur-3xl"
+        className="pointer-events-none absolute inset-x-0 top-1/2 h-[42rem] rounded-[100%] bg-gradient-to-b from-foreground/[0.12] via-transparent to-transparent blur-3xl"
         aria-hidden
       />
       <div className="pointer-events-none absolute inset-0 grid-pattern radial-fade opacity-30" aria-hidden />

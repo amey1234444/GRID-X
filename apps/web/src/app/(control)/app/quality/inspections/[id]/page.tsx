@@ -9,6 +9,7 @@ import {
   saveInspectionResultsAction,
   startInspectionAction,
 } from '@/app/actions/control';
+import { ActivityTrail } from '@/components/app/activity-trail';
 import { ActionDialog } from '@/components/app/action-dialog';
 import { DataTable } from '@/components/app/data-table';
 import { DetailList } from '@/components/app/detail-list';
@@ -357,6 +358,8 @@ export default async function InspectionDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      <ActivityTrail entityType="Inspection" entityId={inspection.id} />
     </div>
   );
 }

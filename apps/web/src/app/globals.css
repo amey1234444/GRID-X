@@ -18,56 +18,62 @@
   :root,
   .dark {
     /* ---- Canvas & surfaces ------------------------------------------- */
-    --background: 240 8% 4%;
-    --foreground: 220 14% 96%;
+    --background: 0 0% 3.5%;
+    --foreground: 0 0% 97%;
 
-    --surface: 240 7% 6.5%;
-    --surface-elevated: 240 7% 9%;
-    --surface-hover: 240 6% 11.5%;
-    --surface-active: 240 6% 14%;
+    --surface: 0 0% 6%;
+    --surface-elevated: 0 0% 8.5%;
+    --surface-hover: 0 0% 11%;
+    --surface-active: 0 0% 14%;
 
-    --card: 240 7% 6.5%;
-    --card-foreground: 220 14% 96%;
-    --popover: 240 7% 8.5%;
-    --popover-foreground: 220 14% 96%;
+    --card: 0 0% 6%;
+    --card-foreground: 0 0% 97%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 0 0% 97%;
 
-    /* ---- Brand ------------------------------------------------------- */
-    --primary: 243 82% 67%;
-    --primary-hover: 243 82% 72%;
-    --primary-foreground: 240 30% 6%;
+    /* ---- Brand -------------------------------------------------------
+     * Monochrome: the primary action is white on black. Hue is reserved
+     * for status, never for chrome or branding.
+     */
+    --primary: 0 0% 97%;
+    --primary-hover: 0 0% 100%;
+    --primary-foreground: 0 0% 5%;
 
-    --secondary: 240 5% 11.5%;
-    --secondary-foreground: 220 14% 92%;
-    --muted: 240 5% 11.5%;
-    --muted-foreground: 220 8% 60%;
+    --secondary: 0 0% 11%;
+    --secondary-foreground: 0 0% 93%;
+    --muted: 0 0% 11%;
+    --muted-foreground: 0 0% 62%;
     /* Third text tier — captions, table meta, footer labels. */
-    --subtle-foreground: 220 7% 44%;
-    --accent: 243 45% 18%;
-    --accent-foreground: 243 90% 88%;
+    --subtle-foreground: 0 0% 45%;
+    --accent: 0 0% 14%;
+    --accent-foreground: 0 0% 97%;
 
-    /* ---- Semantic ---------------------------------------------------- */
-    --destructive: 0 72% 58%;
+    /* ---- Semantic ----------------------------------------------------
+     * Desaturated on purpose: readable against near-black without
+     * turning the product into a colour chart.
+     */
+    --destructive: 4 62% 54%;
     --destructive-foreground: 0 0% 100%;
-    --success: 152 55% 48%;
-    --success-foreground: 240 30% 6%;
-    --warning: 36 92% 58%;
-    --warning-foreground: 240 30% 6%;
-    --info: 205 90% 62%;
-    --info-foreground: 240 30% 6%;
+    --success: 152 38% 45%;
+    --success-foreground: 0 0% 5%;
+    --warning: 38 72% 55%;
+    --warning-foreground: 0 0% 5%;
+    --info: 208 40% 62%;
+    --info-foreground: 0 0% 5%;
 
     /* ---- Industrial machine / operational states --------------------- */
-    --state-operational: 152 55% 48%;
-    --state-warning: 36 92% 58%;
-    --state-critical: 0 72% 58%;
-    --state-offline: 220 8% 46%;
-    --state-maintenance: 205 90% 62%;
+    --state-operational: 152 38% 45%;
+    --state-warning: 38 72% 55%;
+    --state-critical: 4 62% 54%;
+    --state-offline: 0 0% 46%;
+    --state-maintenance: 208 40% 62%;
 
     /* ---- Lines ------------------------------------------------------- */
-    --border: 240 6% 15%;
-    --border-subtle: 240 6% 10.5%;
-    --border-strong: 240 6% 22%;
-    --input: 240 6% 16%;
-    --ring: 243 82% 67%;
+    --border: 0 0% 15%;
+    --border-subtle: 0 0% 10.5%;
+    --border-strong: 0 0% 24%;
+    --input: 0 0% 16%;
+    --ring: 0 0% 72%;
 
     /* ---- Radius hierarchy (restrained — no 24px everywhere) ---------- */
     --radius: 0.625rem; /* 10px — card default */
@@ -84,11 +90,15 @@
     --duration-slow: 320ms;
 
     /* ---- Charts ------------------------------------------------------ */
-    --chart-1: 243 82% 67%;
-    --chart-2: 172 60% 48%;
-    --chart-3: 36 92% 58%;
-    --chart-4: 205 90% 62%;
-    --chart-5: 320 65% 62%;
+    /* A greyscale ramp: categorical series stay neutral, and series that
+     * are read as good/bad use the semantic tokens directly. */
+    --chart-1: 0 0% 95%;
+    --chart-2: 0 0% 68%;
+    --chart-3: 0 0% 46%;
+    --chart-4: 0 0% 30%;
+    --chart-5: 0 0% 82%;
+    --chart-6: 0 0% 57%;
+    --chart-7: 0 0% 38%;
   }
 
   * {
@@ -107,7 +117,7 @@
   }
 
   ::selection {
-    @apply bg-primary/25;
+    @apply bg-foreground/20;
   }
 
   /* Numbers in tables/metrics must never jitter between renders. */
@@ -238,6 +248,6 @@
   }
 
   .text-gradient-primary {
-    @apply bg-gradient-to-r from-primary via-indigo-400 to-sky-400 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-white via-white to-white/55 bg-clip-text text-transparent;
   }
 }

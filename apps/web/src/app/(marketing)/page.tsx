@@ -215,7 +215,7 @@ export default function MarketingHomePage(): React.JSX.Element {
       <section className="relative overflow-hidden border-b border-border-subtle">
         <div className="pointer-events-none absolute inset-0 grid-pattern radial-fade opacity-40" aria-hidden />
         <div
-          className="pointer-events-none absolute -top-64 left-1/4 h-[36rem] w-[44rem] rounded-full bg-primary/10 blur-3xl"
+          className="pointer-events-none absolute -top-64 left-1/4 h-[36rem] w-[44rem] rounded-full bg-foreground/[0.055] blur-3xl"
           aria-hidden
         />
 
@@ -347,7 +347,7 @@ export default function MarketingHomePage(): React.JSX.Element {
                   <ul className="flex-1 space-y-2">
                     {persona.points.map((point) => (
                       <li key={point} className="flex items-start gap-2 text-[0.875rem] text-muted-foreground">
-                        <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-primary" aria-hidden />
+                        <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-muted-foreground" aria-hidden />
                         {point}
                       </li>
                     ))}
@@ -355,7 +355,7 @@ export default function MarketingHomePage(): React.JSX.Element {
 
                   <Link
                     href={persona.href}
-                    className="inline-flex items-center gap-1.5 text-[0.875rem] font-medium text-foreground underline-offset-4 transition-colors hover:text-primary hover:underline"
+                    className="inline-flex items-center gap-1.5 text-[0.875rem] font-medium text-foreground underline-offset-4 transition-colors hover:underline"
                   >
                     {persona.cta}
                     <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
@@ -374,7 +374,7 @@ export default function MarketingHomePage(): React.JSX.Element {
             <div className="relative overflow-hidden rounded-card bg-card px-6 py-16 text-center shadow-hairline sm:px-12">
               <div className="pointer-events-none absolute inset-0 grid-pattern opacity-25" aria-hidden />
               <div
-                className="pointer-events-none absolute left-1/2 top-0 h-56 w-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/15 blur-3xl"
+                className="pointer-events-none absolute left-1/2 top-0 h-56 w-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground/[0.07] blur-3xl"
                 aria-hidden
               />
               <div className="relative mx-auto flex max-w-2xl flex-col items-center gap-5">
