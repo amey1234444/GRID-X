@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import {
+  Activity,
   ArrowRight,
   BadgeCheck,
   FileLock2,
@@ -8,6 +9,7 @@ import {
   Layers,
   ScrollText,
   ShieldCheck,
+  Sparkles,
   WifiOff,
 } from 'lucide-react';
 
@@ -30,7 +32,10 @@ import { Button } from '@/components/ui/button';
 /* -------------------------------------------------------------------- */
 
 const outcomes = [
-  { value: '1 system', label: 'Replaces the calls, WhatsApp threads and spreadsheets between plants' },
+  {
+    value: '1 system',
+    label: 'Replaces the calls, WhatsApp threads and spreadsheets between plants',
+  },
   { value: '100%', label: 'Drawing access logged, revision-controlled and acknowledged' },
   { value: 'Zero', label: 'Payments released without an accepted quantity behind them' },
   { value: '7 KPIs', label: 'Scored on every partner, every period, automatically' },
@@ -155,7 +160,8 @@ const fieldReadiness = [
   {
     icon: <WifiOff />,
     title: 'Offline-tolerant',
-    detail: 'Jobs stay readable, milestones save locally and photos queue until the signal returns.',
+    detail:
+      'Jobs stay readable, milestones save locally and photos queue until the signal returns.',
   },
   {
     icon: <Gauge />,
@@ -183,7 +189,11 @@ const personas = [
   {
     title: 'GRID-X Control',
     audience: 'Operations, engineering, quality and finance',
-    points: ['Allocation and capacity boards', 'Drawing and revision control', 'Inspection and payment approvals'],
+    points: [
+      'Allocation and capacity boards',
+      'Drawing and revision control',
+      'Inspection and payment approvals',
+    ],
     href: '/login',
     cta: 'Sign in to Control',
     icon: Layers,
@@ -191,7 +201,11 @@ const personas = [
   {
     title: 'GRID-X Partner',
     audience: 'Mobile-first, for MSME partner units',
-    points: ['Accept jobs and read instructions', 'Update milestones offline', 'Raise invoices, track payment'],
+    points: [
+      'Accept jobs and read instructions',
+      'Update milestones offline',
+      'Raise invoices, track payment',
+    ],
     href: '/partner/login',
     cta: 'Open partner app',
     icon: Gauge,
@@ -199,7 +213,11 @@ const personas = [
   {
     title: 'GRID-X Inspector',
     audience: 'For quality inspectors on the move',
-    points: ['Queue with plans attached', 'Record measured characteristics', 'Raise rejections and rework'],
+    points: [
+      'Queue with plans attached',
+      'Record measured characteristics',
+      'Raise rejections and rework',
+    ],
     href: '/login',
     cta: 'Inspector sign in',
     icon: BadgeCheck,
@@ -211,35 +229,47 @@ const personas = [
 export default function MarketingHomePage(): React.JSX.Element {
   return (
     <>
-      {/* Hero — left-aligned. A centred hero is the default everyone ships. */}
+      {/* Hero — the product is visible in the first viewport, not buried below a pitch. */}
       <section className="relative overflow-hidden border-b border-border-subtle">
-        <div className="pointer-events-none absolute inset-0 grid-pattern radial-fade opacity-40" aria-hidden />
         <div
-          className="pointer-events-none absolute -top-64 left-1/4 h-[36rem] w-[44rem] rounded-full bg-foreground/[0.055] blur-3xl"
+          className="pointer-events-none absolute inset-0 dot-pattern radial-fade opacity-35"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -top-52 right-[8%] h-[34rem] w-[40rem] rounded-full bg-brand/[0.10] blur-3xl"
           aria-hidden
         />
 
-        <div className="container relative py-20 sm:py-28">
-          <div className="max-w-3xl">
+        <div className="container relative grid items-center gap-14 py-16 sm:py-20 lg:grid-cols-[0.84fr_1.16fr] lg:gap-10 lg:py-24 xl:gap-16">
+          <div className="max-w-2xl">
             <Reveal>
-              <Eyebrow>
-                <span className="mr-1.5 h-1.5 w-1.5 animate-pulse-dot rounded-full bg-success" aria-hidden />
-                Built for OSWAR&apos;s partner network
-              </Eyebrow>
+              <div className="flex flex-wrap items-center gap-2">
+                <Eyebrow>
+                  <span
+                    className="mr-1.5 h-1.5 w-1.5 animate-pulse-dot rounded-full bg-success"
+                    aria-hidden
+                  />
+                  GRID-X Control Network
+                </Eyebrow>
+                <span className="inline-flex items-center gap-1.5 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-subtle">
+                  <Sparkles className="h-3 w-3 text-brand" /> Built for OSWAR
+                </span>
+              </div>
             </Reveal>
 
             <Reveal delay={0.06}>
-              <h1 className="type-display mt-6 text-balance">
-                <span className="text-foreground">The operating system for</span>{' '}
-                <span className="text-subtle">distributed manufacturing.</span>
+              <h1 className="mt-6 text-balance text-[clamp(3rem,6vw,5.35rem)] font-semibold leading-[0.96] tracking-[-0.055em]">
+                <span className="text-foreground">Run every partner</span>{' '}
+                <span className="bg-gradient-to-r from-white/60 via-brand to-white/45 bg-clip-text text-transparent">
+                  like one factory.
+                </span>
               </h1>
             </Reveal>
 
             <Reveal delay={0.12}>
-              <p className="mt-6 max-w-2xl text-pretty text-[1.0625rem] leading-relaxed text-muted-foreground sm:text-[1.125rem]">
-                GRID-X turns a network of MSME partners into one controlled factory. Jobs go out on
-                the right revision, material is tracked to the kilogram, quality is verified before
-                acceptance, and payment is released only against accepted quantity.
+              <p className="mt-6 max-w-xl text-pretty text-[1rem] leading-relaxed text-muted-foreground sm:text-[1.0625rem]">
+                Plan jobs, lock drawing revisions, trace material, verify quality and release
+                payment from one auditable command center built for distributed manufacturing.
               </p>
             </Reveal>
 
@@ -247,20 +277,37 @@ export default function MarketingHomePage(): React.JSX.Element {
               <div className="mt-8 flex flex-col gap-2.5 sm:flex-row sm:items-center">
                 <Button size="lg" asChild>
                   <Link href="/login">
-                    Sign in to GRID-X <ArrowRight />
+                    Enter command center <ArrowRight />
                   </Link>
                 </Button>
                 <Button size="lg" variant="outline" asChild>
-                  <Link href="/platform">Explore the platform</Link>
+                  <Link href="/platform">See how it works</Link>
                 </Button>
-                <p className="mt-2 text-[0.8125rem] text-subtle sm:ml-3 sm:mt-0">
-                  Partner units sign in with a mobile number.
-                </p>
+              </div>
+            </Reveal>
+
+            <Reveal delay={0.23}>
+              <div className="mt-9 grid max-w-xl gap-3 border-t border-border-subtle pt-5 sm:grid-cols-3">
+                {[
+                  { icon: Activity, label: 'Live execution', detail: 'One network view' },
+                  { icon: FileLock2, label: 'Revision locked', detail: 'No wrong drawing' },
+                  { icon: ShieldCheck, label: 'Evidence first', detail: 'Audit by default' },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-start gap-2.5">
+                    <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-control bg-surface-elevated text-brand shadow-hairline">
+                      <item.icon className="h-3.5 w-3.5" />
+                    </span>
+                    <div>
+                      <p className="text-[0.75rem] font-medium">{item.label}</p>
+                      <p className="mt-0.5 text-[0.6875rem] text-subtle">{item.detail}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </Reveal>
           </div>
 
-          <Reveal delay={0.2} y={28} className="mt-16">
+          <Reveal delay={0.16} y={22} className="lg:-mr-24 xl:-mr-28">
             <AppPreview />
           </Reveal>
         </div>
@@ -274,8 +321,8 @@ export default function MarketingHomePage(): React.JSX.Element {
       </section>
 
       {/* The transaction, told as a scrolling flow. */}
-      <section className="border-b border-border-subtle py-24 sm:py-32">
-        <div className="container mb-16 max-w-2xl">
+      <section className="border-b border-border-subtle py-20 sm:py-28">
+        <div className="container mb-14 max-w-3xl">
           <Reveal>
             <Eyebrow>The central transaction</Eyebrow>
             <Statement
@@ -340,14 +387,22 @@ export default function MarketingHomePage(): React.JSX.Element {
                   </span>
 
                   <div>
-                    <h3 className="text-[1.0625rem] font-medium tracking-[-0.01em]">{persona.title}</h3>
+                    <h3 className="text-[1.0625rem] font-medium tracking-[-0.01em]">
+                      {persona.title}
+                    </h3>
                     <p className="mt-0.5 text-[0.8125rem] text-subtle">{persona.audience}</p>
                   </div>
 
                   <ul className="flex-1 space-y-2">
                     {persona.points.map((point) => (
-                      <li key={point} className="flex items-start gap-2 text-[0.875rem] text-muted-foreground">
-                        <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-muted-foreground" aria-hidden />
+                      <li
+                        key={point}
+                        className="flex items-start gap-2 text-[0.875rem] text-muted-foreground"
+                      >
+                        <span
+                          className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-muted-foreground"
+                          aria-hidden
+                        />
                         {point}
                       </li>
                     ))}
@@ -372,7 +427,10 @@ export default function MarketingHomePage(): React.JSX.Element {
         <div className="container">
           <Reveal y={20}>
             <div className="relative overflow-hidden rounded-card bg-card px-6 py-16 text-center shadow-hairline sm:px-12">
-              <div className="pointer-events-none absolute inset-0 grid-pattern opacity-25" aria-hidden />
+              <div
+                className="pointer-events-none absolute inset-0 grid-pattern opacity-25"
+                aria-hidden
+              />
               <div
                 className="pointer-events-none absolute left-1/2 top-0 h-56 w-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground/[0.07] blur-3xl"
                 aria-hidden

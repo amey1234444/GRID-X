@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { CONTROL_NAVIGATION, type AuthUser, type NavSection } from '@gridx/shared';
-import { ChevronRight, Menu, PanelLeftClose, Search, X } from 'lucide-react';
+import { Activity, ChevronRight, Menu, PanelLeftClose, Search, X } from 'lucide-react';
 
 import { CommandPalette, useCommandPalette } from '@/components/app/command-palette';
 import { NavIcon } from '@/components/app/nav-icon';
@@ -108,14 +108,14 @@ function SidebarSection({
         )}
       >
         {active ? (
-          <span
-            className="absolute inset-y-1 left-0 w-[2px] rounded-full bg-primary"
-            aria-hidden
-          />
+          <span className="absolute inset-y-1 left-0 w-[2px] rounded-full bg-primary" aria-hidden />
         ) : null}
         <NavIcon
           name={section.icon}
-          className={cn('h-4 w-4 shrink-0 transition-opacity', active ? 'opacity-100' : 'opacity-60')}
+          className={cn(
+            'h-4 w-4 shrink-0 transition-opacity',
+            active ? 'opacity-100' : 'opacity-60',
+          )}
         />
         <span className="truncate">{section.label}</span>
       </Link>
@@ -258,7 +258,7 @@ export function ControlShell({
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="app-canvas min-h-screen bg-background">
       <CommandPalette user={user} open={paletteOpen} onOpenChange={setPaletteOpen} />
 
       {/* Desktop sidebar --------------------------------------------------- */}
@@ -340,7 +340,10 @@ export function ControlShell({
                 aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               >
                 <PanelLeftClose
-                  className={cn('h-4 w-4 shrink-0 transition-transform duration-300', collapsed && 'rotate-180')}
+                  className={cn(
+                    'h-4 w-4 shrink-0 transition-transform duration-300',
+                    collapsed && 'rotate-180',
+                  )}
                 />
                 {collapsed ? null : <span>Collapse</span>}
               </button>
@@ -351,7 +354,12 @@ export function ControlShell({
       </aside>
 
       {/* Main column ------------------------------------------------------- */}
-      <div className={cn('transition-[padding] duration-300 ease-out-expo', collapsed ? 'lg:pl-[68px]' : 'lg:pl-[248px]')}>
+      <div
+        className={cn(
+          'transition-[padding] duration-300 ease-out-expo',
+          collapsed ? 'lg:pl-[68px]' : 'lg:pl-[248px]',
+        )}
+      >
         <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border-subtle glass px-3 sm:px-5">
           <button
             type="button"
@@ -392,6 +400,15 @@ export function ControlShell({
           </nav>
 
           <div className="flex-1" />
+
+          <div className="hidden items-center gap-2 rounded-control bg-surface-elevated px-2.5 py-1.5 text-[0.6875rem] text-muted-foreground shadow-hairline sm:flex">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-45" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
+            </span>
+            <Activity className="h-3 w-3 text-brand" />
+            Control network online
+          </div>
 
           <button
             type="button"

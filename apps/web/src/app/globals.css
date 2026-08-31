@@ -39,6 +39,12 @@
     --primary-hover: 0 0% 100%;
     --primary-foreground: 0 0% 5%;
 
+    /* Brand signal. GRID-X stays black-first; this cool violet is used only
+     * for focus, live data and depth so operational status colours retain
+     * their meaning. */
+    --brand: 252 92% 72%;
+    --brand-foreground: 250 35% 8%;
+
     --secondary: 0 0% 11%;
     --secondary-foreground: 0 0% 93%;
     --muted: 0 0% 11%;
@@ -214,10 +220,23 @@
   }
 
   .grid-pattern {
-    background-image:
-      linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px),
+    background-image: linear-gradient(to right, hsl(var(--border) / 0.5) 1px, transparent 1px),
       linear-gradient(to bottom, hsl(var(--border) / 0.5) 1px, transparent 1px);
     background-size: 56px 56px;
+  }
+
+  .dot-pattern {
+    background-image: radial-gradient(hsl(var(--border-strong) / 0.42) 0.75px, transparent 0.75px);
+    background-size: 18px 18px;
+  }
+
+  .app-canvas {
+    background-image: radial-gradient(
+        circle at 78% -10%,
+        hsl(var(--brand) / 0.075),
+        transparent 30rem
+      ),
+      linear-gradient(to bottom, transparent, hsl(var(--background)) 38rem);
   }
 
   .radial-fade {

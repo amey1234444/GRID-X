@@ -67,7 +67,11 @@ export function InsightBanner({
   aside?: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <section className="relative overflow-hidden rounded-card bg-card p-5 shadow-hairline sm:p-6">
+    <section className="relative flex h-full min-h-[238px] overflow-hidden rounded-card bg-card p-5 shadow-hairline surface-sheen sm:p-6">
+      <div
+        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/70 to-transparent"
+        aria-hidden
+      />
       {/* Directional wash — signals tone without tinting the text. */}
       <div
         className={cn(
@@ -76,9 +80,12 @@ export function InsightBanner({
         )}
         aria-hidden
       />
-      <div className="pointer-events-none absolute inset-0 grid-pattern opacity-[0.25]" aria-hidden />
+      <div
+        className="pointer-events-none absolute inset-0 grid-pattern opacity-[0.25]"
+        aria-hidden
+      />
 
-      <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+      <div className="relative flex w-full flex-col justify-between gap-5 lg:flex-row lg:items-center">
         <div className="flex min-w-0 items-start gap-4">
           {icon ? (
             <span
@@ -94,7 +101,12 @@ export function InsightBanner({
 
           <div className="min-w-0 space-y-1.5">
             <p className="type-label">{eyebrow}</p>
-            <h2 className={cn('text-[1.375rem] font-semibold leading-tight tracking-[-0.02em]', TONE_TEXT[tone])}>
+            <h2
+              className={cn(
+                'text-[1.375rem] font-semibold leading-tight tracking-[-0.02em]',
+                TONE_TEXT[tone],
+              )}
+            >
               {headline}
             </h2>
             {detail ? <p className="type-small max-w-xl text-muted-foreground">{detail}</p> : null}
@@ -212,7 +224,12 @@ export function Panel({
   bodyClassName?: string;
 }): React.JSX.Element {
   return (
-    <section className={cn('flex flex-col overflow-hidden rounded-card bg-card shadow-hairline', className)}>
+    <section
+      className={cn(
+        'flex flex-col overflow-hidden rounded-card bg-card shadow-hairline',
+        className,
+      )}
+    >
       <header className="flex items-start justify-between gap-3 px-4 pb-3 pt-4">
         <div className="flex min-w-0 items-center gap-2">
           {Icon ? <Icon className="h-4 w-4 shrink-0 text-subtle" /> : null}

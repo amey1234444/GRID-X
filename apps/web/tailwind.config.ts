@@ -32,6 +32,10 @@ const config: Config = {
           hover: 'hsl(var(--primary-hover))',
           foreground: 'hsl(var(--primary-foreground))',
         },
+        brand: {
+          DEFAULT: 'hsl(var(--brand))',
+          foreground: 'hsl(var(--brand-foreground))',
+        },
         secondary: {
           DEFAULT: 'hsl(var(--secondary))',
           foreground: 'hsl(var(--secondary-foreground))',
@@ -106,6 +110,7 @@ const config: Config = {
         subtle: '0 1px 2px 0 rgb(0 0 0 / 0.3), 0 0 0 1px hsl(240 6% 15.5% / 0.5)',
         elevated: '0 16px 40px -16px rgb(0 0 0 / 0.6), 0 0 0 1px hsl(240 6% 17% / 0.7)',
         glow: '0 0 0 1px rgb(255 255 255 / 0.06), 0 24px 64px -24px rgb(99 91 255 / 0.35)',
+        product: '0 40px 100px -32px hsl(252 92% 60% / 0.32), 0 18px 50px -28px rgb(0 0 0 / 0.95)',
       },
       transitionTimingFunction: {
         'out-expo': 'cubic-bezier(0.16, 1, 0.3, 1)',

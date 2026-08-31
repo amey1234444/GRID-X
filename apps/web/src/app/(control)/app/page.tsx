@@ -6,10 +6,29 @@ import type {
   OperationsDashboard,
   QualityDashboard,
 } from '@gridx/shared';
-import { AlertTriangle, CheckCircle2, Clock, PackageCheck, ShieldCheck, TrendingUp, Wallet } from 'lucide-react';
+import {
+  Activity,
+  AlertTriangle,
+  Boxes,
+  CheckCircle2,
+  Clock,
+  Factory,
+  Gauge,
+  PackageCheck,
+  ShieldCheck,
+  TrendingUp,
+  Users,
+  Wallet,
+} from 'lucide-react';
 
 import { CategoryBarChart, DistributionPieChart, TrendAreaChart } from '@/components/app/charts';
-import { InsightBanner, MetricItem, MetricStrip, Panel, PanelEmpty } from '@/components/app/dashboard';
+import {
+  InsightBanner,
+  MetricItem,
+  MetricStrip,
+  Panel,
+  PanelEmpty,
+} from '@/components/app/dashboard';
 import { DataTable, type Column } from '@/components/app/data-table';
 import { PageHeader } from '@/components/app/page-header';
 import { StatusBadge } from '@/components/app/status-badge';
@@ -83,7 +102,11 @@ const jobColumns: Column<JobSummary>[] = [
       </span>
     ),
   },
-  { key: 'partner', header: 'Partner', render: (job) => job.partnerName ?? <span className="text-subtle">Unallocated</span> },
+  {
+    key: 'partner',
+    header: 'Partner',
+    render: (job) => job.partnerName ?? <span className="text-subtle">Unallocated</span>,
+  },
   { key: 'quantity', header: 'Qty', align: 'right', render: (job) => formatNumber(job.quantity) },
   { key: 'status', header: 'Status', render: (job) => <StatusBadge status={job.status} /> },
   { key: 'due', header: 'Due', render: (job) => relativeDays(job.dueDate) },
@@ -105,7 +128,9 @@ function JobQueue({
     <Panel
       title={title}
       description={description}
-      action={jobs.length > 6 ? { label: `All ${jobs.length}`, href: '/app/production/jobs' } : undefined}
+      action={
+        jobs.length > 6 ? { label: `All ${jobs.length}`, href: '/app/production/jobs' } : undefined
+      }
       bodyClassName="px-0 pb-0"
     >
       <DataTable
@@ -193,27 +218,113 @@ export default async function ControlDashboardPage(): Promise<React.JSX.Element>
         }
       />
 
-      {/* 1 — the single thing that decides whether you keep reading. */}
-      <InsightBanner
-        {...insight}
-        aside={
-          <div className="flex items-center gap-6 sm:gap-8">
-            <div>
-              <p className="type-label">Acceptance</p>
-              <p className="type-metric mt-1.5 text-success" data-numeric>
-                {formatPercent(management.qualityAcceptanceRate)}
-              </p>
+      {/* 1 — command view: the exception, network pulse and immediate actions. */}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(310px,0.65fr)]">
+        <InsightBanner
+          {...insight}
+          aside={
+            <div className="flex items-center gap-6 sm:gap-8">
+              <div>
+                <p className="type-label">Acceptance</p>
+                <p className="type-metric mt-1.5 text-success" data-numeric>
+                  {formatPercent(management.qualityAcceptanceRate)}
+                </p>
+              </div>
+              <div className="h-10 w-px bg-border-subtle" aria-hidden />
+              <div>
+                <p className="type-label">On-time</p>
+                <p className="type-metric mt-1.5" data-numeric>
+                  {formatPercent(management.onTimeDeliveryRate)}
+                </p>
+              </div>
             </div>
-            <div className="h-10 w-px bg-border-subtle" aria-hidden />
+          }
+        />
+
+        <section className="relative overflow-hidden rounded-card bg-card p-4 shadow-hairline surface-sheen">
+          <div
+            className="pointer-events-none absolute -right-16 -top-20 h-40 w-40 rounded-full bg-brand/[0.10] blur-3xl"
+            aria-hidden
+          />
+          <header className="relative flex items-start justify-between gap-3">
             <div>
-              <p className="type-label">On-time</p>
-              <p className="type-metric mt-1.5" data-numeric>
-                {formatPercent(management.onTimeDeliveryRate)}
-              </p>
+              <div className="flex items-center gap-1.5">
+                <Activity className="h-3.5 w-3.5 text-brand" />
+                <h2 className="type-card-title">Network pulse</h2>
+              </div>
+              <p className="mt-1 text-[0.75rem] text-subtle">Current execution readiness</p>
+            </div>
+            <span className="inline-flex items-center gap-1.5 rounded-control bg-success/10 px-2 py-1 text-[0.6875rem] font-medium text-success">
+              <span className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-success" /> Live
+            </span>
+          </header>
+
+          <div className="relative mt-4 flex items-center gap-4">
+            <div
+              className="relative grid h-[82px] w-[82px] shrink-0 place-items-center rounded-full"
+              style={{
+                background: `conic-gradient(hsl(var(--brand)) ${Math.max(0, Math.min(100, management.capacityUtilisationPercent))}%, hsl(var(--surface-active)) 0)`,
+              }}
+            >
+              <div className="grid h-[68px] w-[68px] place-items-center rounded-full bg-card text-center">
+                <div>
+                  <p className="text-lg font-semibold leading-none tracking-[-0.04em]" data-numeric>
+                    {formatPercent(management.capacityUtilisationPercent)}
+                  </p>
+                  <p className="mt-1 text-[0.5625rem] uppercase tracking-[0.08em] text-subtle">
+                    Capacity
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="min-w-0 flex-1 space-y-2.5">
+              {[
+                {
+                  label: 'Partner coverage',
+                  value: `${formatNumber(management.activePartners)} active`,
+                  tone: 'bg-success',
+                },
+                {
+                  label: 'Jobs at risk',
+                  value: formatNumber(management.jobsAtRisk),
+                  tone: management.jobsAtRisk > 0 ? 'bg-warning' : 'bg-success',
+                },
+                {
+                  label: 'Inspection queue',
+                  value: formatNumber(operations.awaitingInspection.length),
+                  tone: 'bg-brand',
+                },
+              ].map((item) => (
+                <div key={item.label} className="flex items-center gap-2 text-[0.75rem]">
+                  <span className={`h-1.5 w-1.5 rounded-full ${item.tone}`} />
+                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                    {item.label}
+                  </span>
+                  <span className="shrink-0 font-medium tabular-nums">{item.value}</span>
+                </div>
+              ))}
             </div>
           </div>
-        }
-      />
+
+          <div className="relative mt-4 grid grid-cols-2 gap-1.5 border-t border-border-subtle pt-3">
+            {[
+              { label: 'Production', href: '/app/production/jobs', icon: Factory },
+              { label: 'Partners', href: '/app/partners', icon: Users },
+              { label: 'Material', href: '/app/materials/issues', icon: Boxes },
+              { label: 'Capacity', href: '/app/production/capacity', icon: Gauge },
+            ].map((action) => (
+              <Link
+                key={action.label}
+                href={action.href}
+                className="group flex items-center gap-2 rounded-input bg-surface-elevated px-2.5 py-2 text-[0.75rem] text-muted-foreground shadow-hairline transition-colors hover:bg-surface-hover hover:text-foreground"
+              >
+                <action.icon className="h-3.5 w-3.5 text-subtle transition-colors group-hover:text-brand" />
+                {action.label}
+              </Link>
+            ))}
+          </div>
+        </section>
+      </div>
 
       {/* 2 — supporting figures, dense and unboxed. */}
       <MetricStrip>
@@ -326,7 +437,12 @@ export default async function ControlDashboardPage(): Promise<React.JSX.Element>
               density="compact"
               columns={[
                 { key: 'partner', header: 'Partner', render: (row) => row.businessName },
-                { key: 'openJobs', header: 'Open jobs', align: 'right', render: (row) => formatNumber(row.openJobs) },
+                {
+                  key: 'openJobs',
+                  header: 'Open jobs',
+                  align: 'right',
+                  render: (row) => formatNumber(row.openJobs),
+                },
                 {
                   key: 'committed',
                   header: 'Committed hrs',
@@ -372,11 +488,18 @@ export default async function ControlDashboardPage(): Promise<React.JSX.Element>
               value={formatNumber(quality.openCorrectiveActions)}
               href="/app/quality/corrective-actions"
             />
-            <MetricItem label="Inspectors engaged" value={formatNumber(quality.inspectionWorkload.length)} />
+            <MetricItem
+              label="Inspectors engaged"
+              value={formatNumber(quality.inspectionWorkload.length)}
+            />
           </MetricStrip>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <Panel title="Rework ageing" description="How long rework has been open." icon={AlertTriangle}>
+            <Panel
+              title="Rework ageing"
+              description="How long rework has been open."
+              icon={AlertTriangle}
+            >
               {quality.reworkAgeingDays.length > 0 ? (
                 <CategoryBarChart
                   data={quality.reworkAgeingDays}
@@ -399,8 +522,18 @@ export default async function ControlDashboardPage(): Promise<React.JSX.Element>
                 density="compact"
                 columns={[
                   { key: 'defect', header: 'Defect', render: (row) => humanise(row.defectType) },
-                  { key: 'count', header: 'Occurrences', align: 'right', render: (row) => formatNumber(row.count) },
-                  { key: 'partners', header: 'Partners', align: 'right', render: (row) => formatNumber(row.partners) },
+                  {
+                    key: 'count',
+                    header: 'Occurrences',
+                    align: 'right',
+                    render: (row) => formatNumber(row.count),
+                  },
+                  {
+                    key: 'partners',
+                    header: 'Partners',
+                    align: 'right',
+                    render: (row) => formatNumber(row.partners),
+                  },
                 ]}
                 rows={quality.repeatDefects}
                 empty={{ title: 'No repeat defects recorded' }}
@@ -432,7 +565,11 @@ export default async function ControlDashboardPage(): Promise<React.JSX.Element>
           </MetricStrip>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <Panel title="Invoice ageing" description="Value awaiting approval or payment." icon={Wallet}>
+            <Panel
+              title="Invoice ageing"
+              description="Value awaiting approval or payment."
+              icon={Wallet}
+            >
               {finance.invoiceAgeing.length > 0 ? (
                 <CategoryBarChart
                   data={finance.invoiceAgeing}
@@ -446,7 +583,11 @@ export default async function ControlDashboardPage(): Promise<React.JSX.Element>
               )}
             </Panel>
 
-            <Panel title="Partner outstanding" description="Amounts payable by partner." bodyClassName="px-0 pb-0">
+            <Panel
+              title="Partner outstanding"
+              description="Amounts payable by partner."
+              bodyClassName="px-0 pb-0"
+            >
               <DataTable
                 density="compact"
                 columns={[
@@ -481,7 +622,12 @@ export default async function ControlDashboardPage(): Promise<React.JSX.Element>
                   { key: 'partner', header: 'Partner', render: (row) => row.businessName },
                   { key: 'city', header: 'City', render: (row) => row.city },
                   { key: 'category', header: 'Category', render: (row) => row.category },
-                  { key: 'score', header: 'Score', align: 'right', render: (row) => formatNumber(row.score, 1) },
+                  {
+                    key: 'score',
+                    header: 'Score',
+                    align: 'right',
+                    render: (row) => formatNumber(row.score, 1),
+                  },
                 ]}
                 rows={management.topPartners}
                 rowHref={(row) => `/app/partners/${row.partnerId}`}
@@ -503,7 +649,12 @@ export default async function ControlDashboardPage(): Promise<React.JSX.Element>
                   { key: 'partner', header: 'Partner', render: (row) => row.businessName },
                   { key: 'city', header: 'City', render: (row) => row.city },
                   { key: 'category', header: 'Category', render: (row) => row.category },
-                  { key: 'score', header: 'Score', align: 'right', render: (row) => formatNumber(row.score, 1) },
+                  {
+                    key: 'score',
+                    header: 'Score',
+                    align: 'right',
+                    render: (row) => formatNumber(row.score, 1),
+                  },
                 ]}
                 rows={management.bottomPartners}
                 rowHref={(row) => `/app/partners/${row.partnerId}`}

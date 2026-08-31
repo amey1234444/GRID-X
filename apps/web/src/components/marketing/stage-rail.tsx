@@ -64,7 +64,7 @@ export function StageRail({ stages }: { stages: Stage[] }): React.JSX.Element {
         )}
       >
         <ul className="flex gap-2 lg:flex-col lg:gap-0">
-          {stages.map((stage) => {
+          {stages.map((stage, index) => {
             const isActive = stage.id === active;
             return (
               <li key={stage.id} className="shrink-0 lg:shrink">
@@ -87,6 +87,7 @@ export function StageRail({ stages }: { stages: Stage[] }): React.JSX.Element {
                     )}
                     aria-hidden
                   />
+                  <span className="mr-2 font-mono text-[0.6875rem] text-subtle">0{index + 1}</span>
                   {stage.label}
                 </button>
               </li>
@@ -95,8 +96,8 @@ export function StageRail({ stages }: { stages: Stage[] }): React.JSX.Element {
         </ul>
       </nav>
 
-      <div className="min-w-0 space-y-24 lg:space-y-32">
-        {stages.map((stage) => (
+      <div className="min-w-0 space-y-16 lg:space-y-24">
+        {stages.map((stage, index) => (
           <section
             key={stage.id}
             data-stage={stage.id}
@@ -104,16 +105,21 @@ export function StageRail({ stages }: { stages: Stage[] }): React.JSX.Element {
               if (node) sectionRefs.current.set(stage.id, node);
               else sectionRefs.current.delete(stage.id);
             }}
-            className="scroll-mt-28 space-y-8"
+            className="relative scroll-mt-28 space-y-7 rounded-card border border-border-subtle bg-surface/35 p-5 sm:p-7 lg:p-9"
           >
-            <h3 className="type-hero text-balance max-w-2xl">
-              <span className="text-foreground">{stage.lead}</span>{' '}
-              <span className="text-subtle">{stage.trail}</span>
-            </h3>
+            <div className="flex items-start gap-4 sm:gap-6">
+              <span className="mt-1 font-mono text-[0.75rem] font-medium text-brand">
+                0{index + 1}
+              </span>
+              <h3 className="max-w-2xl text-balance text-[clamp(1.65rem,3.2vw,2.6rem)] font-semibold leading-[1.08] tracking-[-0.035em]">
+                <span className="text-foreground">{stage.lead}</span>{' '}
+                <span className="text-subtle">{stage.trail}</span>
+              </h3>
+            </div>
 
-            <div className="grid gap-px overflow-hidden rounded-card bg-border-subtle sm:grid-cols-2">
+            <div className="grid gap-px overflow-hidden rounded-input bg-border-subtle sm:grid-cols-2">
               {stage.panels.map((panel) => (
-                <article key={panel.title} className="bg-background p-5 sm:p-6">
+                <article key={panel.title} className="bg-background/80 p-5 sm:p-6">
                   <h4 className="type-card-title text-[0.9375rem]">{panel.title}</h4>
                   <p className="mt-1.5 text-[0.875rem] leading-relaxed text-muted-foreground">
                     {panel.detail}
