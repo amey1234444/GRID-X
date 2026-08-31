@@ -3,13 +3,13 @@ import {
   Activity,
   ArrowRight,
   BadgeCheck,
+  CircuitBoard,
   FileLock2,
   Gauge,
   Languages,
   Layers,
   ScrollText,
   ShieldCheck,
-  Sparkles,
   WifiOff,
 } from 'lucide-react';
 
@@ -229,86 +229,92 @@ const personas = [
 export default function MarketingHomePage(): React.JSX.Element {
   return (
     <>
-      {/* Hero — the product is visible in the first viewport, not buried below a pitch. */}
       <section className="relative overflow-hidden border-b border-border-subtle">
         <div
-          className="pointer-events-none absolute inset-0 dot-pattern radial-fade opacity-35"
+          className="pointer-events-none absolute inset-0 grid-pattern radial-fade opacity-30"
           aria-hidden
         />
         <div
-          className="pointer-events-none absolute -top-52 right-[8%] h-[34rem] w-[40rem] rounded-full bg-brand/[0.10] blur-3xl"
+          className="pointer-events-none absolute -top-80 left-1/2 h-[38rem] w-[60rem] -translate-x-1/2 rounded-full bg-brand/[0.065] blur-3xl"
           aria-hidden
         />
 
-        <div className="container relative grid items-center gap-14 py-16 sm:py-20 lg:grid-cols-[0.84fr_1.16fr] lg:gap-10 lg:py-24 xl:gap-16">
-          <div className="max-w-2xl">
-            <Reveal>
-              <div className="flex flex-wrap items-center gap-2">
-                <Eyebrow>
-                  <span
-                    className="mr-1.5 h-1.5 w-1.5 animate-pulse-dot rounded-full bg-success"
-                    aria-hidden
-                  />
-                  GRID-X Control Network
-                </Eyebrow>
-                <span className="inline-flex items-center gap-1.5 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-subtle">
-                  <Sparkles className="h-3 w-3 text-brand" /> Built for OSWAR
-                </span>
-              </div>
-            </Reveal>
+        <div className="container relative pb-12 pt-14 sm:pb-16 sm:pt-20 lg:pt-24">
+          <Reveal>
+            <div className="flex items-center justify-between gap-6 border-y border-border-subtle py-3">
+              <Eyebrow className="border-0 bg-transparent px-0 shadow-none">
+                <span
+                  className="mr-1.5 h-1.5 w-1.5 animate-pulse-dot rounded-full bg-success"
+                  aria-hidden
+                />
+                OSWAR distributed manufacturing network
+              </Eyebrow>
+              <span className="hidden items-center gap-2 font-mono text-[0.625rem] uppercase tracking-[0.12em] text-subtle sm:inline-flex">
+                <CircuitBoard className="h-3.5 w-3.5 text-brand" /> System / GRID-X 2.0
+              </span>
+            </div>
+          </Reveal>
 
-            <Reveal delay={0.06}>
-              <h1 className="mt-6 text-balance text-[clamp(3rem,6vw,5.35rem)] font-semibold leading-[0.96] tracking-[-0.055em]">
-                <span className="text-foreground">Run every partner</span>{' '}
-                <span className="bg-gradient-to-r from-white/60 via-brand to-white/45 bg-clip-text text-transparent">
-                  like one factory.
-                </span>
+          <div className="grid gap-8 py-12 sm:py-16 lg:grid-cols-[1.25fr_0.75fr] lg:items-end lg:gap-20">
+            <Reveal delay={0.05}>
+              <h1 className="max-w-4xl text-balance font-display text-[clamp(3.35rem,7.5vw,7rem)] font-medium leading-[0.88] tracking-[-0.065em]">
+                One factory.
+                <br />
+                <span className="text-muted-foreground">Every partner.</span>
               </h1>
             </Reveal>
 
-            <Reveal delay={0.12}>
-              <p className="mt-6 max-w-xl text-pretty text-[1rem] leading-relaxed text-muted-foreground sm:text-[1.0625rem]">
-                Plan jobs, lock drawing revisions, trace material, verify quality and release
-                payment from one auditable command center built for distributed manufacturing.
-              </p>
-            </Reveal>
-
-            <Reveal delay={0.18}>
-              <div className="mt-8 flex flex-col gap-2.5 sm:flex-row sm:items-center">
-                <Button size="lg" asChild>
-                  <Link href="/login">
-                    Enter command center <ArrowRight />
-                  </Link>
-                </Button>
-                <Button size="lg" variant="outline" asChild>
-                  <Link href="/platform">See how it works</Link>
-                </Button>
-              </div>
-            </Reveal>
-
-            <Reveal delay={0.23}>
-              <div className="mt-9 grid max-w-xl gap-3 border-t border-border-subtle pt-5 sm:grid-cols-3">
-                {[
-                  { icon: Activity, label: 'Live execution', detail: 'One network view' },
-                  { icon: FileLock2, label: 'Revision locked', detail: 'No wrong drawing' },
-                  { icon: ShieldCheck, label: 'Evidence first', detail: 'Audit by default' },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-start gap-2.5">
-                    <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-control bg-surface-elevated text-brand shadow-hairline">
-                      <item.icon className="h-3.5 w-3.5" />
-                    </span>
-                    <div>
-                      <p className="text-[0.75rem] font-medium">{item.label}</p>
-                      <p className="mt-0.5 text-[0.6875rem] text-subtle">{item.detail}</p>
-                    </div>
-                  </div>
-                ))}
+            <Reveal delay={0.11}>
+              <div className="border-l border-brand/45 pl-5 sm:pl-7">
+                <p className="max-w-lg text-pretty text-[1rem] leading-7 text-muted-foreground sm:text-[1.0625rem]">
+                  Plan jobs, lock drawing revisions, trace material, verify quality and release
+                  payment from one auditable command center.
+                </p>
+                <div className="mt-7 flex flex-col gap-2.5 sm:flex-row">
+                  <Button size="lg" asChild>
+                    <Link href="/login">
+                      Enter command center <ArrowRight />
+                    </Link>
+                  </Button>
+                  <Button size="lg" variant="outline" asChild>
+                    <Link href="/platform">Explore the platform</Link>
+                  </Button>
+                </div>
               </div>
             </Reveal>
           </div>
 
-          <Reveal delay={0.16} y={22} className="lg:-mr-24 xl:-mr-28">
+          <Reveal delay={0.16} y={22}>
             <AppPreview />
+          </Reveal>
+
+          <Reveal delay={0.21}>
+            <div className="mt-7 grid gap-px overflow-hidden border border-border-subtle bg-border-subtle sm:grid-cols-3">
+              {[
+                { icon: Activity, label: 'Live execution', detail: 'One view across the network' },
+                {
+                  icon: FileLock2,
+                  label: 'Revision locked',
+                  detail: 'Only released drawings travel',
+                },
+                {
+                  icon: ShieldCheck,
+                  label: 'Evidence first',
+                  detail: 'Every decision is auditable',
+                },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="flex items-center gap-3 bg-background px-4 py-4 sm:px-5"
+                >
+                  <item.icon className="h-4 w-4 shrink-0 text-brand" />
+                  <div>
+                    <p className="text-[0.75rem] font-semibold">{item.label}</p>
+                    <p className="mt-0.5 text-[0.6875rem] text-subtle">{item.detail}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </Reveal>
         </div>
       </section>
@@ -378,16 +384,16 @@ export default function MarketingHomePage(): React.JSX.Element {
             />
           </Reveal>
 
-          <StaggerGroup className="grid gap-px overflow-hidden rounded-card bg-border-subtle lg:grid-cols-3">
+          <StaggerGroup className="grid gap-px overflow-hidden border border-border-subtle bg-border-subtle lg:grid-cols-3">
             {personas.map((persona) => (
               <StaggerItem key={persona.title} className="h-full">
                 <article className="group flex h-full flex-col gap-4 bg-background p-6 transition-colors duration-200 hover:bg-card">
-                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-input bg-surface-elevated text-muted-foreground shadow-hairline transition-colors duration-200 group-hover:text-foreground">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-control border border-border-strong bg-surface-elevated text-brand transition-colors duration-200 group-hover:border-brand/45">
                     <persona.icon className="h-[18px] w-[18px]" />
                   </span>
 
                   <div>
-                    <h3 className="text-[1.0625rem] font-medium tracking-[-0.01em]">
+                    <h3 className="font-display text-[1.125rem] font-medium tracking-[-0.025em]">
                       {persona.title}
                     </h3>
                     <p className="mt-0.5 text-[0.8125rem] text-subtle">{persona.audience}</p>
@@ -410,7 +416,7 @@ export default function MarketingHomePage(): React.JSX.Element {
 
                   <Link
                     href={persona.href}
-                    className="inline-flex items-center gap-1.5 text-[0.875rem] font-medium text-foreground underline-offset-4 transition-colors hover:underline"
+                    className="inline-flex items-center gap-1.5 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.06em] text-brand transition-colors hover:text-foreground"
                   >
                     {persona.cta}
                     <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
@@ -426,7 +432,7 @@ export default function MarketingHomePage(): React.JSX.Element {
       <section className="py-24 sm:py-28">
         <div className="container">
           <Reveal y={20}>
-            <div className="relative overflow-hidden rounded-card bg-card px-6 py-16 text-center shadow-hairline sm:px-12">
+            <div className="relative overflow-hidden border border-border-strong bg-card px-6 py-16 text-center shadow-hairline sm:px-12">
               <div
                 className="pointer-events-none absolute inset-0 grid-pattern opacity-25"
                 aria-hidden

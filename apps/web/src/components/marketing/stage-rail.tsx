@@ -73,7 +73,7 @@ export function StageRail({ stages }: { stages: Stage[] }): React.JSX.Element {
                   onClick={() => scrollTo(stage.id)}
                   aria-current={isActive ? 'true' : undefined}
                   className={cn(
-                    'relative w-full whitespace-nowrap rounded-input px-3 py-2 text-left',
+                    'relative w-full whitespace-nowrap rounded-control px-3 py-2.5 text-left',
                     'text-[0.9375rem] leading-snug transition-colors duration-300 ease-out-expo',
                     isActive
                       ? 'bg-surface-hover font-medium text-foreground lg:bg-transparent'
@@ -82,12 +82,19 @@ export function StageRail({ stages }: { stages: Stage[] }): React.JSX.Element {
                 >
                   <span
                     className={cn(
-                      'absolute inset-y-1 left-0 hidden w-[2px] rounded-full bg-primary transition-transform duration-300 ease-out-expo lg:block',
+                      'absolute inset-y-1 left-0 hidden w-[2px] bg-brand transition-transform duration-300 ease-out-expo lg:block',
                       isActive ? 'scale-y-100' : 'scale-y-0',
                     )}
                     aria-hidden
                   />
-                  <span className="mr-2 font-mono text-[0.6875rem] text-subtle">0{index + 1}</span>
+                  <span
+                    className={cn(
+                      'mr-2 font-mono text-[0.6875rem]',
+                      isActive ? 'text-brand' : 'text-subtle',
+                    )}
+                  >
+                    0{index + 1}
+                  </span>
                   {stage.label}
                 </button>
               </li>
@@ -105,22 +112,24 @@ export function StageRail({ stages }: { stages: Stage[] }): React.JSX.Element {
               if (node) sectionRefs.current.set(stage.id, node);
               else sectionRefs.current.delete(stage.id);
             }}
-            className="relative scroll-mt-28 space-y-7 rounded-card border border-border-subtle bg-surface/35 p-5 sm:p-7 lg:p-9"
+            className="relative scroll-mt-28 space-y-7 border-l border-border-strong bg-surface/20 p-5 sm:p-7 lg:p-9"
           >
             <div className="flex items-start gap-4 sm:gap-6">
               <span className="mt-1 font-mono text-[0.75rem] font-medium text-brand">
                 0{index + 1}
               </span>
-              <h3 className="max-w-2xl text-balance text-[clamp(1.65rem,3.2vw,2.6rem)] font-semibold leading-[1.08] tracking-[-0.035em]">
+              <h3 className="max-w-2xl text-balance font-display text-[clamp(1.65rem,3.2vw,2.75rem)] font-medium leading-[1.04] tracking-[-0.045em]">
                 <span className="text-foreground">{stage.lead}</span>{' '}
                 <span className="text-subtle">{stage.trail}</span>
               </h3>
             </div>
 
-            <div className="grid gap-px overflow-hidden rounded-input bg-border-subtle sm:grid-cols-2">
+            <div className="grid gap-px overflow-hidden border border-border-subtle bg-border-subtle sm:grid-cols-2">
               {stage.panels.map((panel) => (
                 <article key={panel.title} className="bg-background/80 p-5 sm:p-6">
-                  <h4 className="type-card-title text-[0.9375rem]">{panel.title}</h4>
+                  <h4 className="font-display text-[0.9375rem] font-medium tracking-[-0.02em]">
+                    {panel.title}
+                  </h4>
                   <p className="mt-1.5 text-[0.875rem] leading-relaxed text-muted-foreground">
                     {panel.detail}
                   </p>

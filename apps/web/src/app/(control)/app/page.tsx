@@ -241,16 +241,18 @@ export default async function ControlDashboardPage(): Promise<React.JSX.Element>
           }
         />
 
-        <section className="relative overflow-hidden rounded-card bg-card p-4 shadow-hairline surface-sheen">
+        <section className="relative overflow-hidden rounded-card border-t border-border-strong bg-card p-5 shadow-hairline surface-sheen">
           <div
-            className="pointer-events-none absolute -right-16 -top-20 h-40 w-40 rounded-full bg-brand/[0.10] blur-3xl"
+            className="pointer-events-none absolute -right-16 -top-20 h-40 w-40 rounded-full bg-brand/[0.065] blur-3xl"
             aria-hidden
           />
           <header className="relative flex items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-1.5">
                 <Activity className="h-3.5 w-3.5 text-brand" />
-                <h2 className="type-card-title">Network pulse</h2>
+                <h2 className="font-display text-sm font-medium tracking-[-0.02em]">
+                  Network pulse
+                </h2>
               </div>
               <p className="mt-1 text-[0.75rem] text-subtle">Current execution readiness</p>
             </div>
@@ -268,7 +270,10 @@ export default async function ControlDashboardPage(): Promise<React.JSX.Element>
             >
               <div className="grid h-[68px] w-[68px] place-items-center rounded-full bg-card text-center">
                 <div>
-                  <p className="text-lg font-semibold leading-none tracking-[-0.04em]" data-numeric>
+                  <p
+                    className="font-display text-lg font-medium leading-none tracking-[-0.04em]"
+                    data-numeric
+                  >
                     {formatPercent(management.capacityUtilisationPercent)}
                   </p>
                   <p className="mt-1 text-[0.5625rem] uppercase tracking-[0.08em] text-subtle">
@@ -316,7 +321,7 @@ export default async function ControlDashboardPage(): Promise<React.JSX.Element>
               <Link
                 key={action.label}
                 href={action.href}
-                className="group flex items-center gap-2 rounded-input bg-surface-elevated px-2.5 py-2 text-[0.75rem] text-muted-foreground shadow-hairline transition-colors hover:bg-surface-hover hover:text-foreground"
+                className="group flex items-center gap-2 rounded-control border border-border-subtle bg-surface-elevated px-2.5 py-2 text-[0.75rem] text-muted-foreground transition-colors hover:border-border-strong hover:bg-surface-hover hover:text-foreground"
               >
                 <action.icon className="h-3.5 w-3.5 text-subtle transition-colors group-hover:text-brand" />
                 {action.label}

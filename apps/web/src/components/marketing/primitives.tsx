@@ -19,7 +19,7 @@ export function Eyebrow({
     <span
       className={cn(
         'inline-flex items-center rounded-control bg-surface-elevated px-2 py-1',
-        'text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground shadow-hairline',
+        'font-mono text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground shadow-hairline',
         className,
       )}
     >
@@ -64,16 +64,19 @@ export function StatementBand({
   return (
     <section
       className={cn(
-        'relative overflow-hidden border-y border-border-subtle bg-[hsl(240_8%_3%)] py-28 sm:py-36',
+        'relative overflow-hidden border-y border-border-subtle bg-[hsl(207_18%_3%)] py-28 sm:py-36',
         className,
       )}
     >
       {/* Horizon arc — the only decorative flourish on the page. */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-1/2 h-[42rem] rounded-[100%] bg-gradient-to-b from-foreground/[0.12] via-transparent to-transparent blur-3xl"
+        className="pointer-events-none absolute inset-x-0 top-1/2 h-[42rem] rounded-[100%] bg-gradient-to-b from-brand/[0.10] via-transparent to-transparent blur-3xl"
         aria-hidden
       />
-      <div className="pointer-events-none absolute inset-0 grid-pattern radial-fade opacity-30" aria-hidden />
+      <div
+        className="pointer-events-none absolute inset-0 grid-pattern radial-fade opacity-30"
+        aria-hidden
+      />
       <div className="container relative flex flex-col items-center gap-5 text-center">
         {eyebrow ? <p className="type-label">{eyebrow}</p> : null}
         {children}
@@ -101,7 +104,10 @@ export function MetricBand({
     >
       {items.map((item) => (
         <div key={item.label} className="px-0 py-6 sm:px-6 sm:py-4 lg:py-6">
-          <p className="text-[1.75rem] font-semibold leading-none tracking-[-0.03em]" data-numeric>
+          <p
+            className="font-display text-[1.875rem] font-medium leading-none tracking-[-0.04em]"
+            data-numeric
+          >
             {item.value}
           </p>
           <p className="mt-2 text-[0.8125rem] leading-snug text-muted-foreground">{item.label}</p>
@@ -132,11 +138,15 @@ export function FeatureBand({
     >
       {items.map((item) => (
         <div key={item.title} className="bg-background p-6">
-          <span className="inline-flex text-muted-foreground [&_svg]:h-[18px] [&_svg]:w-[18px]">
+          <span className="inline-flex text-brand [&_svg]:h-[18px] [&_svg]:w-[18px]">
             {item.icon}
           </span>
-          <p className="mt-4 text-[0.9375rem] font-medium leading-snug">{item.title}</p>
-          <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-muted-foreground">{item.detail}</p>
+          <p className="mt-4 font-display text-[0.9375rem] font-medium leading-snug">
+            {item.title}
+          </p>
+          <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-muted-foreground">
+            {item.detail}
+          </p>
         </div>
       ))}
     </div>
@@ -158,11 +168,13 @@ export function MiniSurface({
   className?: string;
 }): React.JSX.Element {
   return (
-    <div className={cn('overflow-hidden rounded-input bg-card shadow-hairline', className)}>
+    <div className={cn('overflow-hidden rounded-control bg-card shadow-hairline', className)}>
       <div className="flex items-center gap-1.5 border-b border-border-subtle px-3 py-2">
         <span className="h-1.5 w-1.5 rounded-full bg-surface-active" aria-hidden />
         <span className="h-1.5 w-1.5 rounded-full bg-surface-active" aria-hidden />
-        <span className="ml-1.5 text-[11px] text-subtle">{title}</span>
+        <span className="ml-1.5 font-mono text-[10px] uppercase tracking-[0.06em] text-subtle">
+          {title}
+        </span>
       </div>
       <div className="p-3">{children}</div>
     </div>
@@ -192,7 +204,7 @@ export function MiniRow({
     <div className="flex items-center gap-2 border-b border-border-subtle py-1.5 last:border-b-0">
       <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', dot)} aria-hidden />
       <span className="min-w-0 flex-1 truncate text-[11px] text-foreground">{label}</span>
-      <span className="shrink-0 text-[11px] tabular-nums text-subtle">{meta}</span>
+      <span className="shrink-0 font-mono text-[10px] tabular-nums text-subtle">{meta}</span>
     </div>
   );
 }

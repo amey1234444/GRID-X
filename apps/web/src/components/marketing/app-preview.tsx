@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { LogoMark } from '@/components/brand';
 import { cn } from '@/lib/utils';
 
 const rows = [
@@ -64,23 +65,23 @@ const pulse = [
 
 export function AppPreview(): React.JSX.Element {
   return (
-    <div className="group relative mx-auto w-full max-w-[760px]">
+    <div className="group relative mx-auto w-full max-w-[1180px]">
       <div
-        className="pointer-events-none absolute -inset-12 -z-10 bg-[radial-gradient(circle_at_50%_50%,hsl(var(--brand)/0.18),transparent_62%)] opacity-80 blur-2xl"
+        className="pointer-events-none absolute -inset-16 -z-10 bg-[radial-gradient(circle_at_50%_35%,hsl(var(--brand)/0.12),transparent_64%)] opacity-80 blur-3xl"
         aria-hidden
       />
-      <div className="relative overflow-hidden rounded-[1.125rem] border border-white/[0.08] bg-[#070709] p-1.5 shadow-product transition-transform duration-700 ease-out-expo lg:group-hover:-translate-y-1">
-        <div className="overflow-hidden rounded-[0.875rem] border border-border-subtle bg-background">
-          <div className="flex h-10 items-center justify-between gap-3 border-b border-border-subtle bg-surface px-3">
+      <div className="relative overflow-hidden rounded-[0.75rem] border border-white/[0.1] bg-[#050708] p-1.5 shadow-product transition-transform duration-700 ease-out-expo lg:group-hover:-translate-y-1">
+        <div className="overflow-hidden rounded-[0.5rem] border border-border-subtle bg-background">
+          <div className="flex h-11 items-center justify-between gap-3 border-b border-border-subtle bg-surface px-4">
             <div className="flex items-center gap-1.5" aria-hidden>
               <span className="h-2 w-2 rounded-full bg-white/15" />
               <span className="h-2 w-2 rounded-full bg-white/15" />
               <span className="h-2 w-2 rounded-full bg-white/15" />
             </div>
-            <div className="hidden items-center gap-2 rounded-control bg-black/30 px-2.5 py-1 font-mono text-[9px] text-subtle shadow-hairline sm:flex">
-              <ShieldCheck className="h-2.5 w-2.5" /> control.gridx.oswar.in/app
+            <div className="hidden items-center gap-2 rounded-control bg-black/30 px-3 py-1 font-mono text-[10px] text-subtle shadow-hairline sm:flex">
+              <ShieldCheck className="h-3 w-3 text-success" /> control.gridx.oswar.in/app
             </div>
-            <div className="flex items-center gap-1.5 text-[9px] font-medium text-success">
+            <div className="flex items-center gap-1.5 font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-success">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-50" />
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
@@ -89,68 +90,78 @@ export function AppPreview(): React.JSX.Element {
             </div>
           </div>
 
-          <div className="grid min-h-[430px] grid-cols-1 md:grid-cols-[116px_minmax(0,1fr)]">
-            <aside className="hidden border-r border-border-subtle bg-surface/80 p-2 md:block">
-              <div className="mb-3 flex items-center gap-2 px-1.5 py-1.5">
-                <span className="grid h-6 w-6 place-items-center rounded-[7px] bg-white text-[8px] font-black text-black">
-                  GX
+          <div className="grid min-h-[520px] grid-cols-1 md:grid-cols-[168px_minmax(0,1fr)]">
+            <aside className="hidden border-r border-border-subtle bg-surface/80 p-3 md:block">
+              <div className="mb-5 flex items-center gap-2.5 border-b border-border-subtle px-1.5 pb-4 pt-1">
+                <span className="grid h-8 w-8 place-items-center rounded-input bg-[#0b1114] text-foreground shadow-hairline">
+                  <LogoMark className="h-[19px] w-[19px]" />
                 </span>
-                <span className="text-[10px] font-semibold tracking-[0.08em]">GRID-X</span>
+                <span>
+                  <span className="block font-display text-[11px] font-semibold tracking-[-0.02em]">
+                    GRID<span className="text-brand">-X</span>
+                  </span>
+                  <span className="mt-0.5 block font-mono text-[7px] uppercase tracking-[0.12em] text-subtle">
+                    Control
+                  </span>
+                </span>
               </div>
               <nav className="space-y-0.5">
                 {navigation.map((item) => (
                   <div
                     key={item.label}
                     className={cn(
-                      'flex items-center gap-2 rounded-control px-2 py-2 text-[9px]',
-                      item.active ? 'bg-surface-hover text-foreground' : 'text-subtle',
+                      'relative flex items-center gap-2.5 rounded-control px-2.5 py-2 text-[10px]',
+                      item.active ? 'bg-surface-hover font-medium text-foreground' : 'text-subtle',
                     )}
                   >
-                    <item.icon className="h-3 w-3" />
+                    {item.active ? (
+                      <span className="absolute inset-y-2 left-0 w-px bg-brand" />
+                    ) : null}
+                    <item.icon className="h-3.5 w-3.5" />
                     {item.label}
                   </div>
                 ))}
               </nav>
-              <div className="mt-5 rounded-input border border-border-subtle bg-black/20 p-2.5">
-                <div className="flex items-center gap-1.5 text-[8px] text-subtle">
-                  <Activity className="h-2.5 w-2.5 text-success" /> Network health
+              <div className="mt-7 border border-border-subtle bg-black/20 p-3">
+                <div className="flex items-center gap-1.5 font-mono text-[8px] uppercase tracking-[0.08em] text-subtle">
+                  <Activity className="h-3 w-3 text-success" /> Network health
                 </div>
-                <p className="mt-1.5 text-lg font-semibold tracking-[-0.04em]">96.4%</p>
+                <p className="mt-2 font-display text-xl font-medium tracking-[-0.04em]">96.4%</p>
                 <div className="mt-2 h-1 overflow-hidden rounded-full bg-surface-active">
                   <div className="h-full w-[96%] rounded-full bg-success" />
                 </div>
               </div>
             </aside>
 
-            <div className="min-w-0 bg-[radial-gradient(circle_at_70%_0%,hsl(var(--brand)/0.10),transparent_36%)]">
-              <div className="flex h-11 items-center gap-3 border-b border-border-subtle px-3 sm:px-4">
+            <div className="min-w-0 bg-[radial-gradient(circle_at_72%_0%,hsl(var(--brand)/0.07),transparent_38%)]">
+              <div className="flex h-14 items-center gap-3 border-b border-border-subtle px-4 sm:px-5">
                 <div>
-                  <p className="text-[10px] font-medium">Command center</p>
-                  <p className="text-[8px] text-subtle">Monday, 31 August</p>
+                  <p className="font-display text-xs font-medium">Command center</p>
+                  <p className="mt-0.5 text-[9px] text-subtle">Monday, 31 August</p>
                 </div>
-                <div className="ml-auto hidden h-6 w-36 items-center gap-1.5 rounded-control bg-surface-elevated px-2 text-[8px] text-subtle shadow-hairline sm:flex">
-                  <Search className="h-2.5 w-2.5" /> Search anything
+                <div className="ml-auto hidden h-7 w-44 items-center gap-1.5 rounded-control bg-surface-elevated px-2.5 text-[9px] text-subtle shadow-hairline sm:flex">
+                  <Search className="h-3 w-3" /> Search anything
                   <span className="ml-auto rounded bg-surface-active px-1 py-0.5">⌘K</span>
                 </div>
-                <span className="grid h-6 w-6 place-items-center rounded-full bg-brand/15 text-[8px] font-semibold text-brand">
+                <span className="grid h-7 w-7 place-items-center rounded-full border border-brand/25 bg-brand/10 text-[9px] font-semibold text-brand">
                   AB
                 </span>
               </div>
 
-              <div className="space-y-3 p-3 sm:p-4">
+              <div className="space-y-3.5 p-4 sm:p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="flex items-center gap-1.5 text-[8px] font-medium uppercase tracking-[0.08em] text-success">
-                      <CheckCircle2 className="h-2.5 w-2.5" /> Network stable
+                    <div className="flex items-center gap-1.5 font-mono text-[8px] font-medium uppercase tracking-[0.1em] text-success">
+                      <CheckCircle2 className="h-3 w-3" /> Network stable
                     </div>
-                    <p className="mt-1 text-[13px] font-semibold tracking-[-0.02em] sm:text-sm">
+                    <p className="mt-1 font-display text-sm font-medium tracking-[-0.025em] sm:text-base">
                       Operations are running within plan.
                     </p>
-                    <p className="mt-0.5 text-[8px] text-subtle sm:text-[9px]">
+                    <p className="mt-0.5 text-[9px] text-subtle sm:text-[10px]">
                       38 live jobs across 26 partner units · 3 items need attention
                     </p>
                   </div>
-                  <Badge variant="outline" className="hidden text-[8px] sm:inline-flex">
+                  <Badge variant="outline" className="hidden font-mono text-[8px] sm:inline-flex">
                     Last sync 12s ago
                   </Badge>
                 </div>
@@ -159,15 +170,15 @@ export function AppPreview(): React.JSX.Element {
                   {metrics.map((metric) => (
                     <div
                       key={metric.label}
-                      className="rounded-input bg-card p-2.5 shadow-hairline surface-sheen sm:p-3"
+                      className="rounded-input bg-card p-3 shadow-hairline surface-sheen sm:p-3.5"
                     >
                       <div className="flex items-center justify-between gap-1">
-                        <p className="truncate text-[8px] text-muted-foreground sm:text-[9px]">
+                        <p className="truncate font-mono text-[8px] uppercase tracking-[0.06em] text-muted-foreground sm:text-[9px]">
                           {metric.label}
                         </p>
                         <metric.icon className="hidden h-3 w-3 text-subtle sm:block" />
                       </div>
-                      <p className="mt-1.5 text-base font-semibold tracking-[-0.04em] sm:text-lg">
+                      <p className="mt-2 font-display text-lg font-medium tracking-[-0.04em] sm:text-xl">
                         {metric.value}
                       </p>
                       <p className="mt-0.5 flex items-center gap-0.5 text-[7px] text-success sm:text-[8px]">
@@ -177,12 +188,12 @@ export function AppPreview(): React.JSX.Element {
                   ))}
                 </div>
 
-                <div className="grid gap-2 lg:grid-cols-[1.45fr_0.85fr]">
+                <div className="grid gap-2.5 lg:grid-cols-[1.5fr_0.8fr]">
                   <div className="overflow-hidden rounded-input bg-card p-3 shadow-hairline">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-[9px] font-medium">Production velocity</p>
-                        <p className="text-[7px] text-subtle">Accepted quantity · last 7 days</p>
+                        <p className="text-[10px] font-medium">Production velocity</p>
+                        <p className="text-[8px] text-subtle">Accepted quantity · last 7 days</p>
                       </div>
                       <span className="text-[8px] font-medium text-success">+12.8%</span>
                     </div>
@@ -221,7 +232,7 @@ export function AppPreview(): React.JSX.Element {
                   <div className="rounded-input bg-card p-3 shadow-hairline">
                     <div className="flex items-center gap-1.5">
                       <Gauge className="h-3 w-3 text-brand" />
-                      <p className="text-[9px] font-medium">Network pulse</p>
+                      <p className="text-[10px] font-medium">Network pulse</p>
                     </div>
                     <div className="mt-2 space-y-2.5">
                       {pulse.map((item) => (
@@ -236,10 +247,12 @@ export function AppPreview(): React.JSX.Element {
                                   : 'bg-brand',
                             )}
                           />
-                          <span className="min-w-0 flex-1 truncate text-[7px] text-subtle">
+                          <span className="min-w-0 flex-1 truncate text-[8px] text-subtle">
                             {item.label}
                           </span>
-                          <span className="text-[8px] font-medium tabular-nums">{item.value}</span>
+                          <span className="font-mono text-[9px] font-medium tabular-nums">
+                            {item.value}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -249,16 +262,18 @@ export function AppPreview(): React.JSX.Element {
                 <div className="overflow-hidden rounded-input bg-card shadow-hairline">
                   <div className="flex items-center justify-between border-b border-border-subtle px-3 py-2">
                     <div>
-                      <p className="text-[9px] font-medium">Jobs requiring focus</p>
-                      <p className="text-[7px] text-subtle">Live execution queue</p>
+                      <p className="text-[10px] font-medium">Jobs requiring focus</p>
+                      <p className="text-[8px] text-subtle">Live execution queue</p>
                     </div>
-                    <span className="text-[8px] text-brand">Open board →</span>
+                    <span className="font-mono text-[8px] uppercase tracking-[0.06em] text-brand">
+                      Open board →
+                    </span>
                   </div>
                   <div className="divide-y divide-border-subtle">
                     {rows.map((row) => (
                       <div
                         key={row.job}
-                        className="grid grid-cols-[64px_1fr_auto] items-center gap-2 px-3 py-2 text-[8px] sm:grid-cols-[68px_1.2fr_1fr_auto_62px]"
+                        className="grid grid-cols-[72px_1fr_auto] items-center gap-2 px-3 py-2.5 text-[9px] sm:grid-cols-[76px_1.2fr_1fr_auto_72px]"
                       >
                         <span className="font-medium">{row.job}</span>
                         <span className="truncate text-muted-foreground">{row.component}</span>

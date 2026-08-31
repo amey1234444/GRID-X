@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ArrowUpRight, Factory, RadioTower, ShieldCheck } from 'lucide-react';
 
 import { Wordmark } from '@/components/brand';
 
@@ -34,24 +35,34 @@ const columns = [
 
 export function MarketingFooter(): React.JSX.Element {
   return (
-    <footer className="border-t bg-secondary/40">
-      <div className="container grid gap-12 py-16 md:grid-cols-[1.4fr_repeat(3,1fr)]">
-        <div className="space-y-4">
+    <footer className="relative overflow-hidden border-t border-border-subtle bg-[#060809]">
+      <div className="pointer-events-none absolute inset-0 grid-pattern opacity-20" aria-hidden />
+      <div className="container relative grid gap-12 py-16 lg:grid-cols-[1.5fr_repeat(3,1fr)] lg:py-20">
+        <div className="space-y-6">
           <Wordmark />
-          <p className="max-w-xs text-sm text-muted-foreground">
+          <p className="max-w-sm text-[0.875rem] leading-6 text-muted-foreground">
             The operating system for OSWAR&apos;s distributed manufacturing network — one controlled
             flow from job issue to verified payment.
           </p>
+          <Link
+            href="/login"
+            className="inline-flex items-center gap-2 border-b border-brand/40 pb-1 text-[0.8125rem] font-medium text-foreground transition-colors hover:border-brand hover:text-brand"
+          >
+            Enter the command center <ArrowUpRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
         {columns.map((column) => (
           <div key={column.title} className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <p className="font-mono text-[0.625rem] font-medium uppercase tracking-[0.14em] text-subtle">
               {column.title}
             </p>
             <ul className="space-y-2">
               {column.links.map((link) => (
                 <li key={link.label}>
-                  <Link href={link.href} className="text-sm text-muted-foreground hover:text-foreground">
+                  <Link
+                    href={link.href}
+                    className="text-[0.8125rem] text-muted-foreground transition-colors hover:text-foreground"
+                  >
                     {link.label}
                   </Link>
                 </li>
@@ -60,10 +71,20 @@ export function MarketingFooter(): React.JSX.Element {
           </div>
         ))}
       </div>
-      <div className="border-t">
-        <div className="container flex flex-col items-center justify-between gap-2 py-6 text-xs text-muted-foreground sm:flex-row">
+      <div className="relative border-t border-border-subtle">
+        <div className="container grid gap-4 py-6 text-xs text-muted-foreground md:grid-cols-[1fr_auto] md:items-center">
           <p>© {new Date().getFullYear()} OSWAR Rotocorp. All rights reserved.</p>
-          <p>Built for controlled, auditable outsourced manufacturing.</p>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[0.625rem] uppercase tracking-[0.08em]">
+            <span className="inline-flex items-center gap-1.5">
+              <RadioTower className="h-3 w-3 text-success" /> Live network
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <ShieldCheck className="h-3 w-3 text-info" /> Audit ready
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Factory className="h-3 w-3 text-warning" /> Built for industry
+            </span>
+          </div>
         </div>
       </div>
     </footer>

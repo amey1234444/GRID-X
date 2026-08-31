@@ -34,7 +34,7 @@ export function PageHeader({
   className?: string;
 }): React.JSX.Element {
   return (
-    <div className={cn('space-y-3', className)}>
+    <div className={cn('space-y-4 border-b border-border-subtle pb-5', className)}>
       {breadcrumbs?.length ? (
         <nav aria-label="Breadcrumb">
           <ol className="flex flex-wrap items-center gap-1 text-[0.75rem] text-subtle">
@@ -62,10 +62,10 @@ export function PageHeader({
           <div className="flex items-center gap-2.5">
             {icon ? (
               <span
-                className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-input bg-surface-elevated text-muted-foreground shadow-hairline"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-control border border-border-strong bg-surface-elevated text-brand"
                 aria-hidden
               >
-                <NavIcon name={icon} className="h-4 w-4" />
+                <NavIcon name={icon} className="h-[17px] w-[17px]" />
               </span>
             ) : null}
             <h1 className="type-page-title truncate">{title}</h1>

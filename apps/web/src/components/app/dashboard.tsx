@@ -67,7 +67,7 @@ export function InsightBanner({
   aside?: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <section className="relative flex h-full min-h-[238px] overflow-hidden rounded-card bg-card p-5 shadow-hairline surface-sheen sm:p-6">
+    <section className="relative flex h-full min-h-[238px] overflow-hidden rounded-card border-l-2 border-brand/70 bg-card p-5 shadow-hairline surface-sheen sm:p-6">
       <div
         className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/70 to-transparent"
         aria-hidden
@@ -103,7 +103,7 @@ export function InsightBanner({
             <p className="type-label">{eyebrow}</p>
             <h2
               className={cn(
-                'text-[1.375rem] font-semibold leading-tight tracking-[-0.02em]',
+                'font-display text-[1.5rem] font-medium leading-tight tracking-[-0.03em]',
                 TONE_TEXT[tone],
               )}
             >
@@ -144,7 +144,7 @@ export function MetricStrip({
   return (
     <div
       className={cn(
-        'grid overflow-hidden rounded-card bg-card shadow-hairline',
+        'grid overflow-hidden rounded-card border-t border-border-strong bg-card shadow-hairline',
         'divide-y divide-border-subtle sm:divide-y-0',
         'sm:[&>*]:border-l sm:[&>*]:border-border-subtle sm:[&>*:first-child]:border-l-0',
         columns === 2 && 'sm:grid-cols-2',
@@ -226,7 +226,7 @@ export function Panel({
   return (
     <section
       className={cn(
-        'flex flex-col overflow-hidden rounded-card bg-card shadow-hairline',
+        'flex flex-col overflow-hidden rounded-card border-t border-border-strong bg-card shadow-hairline',
         className,
       )}
     >
@@ -234,7 +234,9 @@ export function Panel({
         <div className="flex min-w-0 items-center gap-2">
           {Icon ? <Icon className="h-4 w-4 shrink-0 text-subtle" /> : null}
           <div className="min-w-0">
-            <h3 className="type-card-title truncate">{title}</h3>
+            <h3 className="font-display text-sm font-medium tracking-[-0.02em] truncate">
+              {title}
+            </h3>
             {description ? (
               <p className="mt-0.5 truncate text-[0.75rem] text-subtle">{description}</p>
             ) : null}

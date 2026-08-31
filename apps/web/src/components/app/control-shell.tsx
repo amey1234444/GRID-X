@@ -69,7 +69,7 @@ function breadcrumbFor(sections: NavSection[], pathname: string): Crumb[] {
 /* ---------------------------------------------------------------------- */
 
 const rowBase = [
-  'group relative flex w-full items-center gap-2.5 rounded-input px-2 py-[7px]',
+  'group relative flex w-full items-center gap-2.5 rounded-control px-2.5 py-2',
   'text-[0.8125rem] leading-none',
   'transition-[background-color,color] duration-150 ease-out-expo',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70',
@@ -108,7 +108,7 @@ function SidebarSection({
         )}
       >
         {active ? (
-          <span className="absolute inset-y-1 left-0 w-[2px] rounded-full bg-primary" aria-hidden />
+          <span className="absolute inset-y-1.5 left-0 w-[2px] bg-brand" aria-hidden />
         ) : null}
         <NavIcon
           name={section.icon}
@@ -166,7 +166,7 @@ function SidebarSection({
                   onClick={onNavigate}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'relative block truncate rounded-input px-2 py-[6px] text-[0.8125rem] leading-none',
+                    'relative block truncate rounded-control px-2 py-[7px] text-[0.8125rem] leading-none',
                     'transition-colors duration-150',
                     active
                       ? 'bg-surface-hover font-medium text-foreground'
@@ -175,7 +175,7 @@ function SidebarSection({
                 >
                   {active ? (
                     <span
-                      className="absolute -left-[13px] top-1/2 h-3.5 w-[2px] -translate-y-1/2 rounded-full bg-primary"
+                      className="absolute -left-[13px] top-1/2 h-3.5 w-[2px] -translate-y-1/2 bg-brand"
                       aria-hidden
                     />
                   ) : null}
@@ -198,7 +198,7 @@ function SearchRow({ onClick }: { onClick: () => void }): React.JSX.Element {
       type="button"
       onClick={onClick}
       className={cn(
-        'group flex w-full items-center gap-2.5 rounded-input bg-surface-elevated px-2 py-[7px]',
+        'group flex w-full items-center gap-2.5 rounded-control bg-surface-elevated px-2.5 py-2',
         'text-[0.8125rem] leading-none text-subtle shadow-hairline',
         'transition-colors duration-150 hover:bg-surface-hover hover:text-muted-foreground',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70',
@@ -244,7 +244,7 @@ export function ControlShell({
 
   const sidebarBody = (onNavigate?: () => void): React.JSX.Element => (
     <>
-      <div className="space-y-2 px-2 pb-3 pt-3">
+      <div className="space-y-3 border-b border-border-subtle px-3 pb-4 pt-4">
         <WorkspaceSwitcher user={user} />
         <SearchRow
           onClick={() => {
@@ -264,19 +264,19 @@ export function ControlShell({
       {/* Desktop sidebar --------------------------------------------------- */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-border-subtle bg-surface lg:flex',
+          'fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-border-subtle bg-[#070a0c] lg:flex',
           'transition-[width] duration-300 ease-out-expo',
-          collapsed ? 'w-[68px]' : 'w-[248px]',
+          collapsed ? 'w-[72px]' : 'w-[264px]',
         )}
       >
         {collapsed ? (
           <>
-            <div className="flex flex-col items-center gap-2 px-2 pb-3 pt-3">
+            <div className="flex flex-col items-center gap-3 border-b border-border-subtle px-2 pb-4 pt-4">
               <Link
                 href="/app"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-[9px] bg-surface-elevated text-foreground shadow-[inset_0_0_0_1px_hsl(var(--border-strong))]"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-input bg-surface-elevated text-foreground shadow-[inset_0_0_0_1px_hsl(var(--border-strong))]"
               >
-                <LogoMark className="h-[17px] w-[17px]" />
+                <LogoMark className="h-[22px] w-[22px]" />
               </Link>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -307,9 +307,9 @@ export function ControlShell({
                       <Link
                         href={href}
                         className={cn(
-                          'inline-flex h-8 w-8 items-center justify-center rounded-input transition-colors duration-150',
+                          'relative inline-flex h-9 w-9 items-center justify-center rounded-control transition-colors duration-150',
                           active
-                            ? 'bg-surface-hover text-foreground'
+                            ? 'bg-surface-hover text-brand'
                             : 'text-muted-foreground hover:bg-surface-hover/70 hover:text-foreground',
                         )}
                       >
@@ -357,10 +357,10 @@ export function ControlShell({
       <div
         className={cn(
           'transition-[padding] duration-300 ease-out-expo',
-          collapsed ? 'lg:pl-[68px]' : 'lg:pl-[248px]',
+          collapsed ? 'lg:pl-[72px]' : 'lg:pl-[264px]',
         )}
       >
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border-subtle glass px-3 sm:px-5">
+        <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border-subtle bg-background/88 px-3 backdrop-blur-2xl sm:px-6">
           <button
             type="button"
             className="inline-flex h-8 w-8 items-center justify-center rounded-input text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground lg:hidden"
@@ -371,7 +371,7 @@ export function ControlShell({
           </button>
 
           <nav aria-label="Breadcrumb" className="min-w-0">
-            <ol className="flex items-center gap-1 text-[0.8125rem]">
+            <ol className="flex items-center gap-1 font-mono text-[0.6875rem] uppercase tracking-[0.05em]">
               {breadcrumbFor(sections, pathname).map((crumb, index, all) => (
                 <li key={`${crumb.label}-${index}`} className="flex min-w-0 items-center gap-1">
                   {index > 0 ? (
@@ -401,13 +401,13 @@ export function ControlShell({
 
           <div className="flex-1" />
 
-          <div className="hidden items-center gap-2 rounded-control bg-surface-elevated px-2.5 py-1.5 text-[0.6875rem] text-muted-foreground shadow-hairline sm:flex">
+          <div className="hidden items-center gap-2 border-l border-border px-3 py-1 font-mono text-[0.625rem] uppercase tracking-[0.08em] text-muted-foreground sm:flex">
             <span className="relative flex h-1.5 w-1.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-45" />
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
             </span>
             <Activity className="h-3 w-3 text-brand" />
-            Control network online
+            Network online
           </div>
 
           <button
@@ -422,7 +422,7 @@ export function ControlShell({
           <UserMenu user={user} />
         </header>
 
-        <main className="mx-auto w-full max-w-[1440px] p-4 sm:p-5 lg:p-6">
+        <main className="mx-auto w-full max-w-[1520px] p-4 sm:p-6 lg:p-8">
           <PageTransition className="space-y-5">{children}</PageTransition>
         </main>
       </div>
@@ -435,7 +435,7 @@ export function ControlShell({
             onClick={() => setMobileOpen(false)}
             aria-hidden
           />
-          <div className="absolute inset-y-0 left-0 flex w-[280px] flex-col border-r border-border-subtle bg-surface duration-300 ease-out-expo animate-in slide-in-from-left">
+          <div className="absolute inset-y-0 left-0 flex w-[296px] flex-col border-r border-border-subtle bg-[#070a0c] duration-300 ease-out-expo animate-in slide-in-from-left">
             <div className="flex items-center justify-between px-3 pt-3">
               <span className="text-[0.8125rem] font-medium">Navigation</span>
               <button

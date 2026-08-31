@@ -103,14 +103,16 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display)', 'var(--font-sans)', 'ui-sans-serif', 'sans-serif'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       boxShadow: {
-        hairline: 'inset 0 0 0 1px hsl(240 6% 15% / 0.7)',
-        popover: '0 12px 32px -8px rgb(0 0 0 / 0.7), 0 0 0 1px hsl(240 6% 18% / 0.8)',
-        subtle: '0 1px 2px 0 rgb(0 0 0 / 0.3), 0 0 0 1px hsl(240 6% 15.5% / 0.5)',
-        elevated: '0 16px 40px -16px rgb(0 0 0 / 0.6), 0 0 0 1px hsl(240 6% 17% / 0.7)',
-        glow: '0 0 0 1px rgb(255 255 255 / 0.06), 0 24px 64px -24px rgb(99 91 255 / 0.35)',
-        product: '0 40px 100px -32px hsl(252 92% 60% / 0.32), 0 18px 50px -28px rgb(0 0 0 / 0.95)',
+        hairline: 'inset 0 0 0 1px hsl(204 10% 15% / 0.75)',
+        popover: '0 12px 32px -8px rgb(0 0 0 / 0.7), 0 0 0 1px hsl(204 10% 18% / 0.8)',
+        subtle: '0 1px 2px 0 rgb(0 0 0 / 0.3), 0 0 0 1px hsl(204 10% 15.5% / 0.55)',
+        elevated: '0 16px 40px -16px rgb(0 0 0 / 0.6), 0 0 0 1px hsl(204 10% 17% / 0.7)',
+        glow: '0 0 0 1px rgb(255 255 255 / 0.06), 0 24px 64px -24px hsl(188 86% 50% / 0.18)',
+        product: '0 48px 120px -42px hsl(188 86% 48% / 0.2), 0 22px 58px -28px rgb(0 0 0 / 0.95)',
       },
       transitionTimingFunction: {
         'out-expo': 'cubic-bezier(0.16, 1, 0.3, 1)',

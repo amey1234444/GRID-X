@@ -40,20 +40,25 @@ export function WorkspaceSwitcher({
         <button
           type="button"
           className={cn(
-            'group flex w-full items-center gap-2.5 rounded-input px-2 py-1.5 text-left',
+            'group flex w-full items-center gap-3 rounded-control px-1 py-1.5 text-left',
             'transition-colors duration-150 hover:bg-surface-hover',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70',
             className,
           )}
         >
           <span
-            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] bg-surface-elevated text-foreground shadow-[inset_0_0_0_1px_hsl(var(--border-strong))]"
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-input bg-surface-elevated text-foreground shadow-[inset_0_0_0_1px_hsl(var(--border-strong))]"
             aria-hidden
           >
-            <LogoMark className="h-[15px] w-[15px]" />
+            <LogoMark className="h-[21px] w-[21px]" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[0.8125rem] font-medium leading-tight">{workspace}</span>
+            <span className="block truncate font-display text-[0.875rem] font-semibold leading-tight tracking-[-0.02em]">
+              GRID<span className="text-brand">-X</span>
+            </span>
+            <span className="mt-1 block truncate font-mono text-[0.55rem] uppercase leading-none tracking-[0.12em] text-subtle">
+              {workspace === 'GRID-X' ? 'Manufacturing OS' : workspace}
+            </span>
           </span>
           <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-subtle transition-colors group-hover:text-muted-foreground" />
         </button>
