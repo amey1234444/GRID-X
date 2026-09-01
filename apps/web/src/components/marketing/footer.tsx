@@ -1,16 +1,25 @@
 import Link from 'next/link';
-import { ArrowUpRight, Factory, RadioTower, ShieldCheck } from 'lucide-react';
 
-import { Wordmark } from '@/components/brand';
+import { LogoMark } from '@/components/brand';
+
+/**
+ * The marketing footer.
+ *
+ * Laid out as a directory rather than a marketing block: the mark sits alone on the left and the
+ * link columns run flush across the rest of the width, so the whole site map is legible at a
+ * glance. Links are muted and only lift to full contrast on hover — at this density, colour would
+ * turn the footer into noise.
+ */
 
 const columns = [
   {
-    title: 'Platform',
+    title: 'Product',
     links: [
-      { label: 'Job allocation', href: '/platform#allocation' },
-      { label: 'Drawing control', href: '/platform#drawings' },
-      { label: 'Material traceability', href: '/platform#material' },
-      { label: 'Quality & rejection', href: '/platform#quality' },
+      { label: 'Overview', href: '/platform' },
+      { label: 'Allocation', href: '/platform#allocation' },
+      { label: 'Drawings', href: '/platform#drawings' },
+      { label: 'Material', href: '/platform#material' },
+      { label: 'Quality', href: '/platform#quality' },
       { label: 'Payments', href: '/platform#payments' },
     ],
   },
@@ -18,9 +27,9 @@ const columns = [
     title: 'Network',
     links: [
       { label: 'For partners', href: '/partners' },
-      { label: 'Partner app', href: '/partner/login' },
       { label: 'Onboarding', href: '/partners#onboarding' },
       { label: 'Scorecards', href: '/partners#scorecards' },
+      { label: 'Partner app', href: '/partner/login' },
     ],
   },
   {
@@ -28,40 +37,47 @@ const columns = [
     links: [
       { label: 'Security', href: '/security' },
       { label: 'Pricing', href: '/pricing' },
+      { label: 'Reporting', href: '/platform#insight' },
+    ],
+  },
+  {
+    title: 'Access',
+    links: [
       { label: 'Sign in', href: '/login' },
+      { label: 'Partner log in', href: '/partner/login' },
+      { label: 'Reset password', href: '/forgot-password' },
     ],
   },
 ];
 
+const legal = [
+  { label: 'Security', href: '/security' },
+  { label: 'Pricing', href: '/pricing' },
+  { label: 'Partners', href: '/partners' },
+];
+
 export function MarketingFooter(): React.JSX.Element {
   return (
-    <footer className="relative overflow-hidden border-t border-border-subtle bg-[#080808]">
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/45 to-transparent" />
-      <div className="container relative grid gap-12 py-20 lg:grid-cols-[1.5fr_repeat(3,1fr)] lg:py-28">
-        <div className="space-y-6">
-          <Wordmark />
-          <p className="max-w-sm text-[0.875rem] leading-6 text-muted-foreground">
-            The operating system for OSWAR&apos;s distributed manufacturing network — one controlled
-            flow from job issue to verified payment.
-          </p>
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-2 text-[0.8125rem] font-medium text-brand transition-colors hover:text-foreground"
-          >
-            Enter the command center <ArrowUpRight className="h-3.5 w-3.5" />
+    <footer className="border-t border-border-subtle bg-[#080808]">
+      <div className="container grid gap-12 py-20 lg:grid-cols-[0.9fr_repeat(4,1fr)] lg:gap-8 lg:py-24">
+        <div className="flex flex-col gap-6">
+          <Link href="/" aria-label="GRID-X home" className="inline-flex">
+            <LogoMark className="h-7 w-7" />
           </Link>
+          <p className="max-w-[16rem] text-[0.8125rem] leading-6 text-muted-foreground lg:hidden">
+            One controlled flow from job issue to verified payment.
+          </p>
         </div>
+
         {columns.map((column) => (
-          <div key={column.title} className="space-y-3">
-            <p className="font-mono text-[0.625rem] font-medium uppercase tracking-[0.14em] text-subtle">
-              {column.title}
-            </p>
-            <ul className="space-y-2">
+          <div key={column.title} className="flex flex-col gap-4">
+            <p className="text-[0.8125rem] font-medium text-foreground">{column.title}</p>
+            <ul className="flex flex-col gap-3">
               {column.links.map((link) => (
                 <li key={link.label}>
                   <Link
                     href={link.href}
-                    className="text-[0.8125rem] text-muted-foreground transition-colors hover:text-foreground"
+                    className="text-[0.8125rem] leading-none text-muted-foreground transition-colors hover:text-foreground"
                   >
                     {link.label}
                   </Link>
@@ -71,21 +87,22 @@ export function MarketingFooter(): React.JSX.Element {
           </div>
         ))}
       </div>
-      <div className="relative border-t border-border-subtle">
-        <div className="container grid gap-4 py-6 text-xs text-muted-foreground md:grid-cols-[1fr_auto] md:items-center">
-          <p>© {new Date().getFullYear()} OSWAR Rotocorp. All rights reserved.</p>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[0.625rem] uppercase tracking-[0.08em]">
-            <span className="inline-flex items-center gap-1.5">
-              <RadioTower className="h-3 w-3 text-success" /> Live network
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck className="h-3 w-3 text-info" /> Audit ready
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Factory className="h-3 w-3 text-warning" /> Built for industry
-            </span>
-          </div>
+
+      <div className="container flex flex-col gap-4 pb-14 pt-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          {legal.map((link) => (
+            <Link
+              key={link.label}
+              href={link.href}
+              className="text-[0.8125rem] text-subtle transition-colors hover:text-foreground"
+            >
+              {link.label}
+            </Link>
+          ))}
         </div>
+        <p className="text-[0.8125rem] text-subtle">
+          © {new Date().getFullYear()} OSWAR Rotocorp
+        </p>
       </div>
     </footer>
   );
