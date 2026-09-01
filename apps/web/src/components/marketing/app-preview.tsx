@@ -70,7 +70,7 @@ export function AppPreview(): React.JSX.Element {
         className="pointer-events-none absolute -inset-16 -z-10 bg-brand/10 blur-3xl"
         aria-hidden
       />
-      <div className="linear-frame relative overflow-hidden rounded-[20px] border border-border-strong p-2 transition-transform duration-700 ease-out-expo lg:group-hover:-translate-y-1">
+      <div className="app-preview-shell linear-frame relative overflow-hidden rounded-[20px] border border-border-strong p-2 transition-transform duration-700 ease-out-expo lg:group-hover:-translate-y-1">
         <div className="overflow-hidden rounded-[13px] border border-border bg-background">
           <div className="flex h-11 items-center justify-between gap-3 border-b border-border-subtle bg-surface px-4">
             <div className="flex items-center gap-1.5" aria-hidden>

@@ -41,14 +41,20 @@ export function QuoteBand({
           <figure
             key={quote.name}
             className={cn(
-              'flex min-h-[340px] flex-col justify-between rounded-[18px] p-8 sm:p-10',
+              'relative isolate flex min-h-[380px] flex-col justify-between overflow-hidden rounded-[18px] p-8 sm:p-10',
               index === 0 ? 'quote-card-paper' : 'quote-card-signal',
             )}
           >
-            <blockquote className="font-display text-[clamp(1.5rem,2.6vw,2.125rem)] font-medium leading-[1.18] tracking-[-0.035em]">
+            {index === 1 ? (
+              <span className="relative z-10 mb-8 flex items-center gap-2 font-mono text-[0.5625rem] uppercase tracking-[0.12em] opacity-55">
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                Reconciled before approval
+              </span>
+            ) : null}
+            <blockquote className="relative z-10 font-display text-[clamp(1.5rem,2.6vw,2.125rem)] font-medium leading-[1.18] tracking-[-0.035em]">
               &ldquo;{quote.quote}&rdquo;
             </blockquote>
-            <figcaption className="mt-10 flex items-center gap-3.5">
+            <figcaption className="relative z-10 mt-10 flex items-center gap-3.5">
               <span
                 className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-current/15 font-mono text-[0.625rem] font-medium uppercase tracking-[0.06em] opacity-80"
                 aria-hidden

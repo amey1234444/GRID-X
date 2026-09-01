@@ -14,14 +14,14 @@ import {
 import { AmbientLines } from '@/components/marketing/ambient-lines';
 import {
   Eyebrow,
-  FeatureBand,
   MetricBand,
   MiniRow,
   MiniSurface,
   Statement,
 } from '@/components/marketing/primitives';
 import { DisclosureList, type DisclosureItem } from '@/components/marketing/disclosure-list';
-import { Reveal, StaggerGroup, StaggerItem } from '@/components/motion';
+import { SecurityControlGrid, SecurityPostureFlow } from '@/components/marketing/security-visuals';
+import { Reveal } from '@/components/motion';
 
 export const metadata: Metadata = {
   title: 'Security',
@@ -225,7 +225,7 @@ export default function SecurityPage(): React.JSX.Element {
         </div>
       </section>
 
-      <FeatureBand items={posture} />
+      <SecurityPostureFlow items={posture} />
 
       <section className="section-graphite border-b border-border-subtle py-24 sm:py-32">
         <div className="container">
@@ -236,37 +236,9 @@ export default function SecurityPage(): React.JSX.Element {
             </p>
           </Reveal>
 
-          <StaggerGroup className="mt-20 grid gap-px overflow-hidden rounded-[18px] border border-border-strong bg-border-subtle md:grid-cols-2 lg:grid-cols-3">
-            {controls.map((control) => (
-              <StaggerItem key={control.title} className="h-full">
-                <article className="plate plate-lit flex h-full flex-col p-7">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-brand/25 bg-brand/10 text-brand">
-                    <control.icon className="h-4 w-4" />
-                  </span>
-                  <h3 className="mt-8 font-display text-lg font-medium leading-snug tracking-[-0.03em]">
-                    {control.title}
-                  </h3>
-                  <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-foreground">
-                    {control.lead}
-                  </p>
-                  <ul className="mt-5 space-y-2.5 border-t border-border-subtle pt-5">
-                    {control.points.map((point) => (
-                      <li
-                        key={point}
-                        className="flex gap-2.5 text-[0.8125rem] leading-relaxed text-muted-foreground"
-                      >
-                        <span
-                          className="mt-[0.5rem] h-1 w-1 shrink-0 rounded-full bg-subtle-foreground"
-                          aria-hidden
-                        />
-                        {point}
-                      </li>
-                    ))}
-                  </ul>
-                </article>
-              </StaggerItem>
-            ))}
-          </StaggerGroup>
+          <Reveal className="mt-20" y={22}>
+            <SecurityControlGrid controls={controls} />
+          </Reveal>
         </div>
       </section>
 

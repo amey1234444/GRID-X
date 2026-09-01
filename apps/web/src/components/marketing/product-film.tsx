@@ -42,11 +42,11 @@ export function ProductFilm({
         loop
         playsInline
         preload="metadata"
-        poster="/media/gridx-control-network-poster.webp?v=2"
+        poster="/media/gridx-control-network-poster.webp?v=3"
         aria-hidden="true"
         tabIndex={-1}
       >
-        <source src="/media/gridx-control-network.mp4?v=2" type="video/mp4" />
+        <source src="/media/gridx-control-network.mp4?v=3" type="video/mp4" />
       </video>
 
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,5,5,0.04),rgba(5,5,5,0.08)_42%,rgba(5,5,5,0.88)_96%)]" />

@@ -1,25 +1,13 @@
 import Link from 'next/link';
-import {
-  ArrowRight,
-  BadgeCheck,
-  Boxes,
-  FileLock2,
-  Gauge,
-  Languages,
-  Layers,
-  RadioTower,
-  ScrollText,
-  ShieldCheck,
-  WifiOff,
-} from 'lucide-react';
+import { ArrowRight, BadgeCheck, Boxes, Layers, RadioTower, ShieldCheck } from 'lucide-react';
 
 import { AmbientLines } from '@/components/marketing/ambient-lines';
 import { AppPreview } from '@/components/marketing/app-preview';
+import { FieldReadinessShowcase } from '@/components/marketing/field-readiness-showcase';
 import { BlueprintFigures, EvidenceVisual } from '@/components/marketing/linear-visuals';
 import { ProductFilm } from '@/components/marketing/product-film';
 import {
   Eyebrow,
-  FeatureBand,
   MetricBand,
   MiniRow,
   MiniSurface,
@@ -142,34 +130,6 @@ const stages: Stage[] = [
         ),
       },
     ],
-  },
-];
-
-const fieldReadiness = [
-  {
-    icon: <WifiOff />,
-    title: 'Offline-tolerant',
-    detail: 'Milestones and photos queue safely until the connection returns.',
-  },
-  {
-    icon: <Gauge />,
-    title: 'Low bandwidth',
-    detail: 'Lean data and compressed previews remain usable on weak mobile networks.',
-  },
-  {
-    icon: <Languages />,
-    title: 'Hindi and English',
-    detail: 'Partner workflows speak the language used on the shop floor.',
-  },
-  {
-    icon: <ScrollText />,
-    title: 'Audited by default',
-    detail: 'Views, decisions, movements and approvals become permanent evidence.',
-  },
-  {
-    icon: <FileLock2 />,
-    title: 'Role controlled',
-    detail: 'Every user sees the right work, and authorisation is enforced server-side.',
   },
 ];
 
@@ -358,8 +318,8 @@ export default function MarketingHomePage(): React.JSX.Element {
               trail="Entry-level Android phones, weak signals, noisy floors and multilingual teams are first-class constraints."
             />
           </Reveal>
-          <Reveal className="mt-14">
-            <FeatureBand items={fieldReadiness} />
+          <Reveal className="mt-14" y={22}>
+            <FieldReadinessShowcase />
           </Reveal>
         </div>
       </section>
@@ -378,12 +338,38 @@ export default function MarketingHomePage(): React.JSX.Element {
                 responsibilities.
               </p>
             </article>
-            <article className="editorial-card--dark flex min-h-[480px] flex-col rounded-[18px] p-8 sm:p-10">
-              <ShieldCheck className="h-8 w-8 text-signal" />
-              <h2 className="mt-10 text-[clamp(2rem,3.4vw,2.75rem)] font-medium leading-[1.04] tracking-[-0.04em]">
+            <article className="evidence-momentum-card relative flex min-h-[480px] flex-col overflow-hidden rounded-[18px] p-8 sm:p-10">
+              <div className="relative z-10 flex items-center justify-between">
+                <span className="grid h-10 w-10 place-items-center rounded-full border border-signal/25 bg-signal/[0.06]">
+                  <ShieldCheck className="h-4 w-4 text-signal" />
+                </span>
+                <span className="font-mono text-[0.5rem] uppercase tracking-[0.12em] text-white/28">
+                  Evidence loop / live
+                </span>
+              </div>
+              <div className="relative z-10 mt-10 grid grid-cols-3 gap-2" aria-hidden>
+                {['Captured', 'Verified', 'Released'].map((step, index) => (
+                  <div
+                    key={step}
+                    className="rounded-xl border border-white/[0.08] bg-black/20 px-3 py-3"
+                  >
+                    <span
+                      className={
+                        index === 2
+                          ? 'block h-1 w-8 rounded-full bg-signal'
+                          : 'block h-1 w-8 rounded-full bg-white/28'
+                      }
+                    />
+                    <span className="mt-3 block font-mono text-[0.5rem] uppercase tracking-[0.08em] text-white/38">
+                      {step}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <h2 className="relative z-10 mt-auto pt-12 text-[clamp(2rem,3.4vw,2.75rem)] font-medium leading-[1.04] tracking-[-0.04em]">
                 Evidence creates momentum.
               </h2>
-              <p className="mt-auto text-base leading-7 text-muted-foreground">
+              <p className="relative z-10 mt-5 text-sm leading-6 text-white/48">
                 Teams act faster because the system makes the next safe decision obvious.
               </p>
             </article>
