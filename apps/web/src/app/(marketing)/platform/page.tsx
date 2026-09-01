@@ -212,13 +212,14 @@ const moduleRows: Record<string, ProductModule['rows']> = {
 };
 
 const explorerModules: ProductModule[] = modules.map(
-  ({ id, label, title, rule, detail, points }) => ({
+  ({ id, label, title, rule, detail, points, icon }) => ({
     id,
     eyebrow: label,
     title,
     summary: detail,
     outcome: rule,
     points,
+    icon,
     rows: moduleRows[id] ?? [],
   }),
 );
@@ -375,7 +376,7 @@ export default function PlatformPage(): React.JSX.Element {
 
       <section
         id="modules"
-        className="section-graphite scroll-mt-16 border-b border-border-subtle py-24 sm:py-32"
+        className="section-blueprint scroll-mt-16 border-b border-border-subtle py-24 sm:py-32"
       >
         <div className="container">
           <Reveal className="grid gap-10 lg:grid-cols-[0.7fr_1.3fr] lg:gap-24">
@@ -433,7 +434,7 @@ export default function PlatformPage(): React.JSX.Element {
           <StaggerGroup className="mt-16 grid gap-px overflow-hidden rounded-[18px] border border-border-strong bg-border-subtle lg:grid-cols-3">
             {personas.map((persona) => (
               <StaggerItem key={persona.title} className="h-full">
-                <article className="group flex h-full min-h-[260px] flex-col bg-[#0d0d0d] p-7 transition-colors hover:bg-[#121212]">
+                <article className="plate plate-lit group flex h-full min-h-[260px] flex-col p-7 transition-[background-color,transform] duration-300 ease-out-expo hover:bg-[#121212] lg:hover:-translate-y-0.5">
                   <p className="type-label">{persona.title}</p>
                   <h3 className="mt-3 font-display text-2xl font-medium tracking-[-0.04em]">
                     GRID-X {persona.title}

@@ -158,8 +158,8 @@ export default function PricingPage(): React.JSX.Element {
               <StaggerItem key={tier.name} className="h-full">
                 <article
                   className={cn(
-                    'flex h-full flex-col p-7 sm:p-8',
-                    tier.highlight ? 'bg-[#121212]' : 'bg-[#0d0d0d]',
+                    'plate plate-lit flex h-full flex-col p-7 sm:p-8',
+                    tier.highlight ? 'plate-raised' : '',
                   )}
                 >
                   <div className="flex items-center justify-between gap-3">

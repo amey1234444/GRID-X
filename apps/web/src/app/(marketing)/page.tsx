@@ -409,7 +409,7 @@ export default function MarketingHomePage(): React.JSX.Element {
           <StaggerGroup className="mt-16 grid gap-px overflow-hidden rounded-[18px] border border-border-strong bg-border-subtle lg:grid-cols-3">
             {personas.map((persona) => (
               <StaggerItem key={persona.title} className="h-full">
-                <article className="group flex h-full min-h-[320px] flex-col bg-[#0d0d0d] p-7 transition-colors hover:bg-[#121212]">
+                <article className="plate plate-lit group flex h-full min-h-[320px] flex-col p-7 transition-[background-color,transform] duration-300 ease-out-expo hover:bg-[#121212] lg:hover:-translate-y-0.5">
                   <span className="grid h-10 w-10 place-items-center rounded-xl border border-brand/25 bg-brand/10 text-brand">
                     <persona.icon className="h-4 w-4" />
                   </span>
