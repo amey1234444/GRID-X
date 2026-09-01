@@ -365,8 +365,8 @@ export default function PlatformPage(): React.JSX.Element {
       <ProductFilm
         as="h1"
         eyebrow="Distributed manufacturing OS"
-        title="Make partner operations self-driving."
-        description="GRID-X moves every outsourced job through allocation, engineering, material, quality and payment controls without breaking the evidence chain."
+        title="One network. Every control connected."
+        description="GRID-X connects partner allocation, released engineering, material custody, measured quality and approved payment without breaking the evidence chain."
         href="#modules"
         linkLabel="Explore the control modules"
       />
