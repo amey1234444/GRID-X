@@ -407,6 +407,12 @@
     color: rgb(17 17 17 / 0.64);
   }
 
+  .marketing-film {
+    background-image: url('/media/gridx-control-network-poster.webp');
+    background-position: center;
+    background-size: cover;
+  }
+
   /* The testimonial pair. One paper card and one in the signal tint, so the band lands as a
      deliberate pause in a page that is otherwise unbroken graphite. Both carry their own
      foreground colour, since neither sits on the app's dark ground. */
@@ -429,6 +435,12 @@
 
   .edge-fade {
     mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .marketing-film video {
+      display: none;
+    }
   }
 
   @keyframes route-flow {

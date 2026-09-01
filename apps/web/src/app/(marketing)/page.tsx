@@ -16,6 +16,7 @@ import {
 import { AmbientLines } from '@/components/marketing/ambient-lines';
 import { AppPreview } from '@/components/marketing/app-preview';
 import { BlueprintFigures, EvidenceVisual } from '@/components/marketing/linear-visuals';
+import { ProductFilm } from '@/components/marketing/product-film';
 import {
   Eyebrow,
   FeatureBand,
@@ -215,7 +216,7 @@ export default function MarketingHomePage(): React.JSX.Element {
           </Reveal>
 
           <Reveal delay={0.05}>
-            <h1 className="mt-8 max-w-[1080px] text-balance text-[clamp(3.4rem,8.2vw,7.75rem)] font-medium leading-[0.9] tracking-[-0.075em]">
+            <h1 className="mt-8 max-w-[930px] text-balance text-[clamp(3.25rem,5.3vw,4.5rem)] font-medium leading-[1] tracking-[-0.045em]">
               The operating system for{' '}
               <span className="bg-gradient-to-r from-white via-white to-white/45 bg-clip-text text-transparent">
                 distributed manufacturing.
@@ -225,7 +226,7 @@ export default function MarketingHomePage(): React.JSX.Element {
 
           <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_0.65fr] lg:items-end">
             <Reveal delay={0.1}>
-              <p className="max-w-2xl text-pretty text-[1.0625rem] leading-8 text-muted-foreground sm:text-xl">
+              <p className="max-w-2xl text-pretty text-[0.9375rem] leading-7 text-muted-foreground sm:text-base">
                 Plan jobs, release drawings, trace material, verify quality and approve payment
                 across every partner as one live, auditable operation.
               </p>
@@ -283,7 +284,7 @@ export default function MarketingHomePage(): React.JSX.Element {
             <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-brand">
               Built for real manufacturing flow
             </p>
-            <h2 className="mt-12 text-balance text-[clamp(2.6rem,5.4vw,5rem)] font-medium leading-[1.04] tracking-[-0.055em]">
+            <h2 className="mt-10 text-balance text-[clamp(2.35rem,3.6vw,3rem)] font-medium leading-[1.04] tracking-[-0.04em]">
               <span className="text-foreground">
                 A new control layer for partner manufacturing.
               </span>{' '}
@@ -298,18 +299,25 @@ export default function MarketingHomePage(): React.JSX.Element {
         </div>
       </section>
 
+      <ProductFilm
+        id="network-film"
+        eyebrow="Network operations"
+        title="Make distributed manufacturing self-driving."
+        description="Jobs move through partner selection, drawing release, material custody, measured quality and payment gates as one continuous operating record."
+      />
+
       <section className="border-b border-border-subtle bg-[#080808] py-24 sm:py-32">
         <div className="container mb-16 grid gap-10 lg:grid-cols-[0.68fr_1.32fr] lg:gap-24">
           <Reveal>
             <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-signal">
               The controlled transaction
             </p>
-            <h2 className="mt-5 text-[clamp(2.5rem,5vw,4.25rem)] font-medium leading-[0.98] tracking-[-0.055em]">
+            <h2 className="mt-5 text-[clamp(2.35rem,3.6vw,3rem)] font-medium leading-[1.02] tracking-[-0.04em]">
               One flow. Four gates.
             </h2>
           </Reveal>
           <Reveal delay={0.06}>
-            <p className="max-w-2xl text-xl leading-8 text-muted-foreground sm:text-2xl sm:leading-9">
+            <p className="max-w-2xl text-[1rem] leading-7 text-muted-foreground">
               Work advances when the required operational evidence exists—not when a call says it is
               done.
             </p>
@@ -321,11 +329,11 @@ export default function MarketingHomePage(): React.JSX.Element {
       <section className="section-graphite border-b border-border-subtle py-24 sm:py-32">
         <div className="container">
           <Reveal className="grid gap-10 lg:grid-cols-[0.7fr_1.3fr] lg:gap-24">
-            <h2 className="text-[clamp(2.5rem,5vw,4.25rem)] font-medium leading-[0.98] tracking-[-0.055em]">
+            <h2 className="text-[clamp(2.35rem,3.6vw,3rem)] font-medium leading-[1.02] tracking-[-0.04em]">
               Verify and release
             </h2>
             <div>
-              <p className="max-w-2xl text-[clamp(1.35rem,2.5vw,2rem)] leading-[1.35] tracking-[-0.035em]">
+              <p className="max-w-2xl text-[clamp(1.2rem,2vw,1.5rem)] leading-[1.4] tracking-[-0.025em]">
                 The drawing, material trail, measured quality and accepted quantity stay together
                 all the way to payment.
               </p>
@@ -362,7 +370,7 @@ export default function MarketingHomePage(): React.JSX.Element {
             <article className="editorial-card relative min-h-[480px] overflow-hidden rounded-[18px] p-8 sm:p-12">
               <div className="absolute -bottom-24 -right-20 h-[420px] w-[420px] rounded-full border-[48px] border-black/[0.05]" />
               <RadioTower className="h-8 w-8" />
-              <h2 className="relative mt-10 max-w-3xl text-[clamp(2.4rem,5vw,4.5rem)] font-medium leading-[1.02] tracking-[-0.06em]">
+              <h2 className="relative mt-10 max-w-3xl text-[clamp(2.2rem,3.6vw,3rem)] font-medium leading-[1.04] tracking-[-0.045em]">
                 See one network—not a collection of disconnected vendors.
               </h2>
               <p className="absolute bottom-10 left-8 max-w-md text-base leading-7 text-muted-foreground sm:left-12">
@@ -372,7 +380,7 @@ export default function MarketingHomePage(): React.JSX.Element {
             </article>
             <article className="editorial-card--dark flex min-h-[480px] flex-col rounded-[18px] p-8 sm:p-10">
               <ShieldCheck className="h-8 w-8 text-signal" />
-              <h2 className="mt-10 text-[clamp(2.2rem,4vw,3.6rem)] font-medium leading-[1.02] tracking-[-0.06em]">
+              <h2 className="mt-10 text-[clamp(2rem,3.4vw,2.75rem)] font-medium leading-[1.04] tracking-[-0.04em]">
                 Evidence creates momentum.
               </h2>
               <p className="mt-auto text-base leading-7 text-muted-foreground">
@@ -390,7 +398,7 @@ export default function MarketingHomePage(): React.JSX.Element {
       <section className="section-grid border-y border-border-subtle py-24 sm:py-32">
         <div className="container">
           <Reveal className="grid gap-8 lg:grid-cols-[0.7fr_1.3fr]">
-            <h2 className="text-[clamp(2.3rem,4.4vw,3.75rem)] font-medium leading-[1.02] tracking-[-0.055em]">
+            <h2 className="text-[clamp(2.35rem,3.6vw,3rem)] font-medium leading-[1.02] tracking-[-0.04em]">
               One system. Three focused experiences.
             </h2>
             <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
@@ -432,7 +440,7 @@ export default function MarketingHomePage(): React.JSX.Element {
             <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-signal">
               Built for the next production run
             </p>
-            <h2 className="mt-8 text-balance text-[clamp(3rem,7vw,6.5rem)] font-medium leading-[0.92] tracking-[-0.07em]">
+            <h2 className="mt-8 text-balance text-[clamp(3rem,5.3vw,4rem)] font-medium leading-[1] tracking-[-0.045em]">
               Bring the whole network into focus.
             </h2>
             <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row">

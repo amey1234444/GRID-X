@@ -199,7 +199,7 @@ export default function PartnersPage(): React.JSX.Element {
         <div className="container">
           <Reveal className="grid gap-10 lg:grid-cols-[0.7fr_1.3fr] lg:gap-24">
             <h2 className="type-hero">What you get</h2>
-            <p className="max-w-2xl text-[clamp(1.25rem,2.2vw,1.75rem)] leading-[1.4] tracking-[-0.03em] text-muted-foreground">
+            <p className="max-w-2xl text-[clamp(1.125rem,1.8vw,1.5rem)] leading-[1.45] tracking-[-0.025em] text-muted-foreground">
               Three things that decide whether a job is worth taking — and what GRID-X does about
               each of them.
             </p>
@@ -313,7 +313,7 @@ export default function PartnersPage(): React.JSX.Element {
             <p className="inline-flex items-center gap-2 font-mono text-[0.625rem] uppercase tracking-[0.14em] text-signal">
               <BadgeCheck className="h-3.5 w-3.5" /> Already an OSWAR partner?
             </p>
-            <h2 className="mt-8 text-balance font-display text-[clamp(2.5rem,6vw,5rem)] font-medium leading-[0.96] tracking-[-0.06em]">
+            <h2 className="mt-8 text-balance font-display text-[clamp(2.5rem,4.8vw,4rem)] font-medium leading-[1] tracking-[-0.045em]">
               Sign in and see today’s work.
             </h2>
             <p className="mx-auto mt-6 max-w-xl text-[0.9375rem] leading-relaxed text-muted-foreground">
