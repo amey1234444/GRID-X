@@ -117,8 +117,23 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: 'liga', 'kern';
+    /* 'cv11' gives Inter the single-storey 'a' and straight-tailed 'l', which keeps small UI
+       labels legible at 11–13px; 'ss03' tightens the punctuation. Both are Inter features that
+       degrade silently on the fallback stack. */
+    font-feature-settings: 'liga', 'kern', 'cv11', 'ss03';
+    font-optical-sizing: auto;
     text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Display type is set tight and large, where optical sizing and a touch of negative tracking
+     do more for the line than any weight change would. */
+  h1,
+  h2,
+  h3 {
+    font-optical-sizing: auto;
+    text-wrap: balance;
   }
 
   ::selection {
@@ -390,6 +405,26 @@
   .editorial-card .text-muted-foreground,
   .editorial-card .text-subtle {
     color: rgb(17 17 17 / 0.64);
+  }
+
+  /* The testimonial pair. One paper card and one in the signal tint, so the band lands as a
+     deliberate pause in a page that is otherwise unbroken graphite. Both carry their own
+     foreground colour, since neither sits on the app's dark ground. */
+  .quote-card-paper {
+    color: #0f0f0f;
+    background-color: #f4f4f2;
+  }
+
+  /* The second card is a step darker rather than a different hue: the product is monochrome, and a
+     coloured panel here would be the only saturated surface on the whole site. */
+  .quote-card-signal {
+    color: #0f0f0f;
+    background-color: #d7d7d3;
+  }
+
+  .quote-card-paper .text-muted-foreground,
+  .quote-card-signal .text-muted-foreground {
+    color: rgb(15 15 15 / 0.66);
   }
 
   .edge-fade {

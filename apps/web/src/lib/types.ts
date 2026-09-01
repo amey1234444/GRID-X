@@ -276,6 +276,12 @@ export interface RateRow {
   component: { id: string; componentCode: string; name: string };
 }
 
+/** Headline figures the rates endpoint computes over the whole filtered set. */
+export interface RateSummary {
+  active: number;
+  averageRate: number | null;
+}
+
 export interface InvoiceRow {
   id: string;
   invoiceNumber: string;
@@ -355,7 +361,7 @@ export interface SettingRow {
   key: string;
   label: string;
   description: string;
-  group: 'security' | 'governance' | 'drawings' | 'materials' | 'commercial';
+  group: 'security' | 'rateLimits' | 'governance' | 'drawings' | 'materials' | 'commercial';
   type: 'boolean' | 'number' | 'roleList';
   value: unknown;
   isDefault: boolean;

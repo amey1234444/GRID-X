@@ -24,7 +24,7 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Public()
-  @RateLimit(10, 5 * 60_000)
+  @RateLimit('login')
   @Post('login')
   login(
     @Body(zodBody(loginSchema)) body: z.infer<typeof loginSchema>,
@@ -34,14 +34,14 @@ export class AuthController {
   }
 
   @Public()
-  @RateLimit(5, 15 * 60_000)
+  @RateLimit('signup')
   @Post('otp/request')
   requestOtp(@Body(zodBody(requestOtpSchema)) body: z.infer<typeof requestOtpSchema>) {
     return this.auth.requestOtp(body);
   }
 
   @Public()
-  @RateLimit(10, 15 * 60_000)
+  @RateLimit('login')
   @Post('otp/verify')
   verifyOtp(
     @Body(zodBody(verifyOtpSchema)) body: z.infer<typeof verifyOtpSchema>,
@@ -51,7 +51,7 @@ export class AuthController {
   }
 
   @Public()
-  @RateLimit(10, 5 * 60_000)
+  @RateLimit('login')
   @Post('partner/login')
   partnerLogin(
     @Body(zodBody(partnerPasswordLoginSchema)) body: z.infer<typeof partnerPasswordLoginSchema>,
@@ -90,7 +90,7 @@ export class AuthController {
     return this.auth.setLanguage(user.id, body.language);
   }
 
-  @RateLimit(5, 15 * 60_000)
+  @RateLimit('login')
   @Post('change-password')
   async changePassword(
     @CurrentUser() user: RequestUser,
@@ -105,14 +105,14 @@ export class AuthController {
    * six-digit secret and must not be brute-forceable.
    */
   @AllowEnrolmentSession()
-  @RateLimit(5, 15 * 60_000)
+  @RateLimit('signup')
   @Post('2fa/enrol')
   beginTwoFactor(@CurrentUser() user: RequestUser) {
     return this.auth.beginTwoFactorEnrolment(user.id);
   }
 
   @AllowEnrolmentSession()
-  @RateLimit(10, 15 * 60_000)
+  @RateLimit('login')
   @Post('2fa/confirm')
   confirmTwoFactor(
     @CurrentUser() user: RequestUser,
@@ -122,7 +122,7 @@ export class AuthController {
     return this.auth.confirmTwoFactorEnrolment(user.id, body.code, this.device(request));
   }
 
-  @RateLimit(10, 15 * 60_000)
+  @RateLimit('login')
   @Post('2fa/disable')
   disableTwoFactor(
     @CurrentUser() user: RequestUser,
@@ -136,7 +136,7 @@ export class AuthController {
    * probe which addresses exist if it is not, and the second is a token guess if it is not.
    */
   @Public()
-  @RateLimit(5, 15 * 60_000)
+  @RateLimit('signup')
   @Post('password/forgot')
   forgotPassword(
     @Body(zodBody(forgotPasswordSchema)) body: z.infer<typeof forgotPasswordSchema>,
@@ -146,7 +146,7 @@ export class AuthController {
   }
 
   @Public()
-  @RateLimit(10, 15 * 60_000)
+  @RateLimit('login')
   @Post('password/reset')
   resetPassword(
     @Body(zodBody(resetPasswordSchema)) body: z.infer<typeof resetPasswordSchema>,

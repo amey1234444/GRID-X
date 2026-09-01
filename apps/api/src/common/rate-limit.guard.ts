@@ -8,7 +8,14 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
+import {
+  RATE_LIMIT_TIER_KEYS,
+  RateLimitWindow,
+  defaultRateLimitFor,
+  rateLimitFor,
+} from '@gridx/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from './settings.service';
 import { RATE_LIMIT_KEY, RateLimitOptions } from './decorators';
 
 interface Bucket {
@@ -38,6 +45,7 @@ export class RateLimitGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly prisma: PrismaService,
+    private readonly settings?: SettingsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -47,25 +55,44 @@ export class RateLimitGuard implements CanActivate {
     ]);
     if (!options) return true;
 
+    const window = await this.resolve(options);
     const request = context.switchToHttp().getRequest<Request>();
     const key = `${context.getClass().name}.${context.getHandler().name}:${this.clientKey(request)}`;
     const now = Date.now();
     this.sweep(now);
 
-    const windowStart = Math.floor(now / options.windowMs) * options.windowMs;
-    const resetAt = windowStart + options.windowMs;
+    const windowStart = Math.floor(now / window.windowMs) * window.windowMs;
+    const resetAt = windowStart + window.windowMs;
 
     const local = this.buckets.get(key);
     if (!local || local.resetAt <= now) {
       this.buckets.set(key, { hits: 1, resetAt });
     } else {
       local.hits += 1;
-      if (local.hits > options.limit) this.reject(key, resetAt, now);
+      if (local.hits > window.limit) this.reject(key, resetAt, now);
     }
 
     const shared = await this.countShared(key, windowStart, resetAt);
-    if (shared !== null && shared > options.limit) this.reject(key, resetAt, now);
+    if (shared !== null && shared > window.limit) this.reject(key, resetAt, now);
     return true;
+  }
+
+  /**
+   * Turns a route's declaration into concrete numbers. A tier is read from system settings so the
+   * allowance can be retuned from the admin screen; if settings cannot be read the tier's shipped
+   * default applies, which keeps the limit closed rather than open.
+   */
+  private async resolve(options: RateLimitOptions): Promise<RateLimitWindow> {
+    if (!('tier' in options)) return options;
+    if (!this.settings) return defaultRateLimitFor(options.tier);
+    try {
+      const keys = RATE_LIMIT_TIER_KEYS[options.tier];
+      const values = await this.settings.getMany([keys.limit, keys.window]);
+      return rateLimitFor(options.tier, values);
+    } catch (error) {
+      this.logger.warn(`Could not read rate-limit settings, using defaults: ${String(error)}`);
+      return defaultRateLimitFor(options.tier);
+    }
   }
 
   private reject(key: string, resetAt: number, now: number): never {

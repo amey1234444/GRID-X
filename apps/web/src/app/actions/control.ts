@@ -1,6 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import {
+  RATE_LIMIT_TIERS,
+  RATE_LIMIT_TIER_KEYS,
+  type RateLimitTier,
+} from '@gridx/shared';
 import { redirect } from 'next/navigation';
 
 import { apiFetch } from '@/lib/session';
@@ -1239,6 +1244,47 @@ export async function createCompanyAction(_state: ActionState, data: FormData): 
  * a checkbox posts on/off, a number posts a number, and a role list posts one entry per checked
  * role. The API rejects any key that is not in the catalogue.
  */
+/**
+ * A rate-limit tier is two settings — an allowance and the window it is counted over — and they
+ * only make sense together. Writing them in one submit stops a half-applied change leaving, say,
+ * 5 attempts per 1 minute standing while the operator goes looking for the second field.
+ */
+export async function updateRateLimitTierAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const tier = text(data, 'tier');
+  if (!tier || !RATE_LIMIT_TIERS.includes(tier as RateLimitTier)) {
+    return { error: 'Unknown rate-limit tier' };
+  }
+  const keys = RATE_LIMIT_TIER_KEYS[tier as RateLimitTier];
+
+  const limit = number(data, 'limit');
+  const windowMinutes = number(data, 'windowMinutes');
+  if (limit === undefined) return { error: 'Enter how many requests are allowed' };
+  if (windowMinutes === undefined) return { error: 'Enter the window in minutes' };
+
+  const revalidate = ['/app/admin/settings', '/app/admin/users'];
+
+  // The allowance first: if the window write fails, the tighter of the two is what is left
+  // standing rather than a wide-open limit.
+  const limitResult = await send(`/settings/${keys.limit}`, { value: limit }, [], 'PATCH');
+  if (limitResult.error) return limitResult;
+
+  const windowResult = await send(
+    `/settings/${keys.window}`,
+    { value: windowMinutes },
+    revalidate,
+    'PATCH',
+  );
+  if (windowResult.error) {
+    return {
+      error: `The allowance was saved but the window was not: ${windowResult.error}`,
+    };
+  }
+  return { error: null, success: 'Saved' };
+}
+
 export async function updateSettingAction(_state: ActionState, data: FormData): Promise<ActionState> {
   const key = text(data, 'key');
   const type = text(data, 'type');

@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { RateLimitGuard } from './rate-limit.guard';
 import { RateLimitOptions } from './decorators';
 import { PrismaService } from '../prisma/prisma.service';
+import { SettingsService } from './settings.service';
 
 /**
  * A stand-in for the shared counter. Counting here as the real table does lets the tests cover the
@@ -36,9 +37,18 @@ function contextFor(body: Record<string, unknown>, ip = '10.0.0.1'): ExecutionCo
 function guardWith(
   options: RateLimitOptions | undefined,
   prisma: PrismaService = sharedCounter().prisma,
+  settings?: SettingsService,
 ): RateLimitGuard {
   const reflector = { getAllAndOverride: () => options } as unknown as Reflector;
-  return new RateLimitGuard(reflector, prisma);
+  return new RateLimitGuard(reflector, prisma, settings);
+}
+
+/** Stands in for the settings table so a tier can be retuned without a redeploy. */
+function settingsWith(values: Record<string, number>): SettingsService {
+  return {
+    getMany: (keys: string[]) =>
+      Promise.resolve(Object.fromEntries(keys.map((key) => [key, values[key]]))),
+  } as unknown as SettingsService;
 }
 
 describe('RateLimitGuard', () => {
@@ -125,5 +135,50 @@ describe('RateLimitGuard', () => {
     expect(await guard.canActivate(context)).toBe(true);
     // Degraded, but never open.
     await expect(guard.canActivate(context)).rejects.toThrow(HttpException);
+  });
+
+  describe('configurable tiers', () => {
+    it('takes a tier allowance from settings, so it can be retuned without a redeploy', async () => {
+      const guard = guardWith(
+        { tier: 'login' },
+        sharedCounter().prisma,
+        settingsWith({ 'rateLimits.loginAttempts': 2, 'rateLimits.loginWindowMinutes': 15 }),
+      );
+      const context = contextFor({ email: 'tuned@oswar.example' });
+
+      expect(await guard.canActivate(context)).toBe(true);
+      expect(await guard.canActivate(context)).toBe(true);
+      await expect(guard.canActivate(context)).rejects.toThrow(HttpException);
+    });
+
+    it('gives ordinary traffic a far larger allowance than sign-in', async () => {
+      const settings = settingsWith({
+        'rateLimits.loginAttempts': 5,
+        'rateLimits.loginWindowMinutes': 15,
+        'rateLimits.normalRequests': 600,
+        'rateLimits.normalWindowMinutes': 5,
+      });
+      const guard = guardWith({ tier: 'normal' }, sharedCounter().prisma, settings);
+      const context = contextFor({ email: 'busy@oswar.example' });
+
+      // Well past the sign-in allowance, and still fine.
+      for (let i = 0; i < 200; i += 1) {
+        expect(await guard.canActivate(context)).toBe(true);
+      }
+    });
+
+    it('falls back to the shipped default when settings cannot be read', async () => {
+      const broken = {
+        getMany: () => Promise.reject(new Error('settings unreadable')),
+      } as unknown as SettingsService;
+      const guard = guardWith({ tier: 'login' }, sharedCounter().prisma, broken);
+      const context = contextFor({ email: 'nosettings@oswar.example' });
+
+      // The shipped default is 5 attempts — closed, not open.
+      for (let i = 0; i < 5; i += 1) {
+        expect(await guard.canActivate(context)).toBe(true);
+      }
+      await expect(guard.canActivate(context)).rejects.toThrow(HttpException);
+    });
   });
 });

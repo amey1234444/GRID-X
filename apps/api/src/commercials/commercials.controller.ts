@@ -23,6 +23,13 @@ const invoiceQuerySchema = paginationSchema.extend({
   partnerId: z.string().optional(),
 });
 
+const rateQuerySchema = paginationSchema.extend({
+  partnerId: z.string().optional(),
+  componentId: z.string().optional(),
+  search: z.string().optional(),
+  isActive: z.coerce.boolean().optional(),
+});
+
 const submitInvoiceBodySchema = submitInvoiceSchema.extend({ partnerId: z.string().optional() });
 
 const approvalQuerySchema = paginationSchema.extend({
@@ -40,10 +47,9 @@ export class CommercialsController {
   @RequirePermissions(PERMISSIONS.RATE_READ)
   listRates(
     @CurrentUser() user: RequestUser,
-    @Query('partnerId') partnerId?: string,
-    @Query('componentId') componentId?: string,
+    @Query(zodBody(rateQuerySchema)) query: z.infer<typeof rateQuerySchema>,
   ) {
-    return this.commercials.listRates(user, partnerId, componentId);
+    return this.commercials.listRates(user, query);
   }
 
   @Post('rates')

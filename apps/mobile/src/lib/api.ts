@@ -1,5 +1,6 @@
 import Constants from 'expo-constants';
 
+import { notifyReachable, notifyUnreachable } from './connectivity';
 import { createLogger } from './logger';
 import { clearSession, loadServerUrl, loadSession, saveSession, saveServerUrl } from './storage';
 import type { LoginResponse, UploadedFileRef } from './types';
@@ -120,6 +121,9 @@ async function rawRequest<T>(
     });
   } catch (error) {
     log.error('request failed', { requestId: id, method, path, durationMs: Date.now() - startedAt });
+    // Could not reach the server at all — flip the app into its offline state
+    // so every screen shows the same banner instead of its own error.
+    notifyUnreachable();
     throw new ApiError(
       0,
       error instanceof Error && error.name === 'AbortError'
@@ -129,6 +133,9 @@ async function rawRequest<T>(
   } finally {
     clearTimeout(timer);
   }
+
+  // Any answer at all — including a 4xx — proves the API is reachable.
+  notifyReachable();
 
   const payload = parseBody(await response.text());
 
