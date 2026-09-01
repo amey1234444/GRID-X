@@ -207,7 +207,7 @@ export default function PartnersPage(): React.JSX.Element {
 
           <div className="mt-20 space-y-px overflow-hidden rounded-[18px] border border-border-strong bg-border-subtle">
             {promises.map((promise) => (
-              <article key={promise.title} className="bg-[#0d0d0d] p-7 sm:p-10">
+              <article key={promise.title} className="plate plate-lit p-7 sm:p-10">
                 <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:gap-14">
                   <div>
                     <h3 className="font-display text-[clamp(1.5rem,2.6vw,2.125rem)] font-medium leading-[1.08] tracking-[-0.04em]">
@@ -242,7 +242,7 @@ export default function PartnersPage(): React.JSX.Element {
           <StaggerGroup className="mt-16 grid gap-px overflow-hidden rounded-[18px] border border-border-strong bg-border-subtle md:grid-cols-3 lg:grid-cols-5">
             {steps.map((step) => (
               <StaggerItem key={step.title} className="h-full">
-                <div className="flex h-full min-h-[220px] flex-col bg-[#0d0d0d] p-6">
+                <div className="plate plate-lit flex h-full min-h-[220px] flex-col p-6">
                   <span className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-brand">
                     {step.step}
                   </span>

@@ -239,7 +239,7 @@ export default function SecurityPage(): React.JSX.Element {
           <StaggerGroup className="mt-20 grid gap-px overflow-hidden rounded-[18px] border border-border-strong bg-border-subtle md:grid-cols-2 lg:grid-cols-3">
             {controls.map((control) => (
               <StaggerItem key={control.title} className="h-full">
-                <article className="flex h-full flex-col bg-[#0d0d0d] p-7">
+                <article className="plate plate-lit flex h-full flex-col p-7">
                   <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-brand/25 bg-brand/10 text-brand">
                     <control.icon className="h-4 w-4" />
                   </span>
@@ -328,7 +328,7 @@ export default function SecurityPage(): React.JSX.Element {
                   { tier: 'Sign-up', detail: 'Anything that sends a message outward.' },
                   { tier: 'Ordinary', detail: 'Everyday authenticated traffic.' },
                 ].map((item) => (
-                  <div key={item.tier} className="bg-[#0d0d0d] p-5">
+                  <div key={item.tier} className="plate plate-lit p-5">
                     <p className="type-label">{item.tier}</p>
                     <p className="mt-3 text-[0.8125rem] leading-relaxed text-muted-foreground">
                       {item.detail}

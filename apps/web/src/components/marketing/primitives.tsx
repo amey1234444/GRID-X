@@ -115,8 +115,20 @@ export function MetricBand({
 }
 
 /**
- * Feature row — five short claims across a single band, as a rhythm break
- * between the long scrolling sections.
+ * Feature band — a row of short claims used as a rhythm break between long
+ * scrolling sections.
+ *
+ * It was previously a flat grid of small icons over hairline dividers, which at
+ * five across read as a footer rather than as a statement: the icon was the
+ * largest element in each cell and the claim itself was set at the same size as
+ * its own explanation.
+ *
+ * Now each cell is a lit plate carrying an index, so the band scans as a
+ * numbered set; the claim steps up to display type and the detail steps down
+ * and greys out, which is what actually creates the hierarchy. The icon becomes
+ * a small plated mark rather than the headline. Hovering raises the plate and
+ * brightens its top light-catch — the only motion, since the band is passed on
+ * the way to something else.
  */
 export function FeatureBand({
   items,
@@ -133,15 +145,40 @@ export function FeatureBand({
         className,
       )}
     >
-      {items.map((item) => (
-        <div key={item.title} className="bg-background p-6">
-          <span className="inline-flex text-brand [&_svg]:h-[18px] [&_svg]:w-[18px]">
-            {item.icon}
-          </span>
-          <p className="mt-4 font-display text-[0.9375rem] font-medium leading-snug">
+      {items.map((item, index) => (
+        <div
+          key={item.title}
+          className={cn(
+            'plate plate-lit group relative flex flex-col p-6 pt-7 xl:p-7 xl:pt-8',
+            'transition-[background-color,transform] duration-300 ease-out-expo',
+            'hover:z-10 hover:bg-[#111111] lg:hover:-translate-y-0.5',
+            '[&::before]:opacity-60 [&::before]:transition-opacity [&::before]:duration-300',
+            'hover:[&::before]:opacity-100',
+          )}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span
+              className={cn(
+                'grid h-8 w-8 place-items-center rounded-lg border border-border-strong',
+                'bg-surface text-muted-foreground transition-colors duration-300',
+                'group-hover:border-border-strong group-hover:text-foreground',
+                '[&_svg]:h-[15px] [&_svg]:w-[15px]',
+              )}
+            >
+              {item.icon}
+            </span>
+            <span
+              className="font-mono text-[0.5625rem] tracking-[0.14em] text-subtle"
+              aria-hidden
+            >
+              {String(index + 1).padStart(2, '0')}
+            </span>
+          </div>
+
+          <p className="mt-9 font-display text-[1.0625rem] font-medium leading-snug tracking-[-0.03em] text-foreground">
             {item.title}
           </p>
-          <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-muted-foreground">
+          <p className="mt-2 text-[0.8125rem] leading-relaxed text-muted-foreground">
             {item.detail}
           </p>
         </div>
