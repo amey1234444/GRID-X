@@ -1,5 +1,7 @@
 import { cn } from '@/lib/utils';
 
+import { AmbientLines } from './ambient-lines';
+
 /**
  * Marketing primitives.
  *
@@ -56,27 +58,22 @@ export function StatementBand({
   eyebrow,
   children,
   className,
+  tone = 'dark',
 }: {
   eyebrow?: string;
   children: React.ReactNode;
   className?: string;
+  tone?: 'dark' | 'light';
 }): React.JSX.Element {
   return (
     <section
       className={cn(
-        'relative overflow-hidden border-y border-border-subtle bg-[hsl(207_18%_3%)] py-28 sm:py-36',
+        'relative overflow-hidden border-y border-border-subtle py-28 sm:py-36',
+        tone === 'light' ? 'statement-band-light' : 'section-graphite',
         className,
       )}
     >
-      {/* Horizon arc — the only decorative flourish on the page. */}
-      <div
-        className="pointer-events-none absolute inset-x-0 top-1/2 h-[42rem] rounded-[100%] bg-gradient-to-b from-brand/[0.10] via-transparent to-transparent blur-3xl"
-        aria-hidden
-      />
-      <div
-        className="pointer-events-none absolute inset-0 grid-pattern radial-fade opacity-30"
-        aria-hidden
-      />
+      {tone === 'dark' ? <AmbientLines variant="routes" className="opacity-40" /> : null}
       <div className="container relative flex flex-col items-center gap-5 text-center">
         {eyebrow ? <p className="type-label">{eyebrow}</p> : null}
         {children}

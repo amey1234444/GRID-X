@@ -67,11 +67,11 @@ export function AppPreview(): React.JSX.Element {
   return (
     <div className="group relative mx-auto w-full max-w-[1180px]">
       <div
-        className="pointer-events-none absolute -inset-16 -z-10 bg-[radial-gradient(circle_at_50%_35%,hsl(var(--brand)/0.12),transparent_64%)] opacity-80 blur-3xl"
+        className="pointer-events-none absolute -inset-16 -z-10 bg-brand/10 blur-3xl"
         aria-hidden
       />
-      <div className="relative overflow-hidden rounded-[0.75rem] border border-white/[0.1] bg-[#050708] p-1.5 shadow-product transition-transform duration-700 ease-out-expo lg:group-hover:-translate-y-1">
-        <div className="overflow-hidden rounded-[0.5rem] border border-border-subtle bg-background">
+      <div className="linear-frame relative overflow-hidden rounded-[20px] border border-border-strong p-2 transition-transform duration-700 ease-out-expo lg:group-hover:-translate-y-1">
+        <div className="overflow-hidden rounded-[13px] border border-border bg-background">
           <div className="flex h-11 items-center justify-between gap-3 border-b border-border-subtle bg-surface px-4">
             <div className="flex items-center gap-1.5" aria-hidden>
               <span className="h-2 w-2 rounded-full bg-white/15" />
@@ -81,10 +81,10 @@ export function AppPreview(): React.JSX.Element {
             <div className="hidden items-center gap-2 rounded-control bg-black/30 px-3 py-1 font-mono text-[10px] text-subtle shadow-hairline sm:flex">
               <ShieldCheck className="h-3 w-3 text-success" /> control.gridx.oswar.in/app
             </div>
-            <div className="flex items-center gap-1.5 font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-success">
+            <div className="flex items-center gap-1.5 font-mono text-[9px] font-medium uppercase tracking-[0.08em] text-signal">
               <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-50" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-signal opacity-50" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-signal" />
               </span>
               Live network
             </div>
@@ -93,7 +93,7 @@ export function AppPreview(): React.JSX.Element {
           <div className="grid min-h-[520px] grid-cols-1 md:grid-cols-[168px_minmax(0,1fr)]">
             <aside className="hidden border-r border-border-subtle bg-surface/80 p-3 md:block">
               <div className="mb-5 flex items-center gap-2.5 border-b border-border-subtle px-1.5 pb-4 pt-1">
-                <span className="grid h-8 w-8 place-items-center rounded-input bg-[#0b1114] text-foreground shadow-hairline">
+                <span className="grid h-8 w-8 place-items-center rounded-input bg-[#0d0e11] text-foreground shadow-hairline">
                   <LogoMark className="h-[19px] w-[19px]" />
                 </span>
                 <span>
@@ -122,7 +122,7 @@ export function AppPreview(): React.JSX.Element {
                   </div>
                 ))}
               </nav>
-              <div className="mt-7 border border-border-subtle bg-black/20 p-3">
+              <div className="mt-7 rounded-lg border border-border-subtle bg-black/20 p-3">
                 <div className="flex items-center gap-1.5 font-mono text-[8px] uppercase tracking-[0.08em] text-subtle">
                   <Activity className="h-3 w-3 text-success" /> Network health
                 </div>
@@ -133,7 +133,7 @@ export function AppPreview(): React.JSX.Element {
               </div>
             </aside>
 
-            <div className="min-w-0 bg-[radial-gradient(circle_at_72%_0%,hsl(var(--brand)/0.07),transparent_38%)]">
+            <div className="min-w-0 bg-[linear-gradient(135deg,rgb(255_255_255/0.018),transparent_42%)]">
               <div className="flex h-14 items-center gap-3 border-b border-border-subtle px-4 sm:px-5">
                 <div>
                   <p className="font-display text-xs font-medium">Command center</p>
@@ -170,7 +170,7 @@ export function AppPreview(): React.JSX.Element {
                   {metrics.map((metric) => (
                     <div
                       key={metric.label}
-                      className="rounded-input bg-card p-3 shadow-hairline surface-sheen sm:p-3.5"
+                      className="rounded-lg bg-card p-3 shadow-hairline surface-sheen sm:p-3.5"
                     >
                       <div className="flex items-center justify-between gap-1">
                         <p className="truncate font-mono text-[8px] uppercase tracking-[0.06em] text-muted-foreground sm:text-[9px]">
@@ -189,7 +189,7 @@ export function AppPreview(): React.JSX.Element {
                 </div>
 
                 <div className="grid gap-2.5 lg:grid-cols-[1.5fr_0.8fr]">
-                  <div className="overflow-hidden rounded-input bg-card p-3 shadow-hairline">
+                  <div className="overflow-hidden rounded-lg bg-card p-3 shadow-hairline">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-[10px] font-medium">Production velocity</p>
@@ -229,7 +229,7 @@ export function AppPreview(): React.JSX.Element {
                     </svg>
                   </div>
 
-                  <div className="rounded-input bg-card p-3 shadow-hairline">
+                  <div className="rounded-lg bg-card p-3 shadow-hairline">
                     <div className="flex items-center gap-1.5">
                       <Gauge className="h-3 w-3 text-brand" />
                       <p className="text-[10px] font-medium">Network pulse</p>
@@ -259,7 +259,7 @@ export function AppPreview(): React.JSX.Element {
                   </div>
                 </div>
 
-                <div className="overflow-hidden rounded-input bg-card shadow-hairline">
+                <div className="overflow-hidden rounded-lg bg-card shadow-hairline">
                   <div className="flex items-center justify-between border-b border-border-subtle px-3 py-2">
                     <div>
                       <p className="text-[10px] font-medium">Jobs requiring focus</p>

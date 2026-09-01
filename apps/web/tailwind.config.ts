@@ -36,6 +36,10 @@ const config: Config = {
           DEFAULT: 'hsl(var(--brand))',
           foreground: 'hsl(var(--brand-foreground))',
         },
+        signal: {
+          DEFAULT: 'hsl(var(--signal))',
+          foreground: 'hsl(var(--signal-foreground))',
+        },
         secondary: {
           DEFAULT: 'hsl(var(--secondary))',
           foreground: 'hsl(var(--secondary-foreground))',
@@ -103,16 +107,16 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        display: ['var(--font-display)', 'var(--font-sans)', 'ui-sans-serif', 'sans-serif'],
+        display: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       boxShadow: {
-        hairline: 'inset 0 0 0 1px hsl(204 10% 15% / 0.75)',
-        popover: '0 12px 32px -8px rgb(0 0 0 / 0.7), 0 0 0 1px hsl(204 10% 18% / 0.8)',
-        subtle: '0 1px 2px 0 rgb(0 0 0 / 0.3), 0 0 0 1px hsl(204 10% 15.5% / 0.55)',
-        elevated: '0 16px 40px -16px rgb(0 0 0 / 0.6), 0 0 0 1px hsl(204 10% 17% / 0.7)',
-        glow: '0 0 0 1px rgb(255 255 255 / 0.06), 0 24px 64px -24px hsl(188 86% 50% / 0.18)',
-        product: '0 48px 120px -42px hsl(188 86% 48% / 0.2), 0 22px 58px -28px rgb(0 0 0 / 0.95)',
+        hairline: 'inset 0 0 0 1px hsl(228 9% 17% / 0.82)',
+        popover: '0 24px 70px -24px rgb(0 0 0 / 0.9), 0 0 0 1px hsl(228 9% 20% / 0.9)',
+        subtle: '0 1px 2px rgb(0 0 0 / 0.35), 0 0 0 1px hsl(228 9% 16% / 0.7)',
+        elevated: '0 28px 80px -36px rgb(0 0 0 / 0.95), 0 0 0 1px hsl(228 9% 20% / 0.85)',
+        glow: '0 0 0 1px rgb(255 255 255 / 0.06), 0 30px 90px -36px hsl(226 92% 70% / 0.3)',
+        product: '0 70px 160px -60px hsl(226 92% 66% / 0.35), 0 30px 80px -38px rgb(0 0 0 / 1)',
       },
       transitionTimingFunction: {
         'out-expo': 'cubic-bezier(0.16, 1, 0.3, 1)',

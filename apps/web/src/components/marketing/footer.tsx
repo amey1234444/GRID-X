@@ -35,9 +35,9 @@ const columns = [
 
 export function MarketingFooter(): React.JSX.Element {
   return (
-    <footer className="relative overflow-hidden border-t border-border-subtle bg-[#060809]">
-      <div className="pointer-events-none absolute inset-0 grid-pattern opacity-20" aria-hidden />
-      <div className="container relative grid gap-12 py-16 lg:grid-cols-[1.5fr_repeat(3,1fr)] lg:py-20">
+    <footer className="relative overflow-hidden border-t border-border-subtle bg-[#08090b]">
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/45 to-transparent" />
+      <div className="container relative grid gap-12 py-20 lg:grid-cols-[1.5fr_repeat(3,1fr)] lg:py-28">
         <div className="space-y-6">
           <Wordmark />
           <p className="max-w-sm text-[0.875rem] leading-6 text-muted-foreground">
@@ -46,7 +46,7 @@ export function MarketingFooter(): React.JSX.Element {
           </p>
           <Link
             href="/login"
-            className="inline-flex items-center gap-2 border-b border-brand/40 pb-1 text-[0.8125rem] font-medium text-foreground transition-colors hover:border-brand hover:text-brand"
+            className="inline-flex items-center gap-2 text-[0.8125rem] font-medium text-brand transition-colors hover:text-foreground"
           >
             Enter the command center <ArrowUpRight className="h-3.5 w-3.5" />
           </Link>

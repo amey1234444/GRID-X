@@ -1,19 +1,25 @@
 import Link from 'next/link';
 import {
-  Activity,
   ArrowRight,
   BadgeCheck,
-  CircuitBoard,
+  Boxes,
   FileLock2,
   Gauge,
   Languages,
   Layers,
+  RadioTower,
   ScrollText,
   ShieldCheck,
   WifiOff,
 } from 'lucide-react';
 
+import { AmbientLines } from '@/components/marketing/ambient-lines';
 import { AppPreview } from '@/components/marketing/app-preview';
+import {
+  BlueprintFigures,
+  EvidenceVisual,
+  PlanningVisual,
+} from '@/components/marketing/linear-visuals';
 import {
   Eyebrow,
   FeatureBand,
@@ -21,59 +27,45 @@ import {
   MiniRow,
   MiniSurface,
   Statement,
-  StatementBand,
 } from '@/components/marketing/primitives';
 import { StageRail, type Stage } from '@/components/marketing/stage-rail';
 import { Reveal, StaggerGroup, StaggerItem } from '@/components/motion';
-import { Button } from '@/components/ui/button';
-
-/* -------------------------------------------------------------------- */
-/* Content                                                               */
-/* -------------------------------------------------------------------- */
 
 const outcomes = [
-  {
-    value: '1 system',
-    label: 'Replaces the calls, WhatsApp threads and spreadsheets between plants',
-  },
-  { value: '100%', label: 'Drawing access logged, revision-controlled and acknowledged' },
-  { value: 'Zero', label: 'Payments released without an accepted quantity behind them' },
-  { value: '7 KPIs', label: 'Scored on every partner, every period, automatically' },
+  { value: '1 system', label: 'Across operations, engineering, quality and finance' },
+  { value: '100%', label: 'Released drawing access logged and acknowledged' },
+  { value: '0 gaps', label: 'Between accepted quantity and approved payment' },
+  { value: '7 signals', label: 'Continuously scoring every manufacturing partner' },
 ];
 
-/**
- * The stages mirror the actual GRID-X transaction, not a marketing funnel.
- * Each panel names a control the system enforces rather than a benefit it
- * claims.
- */
 const stages: Stage[] = [
   {
     id: 'issue',
     label: 'Issue the job',
-    lead: 'Every job leaves with the right revision.',
-    trail: 'Capability, capacity and authorisation are checked before a partner ever sees it.',
+    lead: 'Every job starts controlled.',
+    trail: 'Capability, capacity and drawing authority are checked before release.',
     panels: [
       {
-        title: 'Allocation that argues back',
+        title: 'Allocation with constraints',
         detail:
-          'Partners are scored on capability, declared capacity, quality history and distance. Class A work will not allocate to an unauthorised unit — the system refuses rather than warns.',
+          'GRID-X ranks eligible partners by capability, live capacity, quality history and distance. It blocks an allocation when the required authorisation is missing.',
         visual: (
-          <MiniSurface title="Allocation">
-            <MiniRow label="Precision Auto Components" meta="Score 94" tone="success" />
-            <MiniRow label="Shakti Engineering Works" meta="Score 81" tone="success" />
-            <MiniRow label="Metro Fabricators" meta="No Class A" tone="destructive" />
+          <MiniSurface title="Allocation signal">
+            <MiniRow label="Precision Auto" meta="94 · ready" tone="success" />
+            <MiniRow label="Shakti Works" meta="81 · ready" tone="success" />
+            <MiniRow label="Metro Fabricators" meta="class blocked" tone="warning" />
           </MiniSurface>
         ),
       },
       {
-        title: 'Drawings under revision control',
+        title: 'The right revision travels',
         detail:
-          'Only released revisions reach the shop floor. Every view, download and acknowledgement is written to the job record, so a superseded print is never an open question.',
+          'Only released drawings reach the partner. Every view and acknowledgement is written to the job while superseded revisions remain locked.',
         visual: (
-          <MiniSurface title="DRG-4471 · Rev C">
+          <MiniSurface title="DRG-4471 / Rev C">
             <MiniRow label="Released to partner" meta="09:12" tone="success" />
-            <MiniRow label="Viewed by operator" meta="09:41" />
-            <MiniRow label="Rev B superseded" meta="Locked" tone="warning" />
+            <MiniRow label="Viewed on shop floor" meta="09:41" />
+            <MiniRow label="Rev B superseded" meta="locked" tone="warning" />
           </MiniSurface>
         ),
       },
@@ -81,24 +73,24 @@ const stages: Stage[] = [
   },
   {
     id: 'material',
-    label: 'Track the material',
-    lead: 'Material is tracked to the kilogram.',
-    trail: 'Issued against challan, acknowledged on a phone, and reconciled before anyone is paid.',
+    label: 'Track material',
+    lead: 'Custody stays visible.',
+    trail: 'Issued, acknowledged, consumed and returned quantities remain tied to one job.',
     panels: [
       {
-        title: 'Custody, not trust',
+        title: 'Material under partner custody',
         detail:
-          'Weight is recorded at issue and acknowledged by the partner on their own device. Stock under partner custody is visible at all times, valued and ageing.',
+          'Issue challans and mobile acknowledgement make stock visible by partner, job, age and value—without waiting for a month-end spreadsheet.',
       },
       {
-        title: 'Reconciliation as a gate',
+        title: 'Reconciliation is a gate',
         detail:
-          'Issued versus consumed versus scrap returned. Shortages become deductions on the invoice automatically — not a conversation at month end.',
+          'Consumed quantity and returned scrap must explain every kilogram. Shortage becomes a recorded deduction, not a later negotiation.',
         visual: (
-          <MiniSurface title="Reconciliation · JOB-2291">
+          <MiniSurface title="JOB-2291 / reconciliation">
             <MiniRow label="Issued" meta="1,240 kg" />
             <MiniRow label="Consumed + scrap" meta="1,226 kg" />
-            <MiniRow label="Shortage deducted" meta="14 kg" tone="warning" />
+            <MiniRow label="Shortage" meta="14 kg" tone="warning" />
           </MiniSurface>
         ),
       },
@@ -106,24 +98,24 @@ const stages: Stage[] = [
   },
   {
     id: 'quality',
-    label: 'Verify the quality',
-    lead: 'Nothing is accepted on a phone call.',
-    trail: 'First article, sampling plan and measured characteristics, recorded against the job.',
+    label: 'Verify quality',
+    lead: 'Acceptance requires evidence.',
+    trail: 'Measured characteristics, photographs and decisions stay on the production record.',
     panels: [
       {
-        title: 'Inspection with evidence',
+        title: 'Inspection where work happens',
         detail:
-          'Inspectors work a focused queue with the plan attached, record measured values against nominal and tolerance, and attach photographs from the field.',
+          'Inspectors receive a focused queue with the plan attached, record actual values against tolerance and capture evidence from the field.',
       },
       {
-        title: 'Rejection has consequences',
+        title: 'A rejection changes the system',
         detail:
-          'A rejection raises a rework order, feeds the partner scorecard and opens a corrective action when the same defect repeats across the network.',
+          'Rejected characteristics raise rework, affect the scorecard and trigger corrective action when the same defect repeats.',
         visual: (
-          <MiniSurface title="Inspection · Lot 88">
-            <MiniRow label="Ø 24.00 ±0.05" meta="24.02 ✓" tone="success" />
-            <MiniRow label="Surface finish" meta="Pass" tone="success" />
-            <MiniRow label="Concentricity" meta="Reject" tone="destructive" />
+          <MiniSurface title="Inspection / Lot 88">
+            <MiniRow label="Ø 24.00 ±0.05" meta="24.02" tone="success" />
+            <MiniRow label="Surface finish" meta="pass" tone="success" />
+            <MiniRow label="Concentricity" meta="reject" tone="warning" />
           </MiniSurface>
         ),
       },
@@ -131,24 +123,24 @@ const stages: Stage[] = [
   },
   {
     id: 'payment',
-    label: 'Release the payment',
-    lead: 'Payment follows accepted quantity.',
-    trail: 'Not dispatched quantity, not promised quantity — accepted, reconciled and approved.',
+    label: 'Release payment',
+    lead: 'Payment follows accepted output.',
+    trail: 'Quantity, material and rate gates must agree before finance can approve.',
     panels: [
       {
-        title: 'Three gates before finance',
+        title: 'Three checks before finance',
         detail:
-          'Quantity accepted by inspection, material reconciled without shortage, and rate matched to the agreed schedule. An invoice that fails any one of them cannot be approved.',
+          'Accepted quantity, reconciled material and the agreed rate are evaluated together. A failed check stops the invoice with a precise reason.',
       },
       {
-        title: 'Ageing nobody has to chase',
+        title: 'Transparent ageing',
         detail:
-          'Approval and payment ageing is visible to both sides. Partners see exactly where their money is, which is the difference between a vendor and a network.',
+          'Both teams can see who owns the next decision and how long it has waited, reducing calls without hiding accountability.',
         visual: (
-          <MiniSurface title="Invoice INV-1043">
-            <MiniRow label="Quantity check" meta="Passed" tone="success" />
-            <MiniRow label="Material reconciled" meta="Passed" tone="success" />
-            <MiniRow label="Finance approval" meta="Pending 2d" tone="warning" />
+          <MiniSurface title="INV-1043 / approval">
+            <MiniRow label="Quantity" meta="passed" tone="success" />
+            <MiniRow label="Material" meta="passed" tone="success" />
+            <MiniRow label="Finance" meta="pending 2d" tone="warning" />
           </MiniSurface>
         ),
       },
@@ -160,266 +152,311 @@ const fieldReadiness = [
   {
     icon: <WifiOff />,
     title: 'Offline-tolerant',
-    detail:
-      'Jobs stay readable, milestones save locally and photos queue until the signal returns.',
+    detail: 'Milestones and photos queue safely until the connection returns.',
   },
   {
     icon: <Gauge />,
     title: 'Low bandwidth',
-    detail: 'Compressed drawing previews and lean payloads keep the app usable on 2G.',
+    detail: 'Lean data and compressed previews remain usable on weak mobile networks.',
   },
   {
     icon: <Languages />,
     title: 'Hindi and English',
-    detail: 'Partner screens speak the language of the operator, not the head office.',
+    detail: 'Partner workflows speak the language used on the shop floor.',
   },
   {
     icon: <ScrollText />,
     title: 'Audited by default',
-    detail: 'Every drawing view, quality decision and approval is permanently recorded.',
+    detail: 'Views, decisions, movements and approvals become permanent evidence.',
   },
   {
     icon: <FileLock2 />,
-    title: 'Access controlled',
-    detail: 'Partners see their own work and nothing else. Roles are enforced server-side.',
+    title: 'Role controlled',
+    detail: 'Every user sees the right work, and authorisation is enforced server-side.',
   },
 ];
 
 const personas = [
   {
-    title: 'GRID-X Control',
-    audience: 'Operations, engineering, quality and finance',
-    points: [
-      'Allocation and capacity boards',
-      'Drawing and revision control',
-      'Inspection and payment approvals',
-    ],
+    title: 'Control',
+    label: 'For operations, engineering, quality and finance',
+    detail: 'The full command layer for allocation, release, inspection and payment.',
     href: '/login',
-    cta: 'Sign in to Control',
     icon: Layers,
   },
   {
-    title: 'GRID-X Partner',
-    audience: 'Mobile-first, for MSME partner units',
-    points: [
-      'Accept jobs and read instructions',
-      'Update milestones offline',
-      'Raise invoices, track payment',
-    ],
+    title: 'Partner',
+    label: 'For MSME manufacturing units',
+    detail: 'A mobile-first work queue for jobs, drawings, milestones and invoices.',
     href: '/partner/login',
-    cta: 'Open partner app',
-    icon: Gauge,
+    icon: Boxes,
   },
   {
-    title: 'GRID-X Inspector',
-    audience: 'For quality inspectors on the move',
-    points: [
-      'Queue with plans attached',
-      'Record measured characteristics',
-      'Raise rejections and rework',
-    ],
+    title: 'Inspector',
+    label: 'For quality teams in the field',
+    detail: 'Plans, measurements, evidence and rework decisions in one focused flow.',
     href: '/login',
-    cta: 'Inspector sign in',
     icon: BadgeCheck,
   },
 ];
 
-/* -------------------------------------------------------------------- */
-
 export default function MarketingHomePage(): React.JSX.Element {
   return (
     <>
-      <section className="relative overflow-hidden border-b border-border-subtle">
-        <div
-          className="pointer-events-none absolute inset-0 grid-pattern radial-fade opacity-30"
-          aria-hidden
-        />
-        <div
-          className="pointer-events-none absolute -top-80 left-1/2 h-[38rem] w-[60rem] -translate-x-1/2 rounded-full bg-brand/[0.065] blur-3xl"
-          aria-hidden
-        />
-
-        <div className="container relative pb-12 pt-14 sm:pb-16 sm:pt-20 lg:pt-24">
+      <section className="linear-hero relative overflow-hidden border-b border-border-subtle">
+        <AmbientLines variant="network" className="opacity-25" />
+        <div className="container relative pb-16 pt-20 sm:pt-28 lg:pb-24 lg:pt-36">
           <Reveal>
-            <div className="flex items-center justify-between gap-6 border-y border-border-subtle py-3">
-              <Eyebrow className="border-0 bg-transparent px-0 shadow-none">
-                <span
-                  className="mr-1.5 h-1.5 w-1.5 animate-pulse-dot rounded-full bg-success"
-                  aria-hidden
-                />
-                OSWAR distributed manufacturing network
+            <div className="flex items-center gap-3">
+              <Eyebrow className="rounded-full border border-brand/20 bg-brand/[0.07] px-3 py-1.5 text-brand shadow-none">
+                <span className="mr-2 h-1.5 w-1.5 animate-pulse-dot rounded-full bg-signal" />
+                GRID-X manufacturing network
               </Eyebrow>
-              <span className="hidden items-center gap-2 font-mono text-[0.625rem] uppercase tracking-[0.12em] text-subtle sm:inline-flex">
-                <CircuitBoard className="h-3.5 w-3.5 text-brand" /> System / GRID-X 2.0
+              <span className="hidden font-mono text-[0.625rem] uppercase tracking-[0.12em] text-subtle sm:inline">
+                System / 02
               </span>
             </div>
           </Reveal>
 
-          <div className="grid gap-8 py-12 sm:py-16 lg:grid-cols-[1.25fr_0.75fr] lg:items-end lg:gap-20">
-            <Reveal delay={0.05}>
-              <h1 className="max-w-4xl text-balance font-display text-[clamp(3.35rem,7.5vw,7rem)] font-medium leading-[0.88] tracking-[-0.065em]">
-                One factory.
-                <br />
-                <span className="text-muted-foreground">Every partner.</span>
-              </h1>
-            </Reveal>
+          <Reveal delay={0.05}>
+            <h1 className="mt-8 max-w-[1080px] text-balance text-[clamp(3.4rem,8.2vw,7.75rem)] font-medium leading-[0.9] tracking-[-0.075em]">
+              The operating system for{' '}
+              <span className="bg-gradient-to-r from-[#b9caff] via-[#839cff] to-[#eef0ff] bg-clip-text text-transparent">
+                distributed manufacturing.
+              </span>
+            </h1>
+          </Reveal>
 
-            <Reveal delay={0.11}>
-              <div className="border-l border-brand/45 pl-5 sm:pl-7">
-                <p className="max-w-lg text-pretty text-[1rem] leading-7 text-muted-foreground sm:text-[1.0625rem]">
-                  Plan jobs, lock drawing revisions, trace material, verify quality and release
-                  payment from one auditable command center.
-                </p>
-                <div className="mt-7 flex flex-col gap-2.5 sm:flex-row">
-                  <Button size="lg" asChild>
-                    <Link href="/login">
-                      Enter command center <ArrowRight />
-                    </Link>
-                  </Button>
-                  <Button size="lg" variant="outline" asChild>
-                    <Link href="/platform">Explore the platform</Link>
-                  </Button>
-                </div>
+          <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_0.65fr] lg:items-end">
+            <Reveal delay={0.1}>
+              <p className="max-w-2xl text-pretty text-[1.0625rem] leading-8 text-muted-foreground sm:text-xl">
+                Plan jobs, release drawings, trace material, verify quality and approve payment
+                across every partner as one live, auditable operation.
+              </p>
+            </Reveal>
+            <Reveal delay={0.14}>
+              <div className="flex flex-col gap-3 sm:flex-row lg:justify-end">
+                <Link
+                  href="/login"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-foreground px-6 text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.02]"
+                >
+                  Open GRID-X <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  href="/platform"
+                  className="inline-flex h-12 items-center justify-center rounded-full border border-border-strong bg-surface/70 px-6 text-sm font-semibold text-foreground transition-colors hover:bg-surface-hover"
+                >
+                  Explore the platform
+                </Link>
               </div>
             </Reveal>
           </div>
 
-          <Reveal delay={0.16} y={22}>
+          <Reveal delay={0.18} y={24} className="mt-16 lg:mt-24">
             <AppPreview />
           </Reveal>
+        </div>
+      </section>
 
-          <Reveal delay={0.21}>
-            <div className="mt-7 grid gap-px overflow-hidden border border-border-subtle bg-border-subtle sm:grid-cols-3">
-              {[
-                { icon: Activity, label: 'Live execution', detail: 'One view across the network' },
-                {
-                  icon: FileLock2,
-                  label: 'Revision locked',
-                  detail: 'Only released drawings travel',
-                },
-                {
-                  icon: ShieldCheck,
-                  label: 'Evidence first',
-                  detail: 'Every decision is auditable',
-                },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  className="flex items-center gap-3 bg-background px-4 py-4 sm:px-5"
-                >
-                  <item.icon className="h-4 w-4 shrink-0 text-brand" />
-                  <div>
-                    <p className="text-[0.75rem] font-semibold">{item.label}</p>
-                    <p className="mt-0.5 text-[0.6875rem] text-subtle">{item.detail}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+      <section className="border-b border-border-subtle bg-[#08090b]">
+        <div className="container py-9">
+          <p className="mb-6 font-mono text-[0.625rem] uppercase tracking-[0.14em] text-subtle">
+            One shared system across the operation
+          </p>
+          <div className="edge-fade grid grid-cols-2 gap-y-7 text-center text-sm font-semibold text-muted-foreground sm:grid-cols-4 lg:grid-cols-7">
+            {[
+              'Production',
+              'Engineering',
+              'Quality',
+              'Materials',
+              'Logistics',
+              'Finance',
+              'Partners',
+            ].map((item) => (
+              <span key={item} className="tracking-[-0.02em]">
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section-graphite border-b border-border-subtle py-24 sm:py-32">
+        <div className="container">
+          <Reveal className="max-w-6xl">
+            <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-brand">
+              Built for real manufacturing flow
+            </p>
+            <h2 className="mt-12 text-balance text-[clamp(2.6rem,5.4vw,5rem)] font-medium leading-[1.04] tracking-[-0.055em]">
+              <span className="text-foreground">
+                A new control layer for partner manufacturing.
+              </span>{' '}
+              <span className="text-subtle">
+                GRID-X turns distributed work into one connected, inspectable system.
+              </span>
+            </h2>
+          </Reveal>
+          <Reveal className="mt-20" y={20}>
+            <BlueprintFigures />
           </Reveal>
         </div>
       </section>
 
-      {/* Outcomes — dense, unboxed. */}
-      <section className="border-b border-border-subtle">
-        <div className="container py-4 sm:py-6">
-          <MetricBand items={outcomes} />
+      <section className="section-blueprint border-b border-border-subtle py-24 sm:py-32">
+        <div className="container">
+          <Reveal className="grid gap-10 lg:grid-cols-[0.7fr_1.3fr] lg:items-start lg:gap-24">
+            <h2 className="text-[clamp(2.5rem,5vw,4.25rem)] font-medium leading-[0.98] tracking-[-0.055em]">
+              Plan and monitor
+            </h2>
+            <div>
+              <p className="max-w-2xl text-[clamp(1.35rem,2.5vw,2rem)] leading-[1.35] tracking-[-0.035em] text-foreground">
+                Move from capacity signals to a release-ready production plan without losing the
+                constraints that make the plan real.
+              </p>
+              <Link
+                href="/platform#allocation"
+                className="mt-8 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-brand"
+              >
+                Explore planning <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </Reveal>
+          <Reveal className="mt-16" y={24}>
+            <PlanningVisual />
+          </Reveal>
+          <div className="mt-8 grid gap-5 border-t border-border-subtle pt-8 sm:grid-cols-3">
+            {[
+              'Capability-aware allocation',
+              'Live capacity commitments',
+              'Delay responsibility and ageing',
+            ].map((item) => (
+              <div key={item} className="flex items-center gap-3 text-sm text-muted-foreground">
+                <span className="h-1.5 w-1.5 rounded-full bg-brand" /> {item}
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* The transaction, told as a scrolling flow. */}
-      <section className="border-b border-border-subtle py-20 sm:py-28">
-        <div className="container mb-14 max-w-3xl">
+      <section className="border-b border-border-subtle bg-[#08090b] py-24 sm:py-32">
+        <div className="container mb-16 grid gap-10 lg:grid-cols-[0.68fr_1.32fr] lg:gap-24">
           <Reveal>
-            <Eyebrow>The central transaction</Eyebrow>
-            <Statement
-              className="mt-5"
-              lead="One controlled flow, from job issue to payment."
-              trail="GRID-X will not let a step be skipped — each gate has to be satisfied and recorded before the next one opens."
-            />
+            <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-signal">
+              The controlled transaction
+            </p>
+            <h2 className="mt-5 text-[clamp(2.5rem,5vw,4.25rem)] font-medium leading-[0.98] tracking-[-0.055em]">
+              One flow. Four gates.
+            </h2>
+          </Reveal>
+          <Reveal delay={0.06}>
+            <p className="max-w-2xl text-xl leading-8 text-muted-foreground sm:text-2xl sm:leading-9">
+              Work advances when the required operational evidence exists—not when a call says it is
+              done.
+            </p>
           </Reveal>
         </div>
         <StageRail stages={stages} />
       </section>
 
-      {/* Full-bleed assertion. */}
-      <StatementBand eyebrow="The difference">
-        <Statement
-          className="max-w-4xl text-[clamp(2.25rem,5vw,4rem)]"
-          lead="A network you can audit"
-          trail="is a network you can scale."
-        />
-        <p className="max-w-xl text-pretty text-[1.0625rem] leading-relaxed text-muted-foreground">
-          Every drawing view, quality decision, material movement and payment approval is written
-          down, attributed and permanent. Not because compliance asked — because that is the only
-          way distributed manufacturing holds together.
-        </p>
-      </StatementBand>
-
-      {/* Field reality. */}
-      <section className="py-24 sm:py-28">
-        <div className="container mb-14 max-w-2xl">
-          <Reveal>
-            <Eyebrow>Designed for Indian shop floors</Eyebrow>
-            <Statement
-              className="mt-5"
-              lead="Works where the work happens."
-              trail="Entry-level Android phones, patchy signal, a noisy floor and an operator who does not read English."
-            />
+      <section className="section-graphite border-b border-border-subtle py-24 sm:py-32">
+        <div className="container">
+          <Reveal className="grid gap-10 lg:grid-cols-[0.7fr_1.3fr] lg:gap-24">
+            <h2 className="text-[clamp(2.5rem,5vw,4.25rem)] font-medium leading-[0.98] tracking-[-0.055em]">
+              Verify and release
+            </h2>
+            <div>
+              <p className="max-w-2xl text-[clamp(1.35rem,2.5vw,2rem)] leading-[1.35] tracking-[-0.035em]">
+                The drawing, material trail, measured quality and accepted quantity stay together
+                all the way to payment.
+              </p>
+              <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground">
+                Every gate explains what passed, what failed and who owns the next action.
+              </p>
+            </div>
+          </Reveal>
+          <Reveal className="mt-16" y={24}>
+            <EvidenceVisual />
           </Reveal>
         </div>
-        <Reveal>
-          <FeatureBand items={fieldReadiness} />
-        </Reveal>
       </section>
 
-      {/* Three experiences. */}
-      <section className="border-b border-border-subtle py-24 sm:py-28">
-        <div className="container space-y-14">
-          <Reveal className="max-w-2xl">
-            <Eyebrow>Three experiences</Eyebrow>
+      <section className="border-b border-border-subtle bg-[#08090b] py-24 sm:py-32">
+        <div className="container">
+          <Reveal className="max-w-3xl">
+            <Eyebrow>Designed for Indian shop floors</Eyebrow>
             <Statement
-              className="mt-5"
-              lead="Purpose-built for every person in the chain."
-              trail="Office teams get depth. Partner units get a phone that works on a weak signal. Inspectors get a queue."
+              className="mt-7"
+              lead="Works where the work happens."
+              trail="Entry-level Android phones, weak signals, noisy floors and multilingual teams are first-class constraints."
             />
           </Reveal>
+          <Reveal className="mt-14">
+            <FeatureBand items={fieldReadiness} />
+          </Reveal>
+        </div>
+      </section>
 
-          <StaggerGroup className="grid gap-px overflow-hidden border border-border-subtle bg-border-subtle lg:grid-cols-3">
+      <section className="bg-[#08090b] py-24 sm:py-32">
+        <div className="container">
+          <Reveal className="grid gap-3 lg:grid-cols-[1.65fr_0.85fr]">
+            <article className="blueprint-card relative min-h-[480px] overflow-hidden rounded-[18px] p-8 sm:p-12">
+              <div className="absolute -bottom-24 -right-20 h-[420px] w-[420px] rounded-full border-[48px] border-[#778bff]/10" />
+              <RadioTower className="h-8 w-8" />
+              <h2 className="relative mt-10 max-w-3xl text-[clamp(2.4rem,5vw,4.5rem)] font-medium leading-[1.02] tracking-[-0.06em]">
+                See one network—not a collection of disconnected vendors.
+              </h2>
+              <p className="absolute bottom-10 left-8 max-w-md text-base leading-7 text-muted-foreground sm:left-12">
+                Shared state gives every team the same operational truth without flattening their
+                responsibilities.
+              </p>
+            </article>
+            <article className="signal-card flex min-h-[480px] flex-col rounded-[18px] p-8 sm:p-10">
+              <ShieldCheck className="h-8 w-8" />
+              <h2 className="mt-10 text-[clamp(2.2rem,4vw,3.6rem)] font-medium leading-[1.02] tracking-[-0.06em]">
+                Evidence creates momentum.
+              </h2>
+              <p className="mt-auto text-base leading-7 text-muted-foreground">
+                Teams act faster because the system makes the next safe decision obvious.
+              </p>
+            </article>
+          </Reveal>
+
+          <Reveal className="mt-24">
+            <MetricBand items={outcomes} />
+          </Reveal>
+        </div>
+      </section>
+
+      <section className="section-blueprint border-y border-border-subtle py-24 sm:py-32">
+        <div className="container">
+          <Reveal className="grid gap-8 lg:grid-cols-[0.7fr_1.3fr]">
+            <h2 className="text-[clamp(2.3rem,4.4vw,3.75rem)] font-medium leading-[1.02] tracking-[-0.055em]">
+              One system. Three focused experiences.
+            </h2>
+            <p className="max-w-2xl text-lg leading-8 text-muted-foreground">
+              Each person gets the depth they need without carrying the complexity of everyone
+              else&apos;s workflow.
+            </p>
+          </Reveal>
+          <StaggerGroup className="mt-16 grid gap-px overflow-hidden rounded-[18px] border border-border-strong bg-border-subtle lg:grid-cols-3">
             {personas.map((persona) => (
               <StaggerItem key={persona.title} className="h-full">
-                <article className="group flex h-full flex-col gap-4 bg-background p-6 transition-colors duration-200 hover:bg-card">
-                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-control border border-border-strong bg-surface-elevated text-brand transition-colors duration-200 group-hover:border-brand/45">
-                    <persona.icon className="h-[18px] w-[18px]" />
+                <article className="group flex h-full min-h-[320px] flex-col bg-[#0d0e11] p-7 transition-colors hover:bg-[#111216]">
+                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-brand/25 bg-brand/10 text-brand">
+                    <persona.icon className="h-4 w-4" />
                   </span>
-
-                  <div>
-                    <h3 className="font-display text-[1.125rem] font-medium tracking-[-0.025em]">
-                      {persona.title}
-                    </h3>
-                    <p className="mt-0.5 text-[0.8125rem] text-subtle">{persona.audience}</p>
-                  </div>
-
-                  <ul className="flex-1 space-y-2">
-                    {persona.points.map((point) => (
-                      <li
-                        key={point}
-                        className="flex items-start gap-2 text-[0.875rem] text-muted-foreground"
-                      >
-                        <span
-                          className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-muted-foreground"
-                          aria-hidden
-                        />
-                        {point}
-                      </li>
-                    ))}
-                  </ul>
-
+                  <p className="mt-12 font-mono text-[0.625rem] uppercase tracking-[0.12em] text-subtle">
+                    {persona.label}
+                  </p>
+                  <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">
+                    GRID-X {persona.title}
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-muted-foreground">{persona.detail}</p>
                   <Link
                     href={persona.href}
-                    className="inline-flex items-center gap-1.5 font-mono text-[0.6875rem] font-medium uppercase tracking-[0.06em] text-brand transition-colors hover:text-foreground"
+                    className="mt-auto inline-flex items-center gap-2 pt-8 text-sm font-medium text-brand transition-colors group-hover:text-foreground"
                   >
-                    {persona.cta}
-                    <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
+                    Open {persona.title} <ArrowRight className="h-4 w-4" />
                   </Link>
                 </article>
               </StaggerItem>
@@ -428,35 +465,29 @@ export default function MarketingHomePage(): React.JSX.Element {
         </div>
       </section>
 
-      {/* Close. */}
-      <section className="py-24 sm:py-28">
-        <div className="container">
-          <Reveal y={20}>
-            <div className="relative overflow-hidden border border-border-strong bg-card px-6 py-16 text-center shadow-hairline sm:px-12">
-              <div
-                className="pointer-events-none absolute inset-0 grid-pattern opacity-25"
-                aria-hidden
-              />
-              <div
-                className="pointer-events-none absolute left-1/2 top-0 h-56 w-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground/[0.07] blur-3xl"
-                aria-hidden
-              />
-              <div className="relative mx-auto flex max-w-2xl flex-col items-center gap-5">
-                <Statement
-                  lead="Bring the whole network into one system."
-                  trail="From a first trial order to a certified strategic partner."
-                />
-                <div className="mt-2 flex flex-col gap-2.5 sm:flex-row">
-                  <Button size="lg" asChild>
-                    <Link href="/login">
-                      Sign in to GRID-X <ArrowRight />
-                    </Link>
-                  </Button>
-                  <Button size="lg" variant="outline" asChild>
-                    <Link href="/partner/login">Partner sign in</Link>
-                  </Button>
-                </div>
-              </div>
+      <section className="relative overflow-hidden bg-[#08090b] py-28 sm:py-40">
+        <AmbientLines variant="routes" className="opacity-30" />
+        <div className="container relative text-center">
+          <Reveal className="mx-auto max-w-4xl">
+            <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-signal">
+              Built for the next production run
+            </p>
+            <h2 className="mt-8 text-balance text-[clamp(3rem,7vw,6.5rem)] font-medium leading-[0.92] tracking-[-0.07em]">
+              Bring the whole network into focus.
+            </h2>
+            <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row">
+              <Link
+                href="/login"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-foreground px-7 text-sm font-semibold text-primary-foreground"
+              >
+                Open GRID-X <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/partner/login"
+                className="inline-flex h-12 items-center justify-center rounded-full border border-border-strong bg-surface px-7 text-sm font-semibold"
+              >
+                Partner log in
+              </Link>
             </div>
           </Reveal>
         </div>

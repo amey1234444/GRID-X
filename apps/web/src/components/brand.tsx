@@ -5,19 +5,19 @@ import { cn } from '@/lib/utils';
 export function LogoMark({ className }: { className?: string }): React.JSX.Element {
   return (
     <svg viewBox="0 0 32 32" fill="none" className={cn('h-5 w-5', className)} aria-hidden>
-      <path d="M6 6h20v20H6z" stroke="currentColor" strokeOpacity=".28" strokeWidth="1.5" />
-      <path d="M6 6l20 20M26 6L6 26" stroke="currentColor" strokeWidth="2.25" />
+      <circle cx="16" cy="16" r="13" fill="currentColor" />
       <path
-        d="M16 4v4M16 24v4M4 16h4M24 16h4"
-        stroke="currentColor"
-        strokeOpacity=".5"
-        strokeWidth="1.5"
+        d="M6.8 8.1 23.9 25.2M4.4 12.7l14.9 14.9M12.7 4.4l14.9 14.9"
+        stroke="#090a0c"
+        strokeWidth="2.35"
       />
-      <rect x="3" y="3" width="6" height="6" rx="1" fill="currentColor" />
-      <rect x="23" y="3" width="6" height="6" rx="1" fill="currentColor" />
-      <rect x="3" y="23" width="6" height="6" rx="1" fill="currentColor" />
-      <rect x="23" y="23" width="6" height="6" rx="1" fill="currentColor" />
-      <rect x="12.5" y="12.5" width="7" height="7" rx="1.5" fill="hsl(var(--brand))" />
+      <path
+        d="m19.6 8.1 4.3 4.3-4.3 4.3"
+        stroke="hsl(var(--brand))"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -31,14 +31,10 @@ export function Logo({
 }): React.JSX.Element {
   return (
     <span
-      className={cn(
-        'inline-flex h-10 w-10 items-center justify-center rounded-input bg-[#0b1114] text-foreground',
-        'shadow-[inset_0_0_0_1px_hsl(var(--border-strong)),inset_0_1px_0_hsl(0_0%_100%/0.05),0_8px_24px_-14px_hsl(var(--brand)/0.8)]',
-        className,
-      )}
+      className={cn('inline-flex h-9 w-9 items-center justify-center text-foreground', className)}
       aria-hidden
     >
-      <LogoMark className={cn('h-6 w-6', markClassName)} />
+      <LogoMark className={cn('h-7 w-7', markClassName)} />
     </span>
   );
 }
@@ -53,10 +49,10 @@ export function Wordmark({
   compact?: boolean;
 }): React.JSX.Element {
   return (
-    <Link href={href} className={cn('group flex items-center gap-3', className)}>
+    <Link href={href} className={cn('group flex items-center gap-2.5', className)}>
       <Logo />
       <span className="min-w-0">
-        <span className="block font-display text-[1.05rem] font-semibold leading-none tracking-[-0.035em]">
+        <span className="block font-display text-[1.0625rem] font-semibold leading-none tracking-[-0.04em]">
           GRID<span className="text-brand">-X</span>
         </span>
         {!compact ? (

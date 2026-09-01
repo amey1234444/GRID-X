@@ -18,18 +18,18 @@
   :root,
   .dark {
     /* ---- Canvas & surfaces ------------------------------------------- */
-    --background: 210 16% 3.5%;
-    --foreground: 200 20% 97%;
+    --background: 228 9% 3.8%;
+    --foreground: 220 14% 96%;
 
-    --surface: 210 13% 6%;
-    --surface-elevated: 207 12% 8.5%;
-    --surface-hover: 205 11% 11%;
-    --surface-active: 204 10% 14%;
+    --surface: 228 8% 6%;
+    --surface-elevated: 228 8% 8.5%;
+    --surface-hover: 228 8% 11%;
+    --surface-active: 228 8% 14%;
 
-    --card: 210 13% 6%;
-    --card-foreground: 200 20% 97%;
-    --popover: 208 13% 8%;
-    --popover-foreground: 200 20% 97%;
+    --card: 228 8% 6.5%;
+    --card-foreground: 220 14% 96%;
+    --popover: 228 8% 8%;
+    --popover-foreground: 220 14% 96%;
 
     /* ---- Brand -------------------------------------------------------
      * Monochrome: the primary action is white on black. Hue is reserved
@@ -39,17 +39,19 @@
     --primary-hover: 0 0% 100%;
     --primary-foreground: 0 0% 5%;
 
-    /* Signal cyan. It behaves like the illuminated line on a control panel:
-     * navigation focus, live data and selected state — never decorative fill. */
-    --brand: 188 86% 56%;
-    --brand-foreground: 196 55% 7%;
+    /* Electric periwinkle is the product signal; fluorescent yellow is used
+     * only for decisive moments and high-attention operational markers. */
+    --brand: 226 92% 71%;
+    --brand-foreground: 228 45% 8%;
+    --signal: 64 96% 53%;
+    --signal-foreground: 68 55% 7%;
 
     --secondary: 0 0% 11%;
     --secondary-foreground: 0 0% 93%;
     --muted: 0 0% 11%;
-    --muted-foreground: 204 8% 63%;
+    --muted-foreground: 225 8% 63%;
     /* Third text tier — captions, table meta, footer labels. */
-    --subtle-foreground: 204 7% 46%;
+    --subtle-foreground: 225 7% 45%;
     --accent: 0 0% 14%;
     --accent-foreground: 0 0% 97%;
 
@@ -63,7 +65,7 @@
     --success-foreground: 0 0% 5%;
     --warning: 38 72% 55%;
     --warning-foreground: 0 0% 5%;
-    --info: 198 58% 60%;
+    --info: 213 86% 68%;
     --info-foreground: 0 0% 5%;
 
     /* ---- Industrial machine / operational states --------------------- */
@@ -71,14 +73,14 @@
     --state-warning: 38 72% 55%;
     --state-critical: 4 62% 54%;
     --state-offline: 0 0% 46%;
-    --state-maintenance: 208 40% 62%;
+    --state-maintenance: 213 86% 68%;
 
     /* ---- Lines ------------------------------------------------------- */
-    --border: 204 10% 15%;
-    --border-subtle: 207 10% 10.5%;
-    --border-strong: 200 9% 25%;
-    --input: 204 10% 16%;
-    --ring: 188 68% 54%;
+    --border: 228 9% 15%;
+    --border-subtle: 228 9% 10.5%;
+    --border-strong: 228 9% 24%;
+    --input: 228 9% 16%;
+    --ring: 226 92% 71%;
 
     /* ---- Radius hierarchy (restrained — no 24px everywhere) ---------- */
     --radius: 0.5rem; /* 8px — card default */
@@ -95,15 +97,14 @@
     --duration-slow: 320ms;
 
     /* ---- Charts ------------------------------------------------------ */
-    /* Industrial instrumentation palette: cool process signals first,
-     * semantic warm colours only when a comparison needs them. */
-    --chart-1: 188 72% 55%;
-    --chart-2: 208 62% 62%;
+    /* Cool process signals with a deliberate yellow counterpoint. */
+    --chart-1: 226 92% 71%;
+    --chart-2: 191 88% 50%;
     --chart-3: 152 38% 50%;
-    --chart-4: 38 68% 56%;
-    --chart-5: 216 12% 72%;
+    --chart-4: 64 96% 53%;
+    --chart-5: 249 62% 72%;
     --chart-6: 4 52% 57%;
-    --chart-7: 198 24% 46%;
+    --chart-7: 213 42% 58%;
   }
 
   * {
@@ -121,7 +122,7 @@
   }
 
   ::selection {
-    @apply bg-foreground/20;
+    @apply bg-brand/35;
   }
 
   /* Numbers in tables/metrics must never jitter between renders. */
@@ -229,12 +230,220 @@
   }
 
   .app-canvas {
+    background-color: hsl(var(--background));
+    background-image: linear-gradient(to right, hsl(var(--border) / 0.16) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.12) 1px, transparent 1px),
+      radial-gradient(circle at 74% -10%, hsl(var(--brand) / 0.08), transparent 34rem);
+    background-size:
+      112px 112px,
+      112px 112px,
+      100% 100%;
+    animation: canvas-grid-shift 48s linear infinite;
+  }
+
+  .section-graphite {
+    background-color: #090a0c;
+    background-image: repeating-linear-gradient(
+      118deg,
+      transparent 0,
+      transparent 88px,
+      rgb(255 255 255 / 0.025) 89px,
+      transparent 90px
+    );
+  }
+
+  .section-strata {
+    background-color: #08090b;
+    background-image: linear-gradient(180deg, hsl(var(--brand) / 0.035), transparent 20rem),
+      repeating-linear-gradient(
+        0deg,
+        transparent 0,
+        transparent 47px,
+        hsl(var(--border) / 0.24) 48px
+      );
+  }
+
+  .ambient-lines {
+    color: hsl(var(--border-strong) / 0.7);
+    opacity: 0.58;
+  }
+
+  .ambient-line {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 0.8;
+    stroke-dasharray: 3 13;
+    vector-effect: non-scaling-stroke;
+    animation: route-flow 28s linear infinite;
+  }
+
+  .ambient-line--signal {
+    stroke: hsl(var(--brand) / 0.7);
+    stroke-dasharray: 1 20;
+    stroke-width: 1.15;
+    animation-duration: 13s;
+  }
+
+  .ambient-line--reverse {
+    animation-direction: reverse;
+    animation-duration: 36s;
+  }
+
+  .ambient-nodes {
+    fill: hsl(var(--foreground) / 0.38);
+    animation: node-breathe 4.8s ease-in-out infinite;
+  }
+
+  .ambient-contours {
+    opacity: 0.38;
+    background-image: repeating-radial-gradient(
+      ellipse at 88% 20%,
+      transparent 0,
+      transparent 35px,
+      hsl(var(--border-strong) / 0.42) 36px,
+      transparent 37px,
+      transparent 68px
+    );
+    background-size: 120% 120%;
+    animation: contour-drift 32s ease-in-out infinite alternate;
+  }
+
+  .statement-band-light {
+    color: #10131d;
+    background-color: #dce5ff;
+    background-image: radial-gradient(circle at 82% 18%, #f0eaff 0, transparent 42%),
+      repeating-linear-gradient(
+        110deg,
+        transparent 0,
+        transparent 72px,
+        rgb(49 69 130 / 0.07) 73px,
+        transparent 74px
+      );
+    animation: light-lines-drift 36s linear infinite;
+  }
+
+  .statement-band-light .text-foreground {
+    color: #10131d;
+  }
+
+  .statement-band-light .text-subtle,
+  .statement-band-light .text-muted-foreground,
+  .statement-band-light .type-label {
+    color: #5c6272;
+  }
+
+  .linear-hero {
+    background-color: #08090b;
     background-image: radial-gradient(
-        circle at 78% -10%,
-        hsl(var(--brand) / 0.055),
-        transparent 34rem
+        circle at 50% -18%,
+        hsl(var(--brand) / 0.2),
+        transparent 36rem
       ),
-      linear-gradient(to bottom, hsl(205 22% 5% / 0.5), transparent 28rem);
+      radial-gradient(circle at 84% 12%, hsl(252 72% 70% / 0.08), transparent 28rem),
+      linear-gradient(180deg, rgb(255 255 255 / 0.018), transparent 28rem);
+  }
+
+  .linear-hero::before {
+    position: absolute;
+    inset: 0;
+    content: '';
+    pointer-events: none;
+    background-image: linear-gradient(to right, hsl(var(--border) / 0.22) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.18) 1px, transparent 1px);
+    background-size: 96px 96px;
+    mask-image: linear-gradient(to bottom, black, transparent 72%);
+    animation: blueprint-drift 46s linear infinite;
+  }
+
+  .section-blueprint {
+    background-color: #08090b;
+    background-image: radial-gradient(circle at 18% 8%, hsl(var(--brand) / 0.08), transparent 26rem),
+      linear-gradient(to right, hsl(var(--border) / 0.2) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.16) 1px, transparent 1px);
+    background-size:
+      100% 100%,
+      80px 80px,
+      80px 80px;
+  }
+
+  .linear-frame {
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.035), transparent 18%), #0d0e11;
+    box-shadow:
+      inset 0 0 0 1px hsl(var(--border-strong) / 0.65),
+      0 70px 160px -72px hsl(var(--brand) / 0.5),
+      0 28px 70px -34px rgb(0 0 0 / 1);
+  }
+
+  .blueprint-card {
+    color: #10131d;
+    background-color: #d9e5ff;
+    background-image: radial-gradient(circle at 84% 22%, #ede8ff, transparent 46%),
+      linear-gradient(135deg, rgb(255 255 255 / 0.26), transparent 55%);
+  }
+
+  .signal-card {
+    color: #111408;
+    background-color: hsl(var(--signal));
+    background-image: radial-gradient(circle at 76% 22%, rgb(255 255 255 / 0.28), transparent 38%);
+  }
+
+  .blueprint-card .text-muted-foreground,
+  .blueprint-card .text-subtle,
+  .signal-card .text-muted-foreground,
+  .signal-card .text-subtle {
+    color: rgb(26 30 43 / 0.66);
+  }
+
+  .edge-fade {
+    mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+  }
+
+  @keyframes route-flow {
+    to {
+      stroke-dashoffset: -320;
+    }
+  }
+
+  @keyframes node-breathe {
+    0%,
+    100% {
+      opacity: 0.3;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes contour-drift {
+    from {
+      background-position: 0 0;
+    }
+    to {
+      background-position: -42px 28px;
+    }
+  }
+
+  @keyframes light-lines-drift {
+    to {
+      background-position: 180px 0;
+    }
+  }
+
+  @keyframes canvas-grid-shift {
+    to {
+      background-position:
+        112px 0,
+        0 112px,
+        0 0;
+    }
+  }
+
+  @keyframes blueprint-drift {
+    to {
+      background-position:
+        96px 0,
+        0 96px;
+    }
   }
 
   .radial-fade {

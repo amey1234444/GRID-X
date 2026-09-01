@@ -73,7 +73,7 @@ export function StageRail({ stages }: { stages: Stage[] }): React.JSX.Element {
                   onClick={() => scrollTo(stage.id)}
                   aria-current={isActive ? 'true' : undefined}
                   className={cn(
-                    'relative w-full whitespace-nowrap rounded-control px-3 py-2.5 text-left',
+                    'relative w-full whitespace-nowrap rounded-lg px-3 py-2.5 text-left',
                     'text-[0.9375rem] leading-snug transition-colors duration-300 ease-out-expo',
                     isActive
                       ? 'bg-surface-hover font-medium text-foreground lg:bg-transparent'
@@ -112,7 +112,7 @@ export function StageRail({ stages }: { stages: Stage[] }): React.JSX.Element {
               if (node) sectionRefs.current.set(stage.id, node);
               else sectionRefs.current.delete(stage.id);
             }}
-            className="relative scroll-mt-28 space-y-7 border-l border-border-strong bg-surface/20 p-5 sm:p-7 lg:p-9"
+            className="linear-frame relative scroll-mt-28 space-y-8 overflow-hidden rounded-[18px] border border-border-strong p-5 sm:p-8 lg:p-10"
           >
             <div className="flex items-start gap-4 sm:gap-6">
               <span className="mt-1 font-mono text-[0.75rem] font-medium text-brand">
@@ -124,9 +124,9 @@ export function StageRail({ stages }: { stages: Stage[] }): React.JSX.Element {
               </h3>
             </div>
 
-            <div className="grid gap-px overflow-hidden border border-border-subtle bg-border-subtle sm:grid-cols-2">
+            <div className="grid gap-px overflow-hidden rounded-xl border border-border-subtle bg-border-subtle sm:grid-cols-2">
               {stage.panels.map((panel) => (
-                <article key={panel.title} className="bg-background/80 p-5 sm:p-6">
+                <article key={panel.title} className="bg-[#0e0f12] p-5 sm:p-6">
                   <h4 className="font-display text-[0.9375rem] font-medium tracking-[-0.02em]">
                     {panel.title}
                   </h4>

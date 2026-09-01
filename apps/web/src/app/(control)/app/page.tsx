@@ -243,7 +243,7 @@ export default async function ControlDashboardPage(): Promise<React.JSX.Element>
 
         <section className="relative overflow-hidden rounded-card border-t border-border-strong bg-card p-5 shadow-hairline surface-sheen">
           <div
-            className="pointer-events-none absolute -right-16 -top-20 h-40 w-40 rounded-full bg-brand/[0.065] blur-3xl"
+            className="pointer-events-none absolute right-0 top-0 h-20 w-20 border-b border-l border-border-subtle"
             aria-hidden
           />
           <header className="relative flex items-start justify-between gap-3">

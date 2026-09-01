@@ -40,19 +40,19 @@ export default function GlobalError({
           display: 'grid',
           placeItems: 'center',
           fontFamily: 'system-ui, sans-serif',
-          background: '#0b1120',
-          color: '#e2e8f0',
+          background: '#090a0c',
+          color: '#f3f4f8',
           padding: '2rem',
         }}
       >
         <main style={{ maxWidth: '32rem', textAlign: 'center' }}>
           <h1 style={{ fontSize: '1.25rem', marginBottom: '0.75rem' }}>GRID-X hit a problem</h1>
-          <p style={{ color: '#94a3b8', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+          <p style={{ color: '#9da1ad', lineHeight: 1.6, marginBottom: '1.5rem' }}>
             The page could not be displayed. The error has been reported. Nothing you had already
             saved is affected.
           </p>
           {error.digest ? (
-            <p style={{ color: '#64748b', fontSize: '0.8rem', marginBottom: '1.5rem' }}>
+            <p style={{ color: '#6f7482', fontSize: '0.8rem', marginBottom: '1.5rem' }}>
               Reference: {error.digest}
             </p>
           ) : null}
@@ -60,8 +60,8 @@ export default function GlobalError({
             type="button"
             onClick={reset}
             style={{
-              background: '#2563eb',
-              color: 'white',
+              background: '#8ca5ff',
+              color: '#0b1020',
               border: 0,
               borderRadius: '0.5rem',
               padding: '0.6rem 1.2rem',
