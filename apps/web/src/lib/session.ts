@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import type { AuthUser } from '@gridx/shared';
+import type { AuthUser, Paginated } from '@gridx/shared';
 
 import { API_URL, REFRESH_COOKIE, SESSION_COOKIE } from './config';
 import { createLogger, newRequestId } from './logger';
@@ -339,6 +339,63 @@ export async function apiFetchText(
 export async function apiGet<T>(path: string, fallback: T): Promise<T> {
   const result = await apiFetch<T>(path);
   return result.data ?? fallback;
+}
+
+/**
+ * List endpoints are expected to answer with a page envelope, but a handful
+ * historically returned a bare array. Reading `.data` off that array yields
+ * `undefined` and the screen dies in render, so every list fetch is normalised
+ * here rather than trusting the endpoint's shape.
+ */
+export async function apiGetPage<T, Extra = unknown>(
+  path: string,
+  pageSize = 25,
+): Promise<Paginated<T> & Partial<Extra>> {
+  const result = await apiFetch<unknown>(path);
+  return toPage<T, Extra>(result.data, pageSize);
+}
+
+/**
+ * Coerces whatever a list endpoint returned into a page envelope. Extra keys an
+ * endpoint adds alongside the page (a `summary`, say) are carried through.
+ */
+export function toPage<T, Extra = unknown>(
+  value: unknown,
+  pageSize = 25,
+): Paginated<T> & Partial<Extra> {
+  const empty = { data: [], page: 1, pageSize, total: 0, totalPages: 1 } as unknown as Paginated<T> &
+    Partial<Extra>;
+  if (!value) return empty;
+
+  // A bare array: treat it as a single complete page.
+  if (Array.isArray(value)) {
+    const data = value as T[];
+    return {
+      data,
+      page: 1,
+      pageSize: Math.max(pageSize, data.length),
+      total: data.length,
+      totalPages: 1,
+    } as Paginated<T> & Partial<Extra>;
+  }
+
+  if (typeof value !== 'object') return empty;
+  const envelope = value as Partial<Paginated<T>> & Record<string, unknown>;
+  if (!Array.isArray(envelope.data)) return empty;
+
+  const total = typeof envelope.total === 'number' ? envelope.total : envelope.data.length;
+  const size = typeof envelope.pageSize === 'number' && envelope.pageSize > 0 ? envelope.pageSize : pageSize;
+  return {
+    ...envelope,
+    data: envelope.data,
+    page: typeof envelope.page === 'number' ? envelope.page : 1,
+    pageSize: size,
+    total,
+    totalPages:
+      typeof envelope.totalPages === 'number' && envelope.totalPages > 0
+        ? envelope.totalPages
+        : Math.max(1, Math.ceil(total / size)),
+  } as Paginated<T> & Partial<Extra>;
 }
 
 export async function currentUser(): Promise<AuthUser | null> {

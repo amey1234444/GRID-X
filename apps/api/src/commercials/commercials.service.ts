@@ -50,6 +50,21 @@ export interface InvoiceFilters extends PaginationInput {
   partnerId?: string;
 }
 
+export interface RateSummary {
+  /** Rate cards currently in force across the filtered set. */
+  active: number;
+  /** Mean conversion rate across the filtered set; null when nothing matches. */
+  averageRate: number | null;
+}
+
+export interface RateFilters extends PaginationInput {
+  partnerId?: string;
+  componentId?: string;
+  search?: string;
+  /** Omitted means the full revision history — active cards and superseded ones. */
+  isActive?: boolean;
+}
+
 /**
  * Module 11 — rates, partner invoices and the four-stage payment approval chain.
  * Payment is always accepted quantity × conversion rate, adjusted by incentives and deductions.
@@ -68,21 +83,57 @@ export class CommercialsService {
   // Rates
   // -------------------------------------------------------------------------
 
-  async listRates(actor: RequestUser, partnerId?: string, componentId?: string) {
-    return this.prisma.partnerRate.findMany({
-      where: {
-        ...companyWhere(actor),
-        ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
-        ...(partnerId ? { partnerId } : {}),
-        ...(componentId ? { componentId } : {}),
-        isActive: true,
-      },
-      orderBy: { effectiveFrom: 'desc' },
-      include: {
-        partner: { select: { id: true, businessName: true } },
-        component: { select: { id: true, componentCode: true, name: true } },
-      },
-    });
+  /**
+   * Rate cards, newest revision first. Returns a page envelope like every other
+   * list endpoint — the screen reads `data`/`total`, so a bare array breaks it.
+   *
+   * The full revision history is returned by default: the screen renders both
+   * ACTIVE and SUPERSEDED cards, so filtering to active here would leave it
+   * unable to show a rate's history at all. Pass `isActive` to narrow it.
+   */
+  async listRates(
+    actor: RequestUser,
+    filters: RateFilters,
+  ): Promise<Paginated<unknown> & { summary: RateSummary }> {
+    const where: Prisma.PartnerRateWhereInput = {
+      ...companyWhere(actor),
+      // A partner user only ever sees their own rate card.
+      ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
+      ...(filters.partnerId && !actor.partnerId ? { partnerId: filters.partnerId } : {}),
+      ...(filters.componentId ? { componentId: filters.componentId } : {}),
+      ...(filters.isActive === undefined ? {} : { isActive: filters.isActive }),
+      ...(filters.search
+        ? {
+            OR: [
+              { partner: { businessName: { contains: filters.search, mode: 'insensitive' } } },
+              { component: { componentCode: { contains: filters.search, mode: 'insensitive' } } },
+              { component: { name: { contains: filters.search, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+    };
+
+    const [data, total, activeCount, aggregate] = await Promise.all([
+      this.prisma.partnerRate.findMany({
+        where,
+        ...paginationArgs(filters),
+        orderBy: [{ effectiveFrom: 'desc' }, { createdAt: 'desc' }],
+        include: {
+          partner: { select: { id: true, businessName: true } },
+          component: { select: { id: true, componentCode: true, name: true } },
+        },
+      }),
+      this.prisma.partnerRate.count({ where }),
+      this.prisma.partnerRate.count({ where: { ...where, isActive: true } }),
+      this.prisma.partnerRate.aggregate({ where, _avg: { conversionRate: true } }),
+    ]);
+
+    // Summarised over the whole filtered set, not just the page — otherwise the
+    // headline figures would change every time someone paged through.
+    return {
+      ...paginate(data, total, filters),
+      summary: { active: activeCount, averageRate: aggregate._avg.conversionRate },
+    };
   }
 
   /** Rate revisions keep history: the previous rate is stored on the new record. */
