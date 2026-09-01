@@ -46,7 +46,7 @@ export const metadata: Metadata = {
 const modules = [
   {
     id: 'allocation',
-    icon: Layers,
+    iconName: 'Layers',
     label: 'Module 01 — 02',
     title: 'Demand, jobs and allocation',
     rule: 'A job cannot be released to a partner who is not eligible to make it.',
@@ -68,7 +68,7 @@ const modules = [
   },
   {
     id: 'drawings',
-    icon: FileLock2,
+    iconName: 'FileLock2',
     label: 'Module 03',
     title: 'Drawing and revision control',
     rule: 'Only a released revision can reach a shop floor.',
@@ -90,7 +90,7 @@ const modules = [
   },
   {
     id: 'material',
-    icon: PackageSearch,
+    iconName: 'PackageSearch',
     label: 'Module 06',
     title: 'Material issue and reconciliation',
     rule: 'Every kilogram issued has to be explained before an invoice clears.',
@@ -112,7 +112,7 @@ const modules = [
   },
   {
     id: 'quality',
-    icon: ClipboardCheck,
+    iconName: 'ClipboardCheck',
     label: 'Module 08 — 09',
     title: 'Quality, rejection and rework',
     rule: 'Acceptance requires measured evidence, not a phone call.',
@@ -134,7 +134,7 @@ const modules = [
   },
   {
     id: 'payments',
-    icon: Wallet,
+    iconName: 'Wallet',
     label: 'Module 11',
     title: 'Commercials and payments',
     rule: 'You pay for accepted quantity at the rate that was actually in force.',
@@ -156,7 +156,7 @@ const modules = [
   },
   {
     id: 'insight',
-    icon: Gauge,
+    iconName: 'Gauge',
     label: 'Module 12 — 14',
     title: 'Dashboards, scorecards and reports',
     rule: 'The same numbers everywhere, or they are not numbers.',
@@ -212,14 +212,14 @@ const moduleRows: Record<string, ProductModule['rows']> = {
 };
 
 const explorerModules: ProductModule[] = modules.map(
-  ({ id, label, title, rule, detail, points, icon }) => ({
+  ({ id, label, title, rule, detail, points, iconName }) => ({
     id,
     eyebrow: label,
     title,
     summary: detail,
     outcome: rule,
     points,
-    icon,
+    icon: iconName,
     rows: moduleRows[id] ?? [],
   }),
 );

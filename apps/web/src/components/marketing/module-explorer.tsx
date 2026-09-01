@@ -1,6 +1,16 @@
 'use client';
 
-import { ArrowUpRight, CheckCircle2, Gauge, type LucideIcon } from 'lucide-react';
+import {
+  ArrowUpRight,
+  CheckCircle2,
+  ClipboardCheck,
+  FileLock2,
+  Gauge,
+  Layers,
+  PackageSearch,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react';
 
 import {
   Dialog,
@@ -27,6 +37,26 @@ import { cn } from '@/lib/utils';
  * full record and the control list.
  */
 
+/**
+ * Icons are looked up by name here rather than passed in.
+ *
+ * A lucide icon is a forwardRef object, and a Server Component cannot hand a
+ * function across the boundary to a Client Component — the page compiles and
+ * then dies during static generation with "Functions cannot be passed directly
+ * to Client Components". The same lookup-by-name approach is used by
+ * components/app/nav-icon.tsx.
+ */
+const ICONS: Record<string, LucideIcon> = {
+  Layers,
+  FileLock2,
+  PackageSearch,
+  ClipboardCheck,
+  Wallet,
+  Gauge,
+};
+
+export type ModuleIconName = keyof typeof ICONS;
+
 export interface ProductModule {
   id: string;
   eyebrow: string;
@@ -35,8 +65,8 @@ export interface ProductModule {
   outcome: string;
   points: string[];
   rows: { label: string; value: string; tone?: 'live' | 'warning' | 'neutral' }[];
-  /** Passed by the page so six modules do not share four cycled icons. */
-  icon?: LucideIcon;
+  /** Icon name, so six modules do not share four cycled icons. Must be a key of ICONS. */
+  icon?: string;
 }
 
 function ToneDot({ tone }: { tone?: 'live' | 'warning' | 'neutral' }): React.JSX.Element {
@@ -93,7 +123,7 @@ export function ModuleExplorer({ modules }: { modules: ProductModule[] }): React
   return (
     <div className="grid gap-px overflow-hidden rounded-[18px] border border-border-strong bg-border-subtle md:grid-cols-2 lg:grid-cols-3">
       {modules.map((module, index) => {
-        const Icon = module.icon ?? Gauge;
+        const Icon = (module.icon ? ICONS[module.icon] : undefined) ?? Gauge;
         const preview = module.rows.slice(0, 2);
 
         return (
