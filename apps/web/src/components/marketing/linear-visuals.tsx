@@ -184,8 +184,8 @@ const evidenceRows = [
 
 export function EvidenceVisual(): React.JSX.Element {
   return (
-    <div className="linear-frame overflow-hidden rounded-[18px] border border-border-strong p-2">
-      <div className="plate plate-lit rounded-xl border border-border-subtle p-5 sm:p-7">
+    <div className="evidence-gate-surface linear-frame overflow-hidden rounded-[18px] border border-border-strong p-2">
+      <div className="plate plate-lit relative rounded-xl border border-border-subtle p-5 sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="font-mono text-[0.625rem] uppercase tracking-[0.12em] text-subtle">
@@ -235,7 +235,7 @@ export function EvidenceVisual(): React.JSX.Element {
             <div
               key={row.label}
               className={cn(
-                'grid gap-x-4 gap-y-2 border-b border-border-subtle px-4 py-3.5 last:border-b-0',
+                'grid gap-x-4 gap-y-2 border-b border-border-subtle px-4 py-3.5 transition-colors duration-200 last:border-b-0 hover:bg-white/[0.025]',
                 'sm:grid-cols-[1.6fr_0.8fr_1fr_auto] sm:items-center',
                 row.state === 'attention' ? 'bg-warning/[0.045]' : 'bg-black/20',
               )}
