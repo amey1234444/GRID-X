@@ -25,13 +25,17 @@ maps back to the *GRID-X Software Product Blueprint*.
 | [08 — Dashboards and reports](08-dashboards-reports.md) | The five dashboards and the seventeen reports, with their formulas |
 | [09 — Blueprint coverage](09-blueprint-coverage.md) | Section-by-section traceability from the blueprint to the code |
 | [10 — Operations](10-operations.md) | Local setup, environment variables, testing, CI, seeding and Render deployment |
+| [11 — Application flow and navigation](11-application-flow.md) | Section-by-section walkthrough of the sidebar, the job lifecycle end to end, and a worked example |
+| [12 — Partners and Engineering](12-partners-and-engineering.md) | The two master-data sections field by field: partner onboarding gates, capabilities, scorecards, components, criticality, drawing revision control and watermarking |
 | [Deployment on Render](deployment-render.md) | The original step-by-step Render runbook |
 
 ## Quick orientation
 
 | I want to… | Read |
 | --- | --- |
-| Understand how a job moves from creation to payment | [04 — Functional modules](04-modules.md) |
+| Understand how a job moves from creation to payment | [11 — Application flow](11-application-flow.md) |
+| Know what a sidebar section does | [11 — Application flow](11-application-flow.md) |
+| Understand partner onboarding or component/drawing control | [12 — Partners and Engineering](12-partners-and-engineering.md) |
 | Find the endpoint for something | [05 — API reference](05-api-reference.md) |
 | Know what a role is allowed to do | [03 — Security, auth and RBAC](03-security-rbac.md) |
 | Add a field or a table | [02 — Data model](02-data-model.md) |

@@ -76,6 +76,18 @@ export function ErrorScreen({
             </p>
           ) : null}
 
+          {/*
+            A digest is a one-way hash — useless on its own when you are the
+            one debugging. In development the real message is shown inline so
+            the cause is on screen instead of buried in the server terminal.
+            Never rendered in production: it can carry internal detail.
+          */}
+          {process.env.NODE_ENV === 'development' && error.message ? (
+            <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-input bg-destructive/[0.06] px-2.5 py-2 font-mono text-[11px] leading-relaxed text-destructive shadow-[inset_0_0_0_1px_hsl(var(--destructive)/0.2)]">
+              {error.message}
+            </pre>
+          ) : null}
+
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <Button onClick={reset} size="sm">
               <RotateCw /> Try again
