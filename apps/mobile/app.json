@@ -12,7 +12,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#090909"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "in.oswar.gridx"
@@ -28,7 +30,10 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "apiBaseUrl": "http://10.0.2.2:4000/api"
+      "apiBaseUrl": "https://gridx-api.onrender.com/api",
+      "eas": {
+        "projectId": "e93f216f-d9f0-4b35-b753-073cde1d883f"
+      }
     }
   }
 }
