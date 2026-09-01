@@ -264,7 +264,7 @@ export function ControlShell({
       {/* Desktop sidebar --------------------------------------------------- */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-border-subtle bg-[#090a0c] lg:flex',
+          'fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-border-subtle bg-[#090909] lg:flex',
           'transition-[width] duration-300 ease-out-expo',
           collapsed ? 'w-[72px]' : 'w-[264px]',
         )}
@@ -435,7 +435,7 @@ export function ControlShell({
             onClick={() => setMobileOpen(false)}
             aria-hidden
           />
-          <div className="absolute inset-y-0 left-0 flex w-[296px] flex-col border-r border-border-subtle bg-[#090a0c] duration-300 ease-out-expo animate-in slide-in-from-left">
+          <div className="absolute inset-y-0 left-0 flex w-[296px] flex-col border-r border-border-subtle bg-[#090909] duration-300 ease-out-expo animate-in slide-in-from-left">
             <div className="flex items-center justify-between px-3 pt-3">
               <span className="text-[0.8125rem] font-medium">Navigation</span>
               <button

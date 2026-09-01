@@ -111,12 +111,12 @@ const config: Config = {
         mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       boxShadow: {
-        hairline: 'inset 0 0 0 1px hsl(228 9% 17% / 0.82)',
-        popover: '0 24px 70px -24px rgb(0 0 0 / 0.9), 0 0 0 1px hsl(228 9% 20% / 0.9)',
-        subtle: '0 1px 2px rgb(0 0 0 / 0.35), 0 0 0 1px hsl(228 9% 16% / 0.7)',
-        elevated: '0 28px 80px -36px rgb(0 0 0 / 0.95), 0 0 0 1px hsl(228 9% 20% / 0.85)',
-        glow: '0 0 0 1px rgb(255 255 255 / 0.06), 0 30px 90px -36px hsl(226 92% 70% / 0.3)',
-        product: '0 70px 160px -60px hsl(226 92% 66% / 0.35), 0 30px 80px -38px rgb(0 0 0 / 1)',
+        hairline: 'inset 0 0 0 1px hsl(0 0% 17% / 0.82)',
+        popover: '0 24px 70px -24px rgb(0 0 0 / 0.9), 0 0 0 1px hsl(0 0% 20% / 0.9)',
+        subtle: '0 1px 2px rgb(0 0 0 / 0.35), 0 0 0 1px hsl(0 0% 16% / 0.7)',
+        elevated: '0 28px 80px -36px rgb(0 0 0 / 0.95), 0 0 0 1px hsl(0 0% 20% / 0.85)',
+        glow: '0 0 0 1px rgb(255 255 255 / 0.06), 0 30px 90px -36px rgb(255 255 255 / 0.13)',
+        product: '0 70px 160px -60px rgb(255 255 255 / 0.12), 0 30px 80px -38px rgb(0 0 0 / 1)',
       },
       transitionTimingFunction: {
         'out-expo': 'cubic-bezier(0.16, 1, 0.3, 1)',

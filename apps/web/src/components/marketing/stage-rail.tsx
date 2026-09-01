@@ -126,7 +126,7 @@ export function StageRail({ stages }: { stages: Stage[] }): React.JSX.Element {
 
             <div className="grid gap-px overflow-hidden rounded-xl border border-border-subtle bg-border-subtle sm:grid-cols-2">
               {stage.panels.map((panel) => (
-                <article key={panel.title} className="bg-[#0e0f12] p-5 sm:p-6">
+                <article key={panel.title} className="bg-[#0e0e0e] p-5 sm:p-6">
                   <h4 className="font-display text-[0.9375rem] font-medium tracking-[-0.02em]">
                     {panel.title}
                   </h4>

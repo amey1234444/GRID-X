@@ -93,7 +93,7 @@ export function AppPreview(): React.JSX.Element {
           <div className="grid min-h-[520px] grid-cols-1 md:grid-cols-[168px_minmax(0,1fr)]">
             <aside className="hidden border-r border-border-subtle bg-surface/80 p-3 md:block">
               <div className="mb-5 flex items-center gap-2.5 border-b border-border-subtle px-1.5 pb-4 pt-1">
-                <span className="grid h-8 w-8 place-items-center rounded-input bg-[#0d0e11] text-foreground shadow-hairline">
+                <span className="grid h-8 w-8 place-items-center rounded-input bg-[#0d0d0d] text-foreground shadow-hairline">
                   <LogoMark className="h-[19px] w-[19px]" />
                 </span>
                 <span>

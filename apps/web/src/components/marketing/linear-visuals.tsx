@@ -59,7 +59,7 @@ function FigureGraphic({ index }: { index: number }): React.JSX.Element {
               width="62"
               height="46"
               rx="7"
-              fill={nodeIndex === 0 ? 'hsl(var(--brand) / .1)' : '#0d0e11'}
+              fill={nodeIndex === 0 ? 'hsl(var(--brand) / .1)' : '#0d0d0d'}
               stroke={nodeIndex === 0 ? 'hsl(var(--brand) / .72)' : 'hsl(var(--border-strong))'}
             />
             <circle
@@ -114,94 +114,6 @@ export function BlueprintFigures(): React.JSX.Element {
   );
 }
 
-const timelineRows = [
-  { label: 'Pump housing · JOB-412', start: 12, width: 48, tone: 'brand' },
-  { label: 'Oven arm · JOB-408', start: 27, width: 61, tone: 'signal' },
-  { label: 'Base frame · JOB-405', start: 6, width: 67, tone: 'brand' },
-  { label: 'Bracket set · JOB-399', start: 42, width: 40, tone: 'success' },
-] as const;
-
-export function PlanningVisual(): React.JSX.Element {
-  return (
-    <div className="linear-frame relative overflow-hidden rounded-[18px] border border-border-strong">
-      <div className="flex h-12 items-center border-b border-border-subtle px-5">
-        <p className="text-[0.75rem] font-semibold">Network production plan</p>
-        <div className="ml-auto flex items-center gap-2 font-mono text-[0.5625rem] uppercase tracking-[0.1em] text-subtle">
-          <span className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-signal" /> Live capacity
-        </div>
-      </div>
-      <div className="grid min-h-[420px] lg:grid-cols-[1.05fr_0.95fr]">
-        <div className="border-b border-border-subtle p-5 lg:border-b-0 lg:border-r">
-          <div className="grid grid-cols-6 border-b border-border-subtle pb-2 font-mono text-[0.5625rem] text-subtle">
-            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-              <span key={day}>{day}</span>
-            ))}
-          </div>
-          <div className="relative mt-3 space-y-5 py-2">
-            <div className="pointer-events-none absolute inset-0 grid grid-cols-6">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <span key={index} className="border-r border-border-subtle/70 last:border-r-0" />
-              ))}
-            </div>
-            {timelineRows.map((row) => (
-              <div key={row.label} className="relative h-16">
-                <p className="text-[0.6875rem] text-muted-foreground">{row.label}</p>
-                <div className="relative mt-2 h-7 rounded-md border border-border bg-black/20">
-                  <span
-                    className={cn(
-                      'absolute inset-y-1 rounded-[3px]',
-                      row.tone === 'signal'
-                        ? 'bg-signal/80'
-                        : row.tone === 'success'
-                          ? 'bg-success/70'
-                          : 'bg-brand/75',
-                    )}
-                    style={{ left: `${row.start}%`, width: `${row.width}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="relative overflow-hidden p-5">
-          <p className="text-[0.75rem] font-semibold">Partner capacity signal</p>
-          <p className="mt-1 text-[0.625rem] text-subtle">Committed load vs. accepted output</p>
-          <svg viewBox="0 0 360 250" className="mt-5 w-full" aria-hidden>
-            {[40, 90, 140, 190, 240].map((y) => (
-              <path key={y} d={`M0 ${y}H360`} stroke="hsl(var(--border-subtle))" />
-            ))}
-            <path
-              d="M0 192H78l32-78h83l37 48h74l24-96h32"
-              fill="none"
-              stroke="hsl(var(--brand) / .72)"
-              strokeWidth="1.5"
-            />
-            <path
-              d="M0 216h102l28-54h98l35 29h97"
-              fill="none"
-              stroke="hsl(var(--signal) / .58)"
-              strokeWidth="1"
-            />
-            {Array.from({ length: 32 }).map((_, index) => {
-              const x = 18 + ((index * 79) % 330);
-              const y = 35 + ((index * 47) % 185);
-              return (
-                <circle
-                  key={index}
-                  cx={x}
-                  cy={y}
-                  r={index % 5 === 0 ? 3.5 : 2.5}
-                  fill={index % 6 === 0 ? 'hsl(var(--signal) / .74)' : 'hsl(var(--brand) / .72)'}
-                />
-              );
-            })}
-          </svg>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 const evidenceRows = [
   { icon: FileStack, label: 'Drawing revision', value: 'Rev C · acknowledged', tone: 'brand' },
   { icon: Scale, label: 'Material custody', value: '1,226 / 1,240 kg', tone: 'signal' },
@@ -211,7 +123,7 @@ const evidenceRows = [
 export function EvidenceVisual(): React.JSX.Element {
   return (
     <div className="linear-frame overflow-hidden rounded-[18px] border border-border-strong p-2">
-      <div className="rounded-xl border border-border-subtle bg-[#111216] p-5 sm:p-7">
+      <div className="rounded-xl border border-border-subtle bg-[#121212] p-5 sm:p-7">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="font-mono text-[0.625rem] uppercase tracking-[0.12em] text-brand">

@@ -15,11 +15,7 @@ import {
 
 import { AmbientLines } from '@/components/marketing/ambient-lines';
 import { AppPreview } from '@/components/marketing/app-preview';
-import {
-  BlueprintFigures,
-  EvidenceVisual,
-  PlanningVisual,
-} from '@/components/marketing/linear-visuals';
+import { BlueprintFigures, EvidenceVisual } from '@/components/marketing/linear-visuals';
 import {
   Eyebrow,
   FeatureBand,
@@ -221,7 +217,7 @@ export default function MarketingHomePage(): React.JSX.Element {
           <Reveal delay={0.05}>
             <h1 className="mt-8 max-w-[1080px] text-balance text-[clamp(3.4rem,8.2vw,7.75rem)] font-medium leading-[0.9] tracking-[-0.075em]">
               The operating system for{' '}
-              <span className="bg-gradient-to-r from-[#b9caff] via-[#839cff] to-[#eef0ff] bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-white via-white to-white/45 bg-clip-text text-transparent">
                 distributed manufacturing.
               </span>
             </h1>
@@ -258,7 +254,7 @@ export default function MarketingHomePage(): React.JSX.Element {
         </div>
       </section>
 
-      <section className="border-b border-border-subtle bg-[#08090b]">
+      <section className="border-b border-border-subtle bg-[#080808]">
         <div className="container py-9">
           <p className="mb-6 font-mono text-[0.625rem] uppercase tracking-[0.14em] text-subtle">
             One shared system across the operation
@@ -302,43 +298,7 @@ export default function MarketingHomePage(): React.JSX.Element {
         </div>
       </section>
 
-      <section className="section-blueprint border-b border-border-subtle py-24 sm:py-32">
-        <div className="container">
-          <Reveal className="grid gap-10 lg:grid-cols-[0.7fr_1.3fr] lg:items-start lg:gap-24">
-            <h2 className="text-[clamp(2.5rem,5vw,4.25rem)] font-medium leading-[0.98] tracking-[-0.055em]">
-              Plan and monitor
-            </h2>
-            <div>
-              <p className="max-w-2xl text-[clamp(1.35rem,2.5vw,2rem)] leading-[1.35] tracking-[-0.035em] text-foreground">
-                Move from capacity signals to a release-ready production plan without losing the
-                constraints that make the plan real.
-              </p>
-              <Link
-                href="/platform#allocation"
-                className="mt-8 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-brand"
-              >
-                Explore planning <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-          </Reveal>
-          <Reveal className="mt-16" y={24}>
-            <PlanningVisual />
-          </Reveal>
-          <div className="mt-8 grid gap-5 border-t border-border-subtle pt-8 sm:grid-cols-3">
-            {[
-              'Capability-aware allocation',
-              'Live capacity commitments',
-              'Delay responsibility and ageing',
-            ].map((item) => (
-              <div key={item} className="flex items-center gap-3 text-sm text-muted-foreground">
-                <span className="h-1.5 w-1.5 rounded-full bg-brand" /> {item}
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="border-b border-border-subtle bg-[#08090b] py-24 sm:py-32">
+      <section className="border-b border-border-subtle bg-[#080808] py-24 sm:py-32">
         <div className="container mb-16 grid gap-10 lg:grid-cols-[0.68fr_1.32fr] lg:gap-24">
           <Reveal>
             <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-signal">
@@ -380,7 +340,7 @@ export default function MarketingHomePage(): React.JSX.Element {
         </div>
       </section>
 
-      <section className="border-b border-border-subtle bg-[#08090b] py-24 sm:py-32">
+      <section className="border-b border-border-subtle bg-[#080808] py-24 sm:py-32">
         <div className="container">
           <Reveal className="max-w-3xl">
             <Eyebrow>Designed for Indian shop floors</Eyebrow>
@@ -396,11 +356,11 @@ export default function MarketingHomePage(): React.JSX.Element {
         </div>
       </section>
 
-      <section className="bg-[#08090b] py-24 sm:py-32">
+      <section className="bg-[#080808] py-24 sm:py-32">
         <div className="container">
           <Reveal className="grid gap-3 lg:grid-cols-[1.65fr_0.85fr]">
-            <article className="blueprint-card relative min-h-[480px] overflow-hidden rounded-[18px] p-8 sm:p-12">
-              <div className="absolute -bottom-24 -right-20 h-[420px] w-[420px] rounded-full border-[48px] border-[#778bff]/10" />
+            <article className="editorial-card relative min-h-[480px] overflow-hidden rounded-[18px] p-8 sm:p-12">
+              <div className="absolute -bottom-24 -right-20 h-[420px] w-[420px] rounded-full border-[48px] border-black/[0.05]" />
               <RadioTower className="h-8 w-8" />
               <h2 className="relative mt-10 max-w-3xl text-[clamp(2.4rem,5vw,4.5rem)] font-medium leading-[1.02] tracking-[-0.06em]">
                 See one network—not a collection of disconnected vendors.
@@ -410,8 +370,8 @@ export default function MarketingHomePage(): React.JSX.Element {
                 responsibilities.
               </p>
             </article>
-            <article className="signal-card flex min-h-[480px] flex-col rounded-[18px] p-8 sm:p-10">
-              <ShieldCheck className="h-8 w-8" />
+            <article className="editorial-card--dark flex min-h-[480px] flex-col rounded-[18px] p-8 sm:p-10">
+              <ShieldCheck className="h-8 w-8 text-signal" />
               <h2 className="mt-10 text-[clamp(2.2rem,4vw,3.6rem)] font-medium leading-[1.02] tracking-[-0.06em]">
                 Evidence creates momentum.
               </h2>
@@ -427,7 +387,7 @@ export default function MarketingHomePage(): React.JSX.Element {
         </div>
       </section>
 
-      <section className="section-blueprint border-y border-border-subtle py-24 sm:py-32">
+      <section className="section-grid border-y border-border-subtle py-24 sm:py-32">
         <div className="container">
           <Reveal className="grid gap-8 lg:grid-cols-[0.7fr_1.3fr]">
             <h2 className="text-[clamp(2.3rem,4.4vw,3.75rem)] font-medium leading-[1.02] tracking-[-0.055em]">
@@ -441,7 +401,7 @@ export default function MarketingHomePage(): React.JSX.Element {
           <StaggerGroup className="mt-16 grid gap-px overflow-hidden rounded-[18px] border border-border-strong bg-border-subtle lg:grid-cols-3">
             {personas.map((persona) => (
               <StaggerItem key={persona.title} className="h-full">
-                <article className="group flex h-full min-h-[320px] flex-col bg-[#0d0e11] p-7 transition-colors hover:bg-[#111216]">
+                <article className="group flex h-full min-h-[320px] flex-col bg-[#0d0d0d] p-7 transition-colors hover:bg-[#121212]">
                   <span className="grid h-10 w-10 place-items-center rounded-xl border border-brand/25 bg-brand/10 text-brand">
                     <persona.icon className="h-4 w-4" />
                   </span>
@@ -465,7 +425,7 @@ export default function MarketingHomePage(): React.JSX.Element {
         </div>
       </section>
 
-      <section className="relative overflow-hidden bg-[#08090b] py-28 sm:py-40">
+      <section className="relative overflow-hidden bg-[#080808] py-28 sm:py-40">
         <AmbientLines variant="routes" className="opacity-30" />
         <div className="container relative text-center">
           <Reveal className="mx-auto max-w-4xl">

@@ -8,7 +8,7 @@ export function LogoMark({ className }: { className?: string }): React.JSX.Eleme
       <circle cx="16" cy="16" r="13" fill="currentColor" />
       <path
         d="M6.8 8.1 23.9 25.2M4.4 12.7l14.9 14.9M12.7 4.4l14.9 14.9"
-        stroke="#090a0c"
+        stroke="#090909"
         strokeWidth="2.35"
       />
       <path

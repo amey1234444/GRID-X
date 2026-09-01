@@ -35,7 +35,7 @@ const columns = [
 
 export function MarketingFooter(): React.JSX.Element {
   return (
-    <footer className="relative overflow-hidden border-t border-border-subtle bg-[#08090b]">
+    <footer className="relative overflow-hidden border-t border-border-subtle bg-[#080808]">
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/45 to-transparent" />
       <div className="container relative grid gap-12 py-20 lg:grid-cols-[1.5fr_repeat(3,1fr)] lg:py-28">
         <div className="space-y-6">

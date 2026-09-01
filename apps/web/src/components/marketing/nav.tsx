@@ -137,10 +137,10 @@ export function MarketingNav(): React.JSX.Element {
           'transition-all duration-200 ease-out-expo',
         )}
       >
-        <div className="overflow-hidden rounded-[18px] border border-border-strong bg-[#101114]/95 p-2 shadow-popover backdrop-blur-2xl">
+        <div className="overflow-hidden rounded-[18px] border border-border-strong bg-[#101010]/95 p-2 shadow-popover backdrop-blur-2xl">
           <div className="grid gap-px overflow-hidden rounded-xl border border-border-subtle bg-border-subtle md:grid-cols-[1fr_1fr_0.72fr]">
             {productGroups.map((group) => (
-              <div key={group.title} className="bg-[#121316] p-5">
+              <div key={group.title} className="bg-[#121212] p-5">
                 <p className="mb-2 px-2 font-mono text-[0.625rem] uppercase tracking-[0.12em] text-subtle">
                   {group.title}
                 </p>
@@ -166,7 +166,7 @@ export function MarketingNav(): React.JSX.Element {
                 ))}
               </div>
             ))}
-            <div className="relative overflow-hidden bg-[#121316] p-6">
+            <div className="relative overflow-hidden bg-[#121212] p-6">
               <div className="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-brand/20 blur-3xl" />
               <Network className="relative h-6 w-6 text-signal" />
               <p className="relative mt-5 text-lg font-semibold tracking-[-0.03em]">
