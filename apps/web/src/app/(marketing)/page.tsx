@@ -302,8 +302,8 @@ export default function MarketingHomePage(): React.JSX.Element {
       <ProductFilm
         id="network-film"
         eyebrow="Network operations"
-        title="Make distributed manufacturing self-driving."
-        description="Jobs move through partner selection, drawing release, material custody, measured quality and payment gates as one continuous operating record."
+        title="From issued job to verified payment."
+        description="Watch allocation, engineering control, material custody, measured quality and commercial approval move through one connected manufacturing network."
       />
 
       <section className="border-b border-border-subtle bg-[#080808] py-24 sm:py-32">
