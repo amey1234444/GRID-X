@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 
 import { AmbientLines } from '@/components/marketing/ambient-lines';
+import { ModuleExplorer, type ProductModule } from '@/components/marketing/module-explorer';
 import {
   Eyebrow,
   FeatureBand,
@@ -21,6 +22,7 @@ import {
 } from '@/components/marketing/primitives';
 import { DisclosureList, type DisclosureItem } from '@/components/marketing/disclosure-list';
 import { QuoteBand, type Quote } from '@/components/marketing/quote-band';
+import { ProductFilm } from '@/components/marketing/product-film';
 import { Reveal, StaggerGroup, StaggerItem } from '@/components/motion';
 
 export const metadata: Metadata = {
@@ -176,11 +178,57 @@ const modules = [
   },
 ];
 
+const moduleRows: Record<string, ProductModule['rows']> = {
+  allocation: [
+    { label: 'Precision Auto', value: '94 / ready', tone: 'live' },
+    { label: 'Shakti Works', value: '81 / ready', tone: 'live' },
+    { label: 'Metro Fabricators', value: 'class blocked', tone: 'warning' },
+  ],
+  drawings: [
+    { label: 'DRG-4471 / Rev C', value: 'released', tone: 'live' },
+    { label: 'Partner acknowledgement', value: '09:41', tone: 'live' },
+    { label: 'Rev B', value: 'superseded', tone: 'neutral' },
+  ],
+  material: [
+    { label: 'Issued', value: '1,240 kg', tone: 'neutral' },
+    { label: 'Consumed + scrap', value: '1,226 kg', tone: 'live' },
+    { label: 'Variance', value: '14 kg', tone: 'warning' },
+  ],
+  quality: [
+    { label: 'Ø 24.00 ±0.05', value: '24.02', tone: 'live' },
+    { label: 'Surface finish', value: 'pass', tone: 'live' },
+    { label: 'Concentricity', value: 'reject', tone: 'warning' },
+  ],
+  payments: [
+    { label: 'Quantity gate', value: 'passed', tone: 'live' },
+    { label: 'Material gate', value: 'passed', tone: 'live' },
+    { label: 'Finance approval', value: 'pending 2d', tone: 'warning' },
+  ],
+  insight: [
+    { label: 'On-time delivery', value: '94.2%', tone: 'live' },
+    { label: 'Acceptance rate', value: '98.6%', tone: 'live' },
+    { label: 'Items needing action', value: '3', tone: 'warning' },
+  ],
+};
+
+const explorerModules: ProductModule[] = modules.map(
+  ({ id, label, title, rule, detail, points }) => ({
+    id,
+    eyebrow: label,
+    title,
+    summary: detail,
+    outcome: rule,
+    points,
+    rows: moduleRows[id] ?? [],
+  }),
+);
+
 const surface = [
   {
     icon: <Layers />,
     title: 'One record',
-    detail: 'Every module writes to the same job, so no screen holds a private version of the truth.',
+    detail:
+      'Every module writes to the same job, so no screen holds a private version of the truth.',
   },
   {
     icon: <FileLock2 />,
@@ -301,8 +349,7 @@ const personas = [
   },
   {
     title: 'Partner',
-    detail:
-      'Jobs, drawings, material acknowledgement, milestones, inspections and payment status.',
+    detail: 'Jobs, drawings, material acknowledgement, milestones, inspections and payment status.',
     href: '/partner/login',
   },
   {
@@ -315,100 +362,38 @@ const personas = [
 export default function PlatformPage(): React.JSX.Element {
   return (
     <>
-      <section className="relative overflow-hidden border-b border-border-subtle bg-[#080808] py-24 sm:py-32">
-        <AmbientLines variant="routes" className="opacity-30" />
-        <div className="container relative">
-          <Reveal className="max-w-4xl">
-            <Eyebrow>Product</Eyebrow>
-            <Statement
-              as="h1"
-              className="mt-7"
-              lead="Fourteen modules, one control layer."
-              trail="Each enforces a rule the operation already has, and writes what it did to a shared record."
-            />
-            <p className="mt-8 max-w-2xl text-[1.0625rem] leading-relaxed text-muted-foreground">
-              GRID-X is not a dashboard sitting on top of spreadsheets. Every module owns its
-              workflow, refuses the states that should not exist, and leaves an audit trail behind
-              it.
-            </p>
-            <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/login"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-foreground px-7 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
-              >
-                Open GRID-X <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href="/security"
-                className="inline-flex h-12 items-center justify-center rounded-full border border-border-strong bg-surface px-7 text-sm font-semibold transition-colors hover:bg-surface-hover"
-              >
-                How it is secured
-              </Link>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+      <ProductFilm
+        as="h1"
+        eyebrow="Distributed manufacturing OS"
+        title="Make partner operations self-driving."
+        description="GRID-X moves every outsourced job through allocation, engineering, material, quality and payment controls without breaking the evidence chain."
+        href="#modules"
+        linkLabel="Explore the control modules"
+      />
 
       <FeatureBand items={surface} />
 
-      <section className="section-graphite border-b border-border-subtle py-24 sm:py-32">
+      <section
+        id="modules"
+        className="section-graphite scroll-mt-16 border-b border-border-subtle py-24 sm:py-32"
+      >
         <div className="container">
           <Reveal className="grid gap-10 lg:grid-cols-[0.7fr_1.3fr] lg:gap-24">
             <h2 className="type-hero">The modules</h2>
-            <p className="max-w-2xl text-[clamp(1.25rem,2.2vw,1.75rem)] leading-[1.4] tracking-[-0.03em] text-muted-foreground">
-              Listed in the order the work actually moves — from the decision to outsource through
-              to the payment that closes it.
-            </p>
+            <div className="max-w-2xl">
+              <p className="text-[clamp(1.125rem,1.8vw,1.5rem)] leading-[1.45] tracking-[-0.025em] text-muted-foreground">
+                Listed in the order the work actually moves — from the decision to outsource through
+                to the payment that closes it.
+              </p>
+              <p className="mt-5 font-mono text-[0.625rem] uppercase tracking-[0.11em] text-subtle">
+                Select a module to inspect its controls and live record
+              </p>
+            </div>
           </Reveal>
 
-          <div className="mt-20 space-y-px overflow-hidden rounded-[18px] border border-border-strong bg-border-subtle">
-            {modules.map((module) => (
-              <article
-                key={module.id}
-                id={module.id}
-                className="scroll-mt-24 bg-[#0d0d0d] p-7 sm:p-10"
-              >
-                <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:gap-14">
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-brand/25 bg-brand/10 text-brand">
-                        <module.icon className="h-4 w-4" />
-                      </span>
-                      <span className="type-label">{module.label}</span>
-                    </div>
-
-                    <h3 className="mt-6 font-display text-[clamp(1.5rem,2.6vw,2.125rem)] font-medium leading-[1.08] tracking-[-0.04em]">
-                      {module.title}
-                    </h3>
-                    <p className="mt-4 max-w-xl text-[1.0625rem] leading-relaxed text-foreground">
-                      {module.rule}
-                    </p>
-                    <p className="mt-3 max-w-xl text-[0.9375rem] leading-relaxed text-muted-foreground">
-                      {module.detail}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col gap-6">
-                    {module.visual}
-                    <ul className="space-y-2.5 border-t border-border-subtle pt-5">
-                      {module.points.map((point) => (
-                        <li
-                          key={point}
-                          className="flex gap-2.5 text-[0.8125rem] leading-relaxed text-muted-foreground"
-                        >
-                          <span
-                            className="mt-[0.5rem] h-1 w-1 shrink-0 rounded-full bg-subtle-foreground"
-                            aria-hidden
-                          />
-                          {point}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
+          <Reveal className="mt-16" y={18}>
+            <ModuleExplorer modules={explorerModules} />
+          </Reveal>
         </div>
       </section>
 
@@ -486,7 +471,7 @@ export default function PlatformPage(): React.JSX.Element {
             <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-signal">
               Every module, one record
             </p>
-            <h2 className="mt-8 text-balance font-display text-[clamp(2.5rem,6vw,5rem)] font-medium leading-[0.96] tracking-[-0.06em]">
+            <h2 className="mt-8 text-balance font-display text-[clamp(2.5rem,4.8vw,4rem)] font-medium leading-[1] tracking-[-0.045em]">
               See the whole network at once.
             </h2>
             <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row">

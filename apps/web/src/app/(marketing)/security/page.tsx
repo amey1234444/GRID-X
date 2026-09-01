@@ -231,7 +231,7 @@ export default function SecurityPage(): React.JSX.Element {
         <div className="container">
           <Reveal className="grid gap-10 lg:grid-cols-[0.7fr_1.3fr] lg:gap-24">
             <h2 className="type-hero">The controls</h2>
-            <p className="max-w-2xl text-[clamp(1.25rem,2.2vw,1.75rem)] leading-[1.4] tracking-[-0.03em] text-muted-foreground">
+            <p className="max-w-2xl text-[clamp(1.125rem,1.8vw,1.5rem)] leading-[1.45] tracking-[-0.025em] text-muted-foreground">
               What is actually enforced, stated plainly enough that you can hold us to it.
             </p>
           </Reveal>
@@ -356,7 +356,7 @@ export default function SecurityPage(): React.JSX.Element {
             <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-signal">
               Controlled by design
             </p>
-            <h2 className="mt-8 text-balance font-display text-[clamp(2.5rem,6vw,5rem)] font-medium leading-[0.96] tracking-[-0.06em]">
+            <h2 className="mt-8 text-balance font-display text-[clamp(2.5rem,4.8vw,4rem)] font-medium leading-[1] tracking-[-0.045em]">
               Let the work out without losing the record.
             </h2>
             <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row">
