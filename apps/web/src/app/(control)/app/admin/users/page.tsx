@@ -10,6 +10,7 @@ import { ActionDialog } from '@/components/app/action-dialog';
 import { DataTable, type Column } from '@/components/app/data-table';
 import { PageHeader } from '@/components/app/page-header';
 import { PaginationControls } from '@/components/app/pagination-controls';
+import { RateLimitPanel } from '@/components/app/rate-limit-panel';
 import { SearchFilters } from '@/components/app/search-filters';
 import { StatCard } from '@/components/app/stat-card';
 import { StatusBadge } from '@/components/app/status-badge';
@@ -18,7 +19,7 @@ import { optionsFrom } from '@/lib/options';
 import { readPage, readParam, type SearchParams } from '@/lib/query';
 import { companyOptions, partnerOptions } from '@/lib/reference';
 import { apiGet } from '@/lib/session';
-import { emptyPage, type Paginated, type UserRow } from '@/lib/types';
+import { emptyPage, type Paginated, type SettingRow, type UserRow } from '@/lib/types';
 
 export const metadata = { title: 'Users · GRID-X' };
 
@@ -34,10 +35,11 @@ export default async function UsersPage({
     if (value) query.set(key, value);
   }
 
-  const [users, partners, companies] = await Promise.all([
+  const [users, partners, companies, settings] = await Promise.all([
     apiGet<Paginated<UserRow>>(`/users?${query.toString()}`, emptyPage<UserRow>()),
     partnerOptions(),
     companyOptions(),
+    apiGet<SettingRow[]>('/settings', []),
   ]);
 
   const columns: Column<UserRow>[] = [
@@ -165,7 +167,7 @@ export default async function UsersPage({
       <PageHeader
         icon="Settings"
         title="Users"
-        description="Internal and partner users, their roles and session security posture."
+        description="Internal and partner users, their roles and session security posture — and how hard the sign-in surface is to push against."
         actions={
           <ActionDialog
             title="Create user"
@@ -228,6 +230,8 @@ export default async function UsersPage({
           value={formatNumber(users.data.filter((row) => row.twoFactorEnabled).length)}
         />
       </div>
+
+      <RateLimitPanel settings={settings} />
 
       <SearchFilters
         searchPlaceholder="Search by name, email or phone…"

@@ -22,12 +22,25 @@ export const metadata = { title: 'Settings · GRID-X' };
  * with the rule it governs and a control of the right shape for its type.
  */
 
-const GROUP_ORDER = ['security', 'governance', 'drawings', 'materials', 'commercial'] as const;
+const GROUP_ORDER = [
+  'security',
+  'rateLimits',
+  'governance',
+  'drawings',
+  'materials',
+  'commercial',
+] as const;
 
 const GROUP_LABELS: Record<string, { title: string; description: string }> = {
   security: {
     title: 'Security',
     description: 'Who must hold a second factor, and how long a password reset link stays usable.',
+  },
+  rateLimits: {
+    title: 'Rate limits',
+    description:
+      'How many requests one caller may make before GRID-X starts refusing them. Sign-in and ' +
+      'sign-up stay tight; ordinary traffic is deliberately generous.',
   },
   governance: {
     title: 'Governance',

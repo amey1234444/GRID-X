@@ -79,7 +79,7 @@ export class AdminController {
    * Section 18 — password recovery for a user who cannot start one themselves. Rate limited
    * because it changes credentials, even though the caller is already an administrator.
    */
-  @RateLimit(10, 15 * 60_000)
+  @RateLimit('signup')
   @Post('users/:id/reset-password')
   @RequirePermissions(PERMISSIONS.USER_MANAGE)
   resetUserPassword(
