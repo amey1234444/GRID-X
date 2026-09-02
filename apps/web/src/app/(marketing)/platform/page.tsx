@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 
 import { AmbientLines } from '@/components/marketing/ambient-lines';
+import { ExperienceShowcase } from '@/components/marketing/experience-showcase';
 import { ModuleExplorer, type ProductModule } from '@/components/marketing/module-explorer';
 import {
   Eyebrow,
@@ -23,7 +24,7 @@ import {
 import { DisclosureList, type DisclosureItem } from '@/components/marketing/disclosure-list';
 import { QuoteBand, type Quote } from '@/components/marketing/quote-band';
 import { ProductFilm } from '@/components/marketing/product-film';
-import { Reveal, StaggerGroup, StaggerItem } from '@/components/motion';
+import { Reveal } from '@/components/motion';
 
 export const metadata: Metadata = {
   title: 'Product',
@@ -341,25 +342,6 @@ const quotes: [Quote, Quote] = [
   },
 ];
 
-const personas = [
-  {
-    title: 'Control',
-    detail:
-      'The full operation — allocation, drawings, material, quality, commercials and reporting.',
-    href: '/login',
-  },
-  {
-    title: 'Partner',
-    detail: 'Jobs, drawings, material acknowledgement, milestones, inspections and payment status.',
-    href: '/partner/login',
-  },
-  {
-    title: 'Inspector',
-    detail: 'A focused queue with the plan attached, built for recording results on the floor.',
-    href: '/login',
-  },
-];
-
 export default function PlatformPage(): React.JSX.Element {
   return (
     <>
@@ -431,25 +413,9 @@ export default function PlatformPage(): React.JSX.Element {
               the depth that role actually needs.
             </p>
           </Reveal>
-          <StaggerGroup className="mt-16 grid gap-px overflow-hidden rounded-[18px] border border-border-strong bg-border-subtle lg:grid-cols-3">
-            {personas.map((persona) => (
-              <StaggerItem key={persona.title} className="h-full">
-                <article className="plate plate-lit group flex h-full min-h-[260px] flex-col p-7 transition-[background-color,transform] duration-300 ease-out-expo hover:bg-[#121212] lg:hover:-translate-y-0.5">
-                  <p className="type-label">{persona.title}</p>
-                  <h3 className="mt-3 font-display text-2xl font-medium tracking-[-0.04em]">
-                    GRID-X {persona.title}
-                  </h3>
-                  <p className="mt-3 text-sm leading-6 text-muted-foreground">{persona.detail}</p>
-                  <Link
-                    href={persona.href}
-                    className="mt-auto inline-flex items-center gap-2 pt-8 text-sm font-medium text-brand transition-colors group-hover:text-foreground"
-                  >
-                    Open {persona.title} <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </article>
-              </StaggerItem>
-            ))}
-          </StaggerGroup>
+          <Reveal className="mt-16" y={22}>
+            <ExperienceShowcase />
+          </Reveal>
         </div>
       </section>
 

@@ -36,34 +36,48 @@ export function QuoteBand({
 }): React.JSX.Element {
   return (
     <div className={cn('flex flex-col gap-10', className)}>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-[1.08fr_0.92fr]">
         {quotes.map((quote, index) => (
           <figure
             key={quote.name}
             className={cn(
-              'relative isolate flex min-h-[380px] flex-col justify-between overflow-hidden rounded-[18px] p-8 sm:p-10',
+              'relative isolate flex min-h-[420px] flex-col overflow-hidden rounded-[18px] p-8 sm:p-10',
               index === 0 ? 'quote-card-paper' : 'quote-card-signal',
             )}
           >
-            {index === 1 ? (
-              <span className="relative z-10 mb-8 flex items-center gap-2 font-mono text-[0.5625rem] uppercase tracking-[0.12em] opacity-55">
+            <div className="relative z-10 flex items-center justify-between gap-4">
+              <span className="flex items-center gap-2 font-mono text-[0.5625rem] uppercase tracking-[0.12em] opacity-55">
                 <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                Reconciled before approval
+                {index === 0 ? 'One released revision' : 'Reconciled before approval'}
               </span>
-            ) : null}
-            <blockquote className="relative z-10 font-display text-[clamp(1.5rem,2.6vw,2.125rem)] font-medium leading-[1.18] tracking-[-0.035em]">
+              <span className="font-mono text-[0.5rem] tracking-[0.12em] opacity-25">
+                0{index + 1}
+              </span>
+            </div>
+            <span
+              className="pointer-events-none absolute -right-3 top-10 font-serif text-[12rem] leading-none opacity-[0.035]"
+              aria-hidden
+            >
+              &ldquo;
+            </span>
+            <blockquote className="relative z-10 mt-16 max-w-[44rem] font-display text-[clamp(1.65rem,2.7vw,2.4rem)] font-medium leading-[1.14] tracking-[-0.045em]">
               &ldquo;{quote.quote}&rdquo;
             </blockquote>
-            <figcaption className="relative z-10 mt-10 flex items-center gap-3.5">
-              <span
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-current/15 font-mono text-[0.625rem] font-medium uppercase tracking-[0.06em] opacity-80"
-                aria-hidden
-              >
-                {quote.initials}
+            <figcaption className="relative z-10 mt-auto flex items-end justify-between gap-5 border-t border-current/10 pt-7">
+              <span className="flex min-w-0 items-center gap-3.5">
+                <span
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-current/15 font-mono text-[0.625rem] font-medium uppercase tracking-[0.06em] opacity-80"
+                  aria-hidden
+                >
+                  {quote.initials}
+                </span>
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-[0.875rem] font-medium">{quote.name}</span>
+                  <span className="truncate text-[0.8125rem] opacity-70">{quote.role}</span>
+                </span>
               </span>
-              <span className="flex min-w-0 flex-col">
-                <span className="truncate text-[0.875rem] font-medium">{quote.name}</span>
-                <span className="truncate text-[0.8125rem] opacity-70">{quote.role}</span>
+              <span className="hidden max-w-[10rem] text-right font-mono text-[0.5rem] uppercase leading-4 tracking-[0.08em] opacity-35 sm:block">
+                {index === 0 ? 'Same print / every viewer' : 'Material closed / invoice ready'}
               </span>
             </figcaption>
           </figure>

@@ -1,5 +1,6 @@
+import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowLeft, Quote } from 'lucide-react';
+import { ArrowLeft, Check, Quote } from 'lucide-react';
 
 import { Wordmark } from '@/components/brand';
 import { Reveal } from '@/components/motion';
@@ -27,37 +28,87 @@ export default function AuthLayout({ children }: { children: React.ReactNode }):
         </p>
       </div>
 
-      <div className="relative hidden overflow-hidden border-l border-border-subtle bg-surface/60 lg:block">
-        <div className="pointer-events-none absolute inset-0 grid-pattern radial-fade opacity-60" aria-hidden />
-        <div
-          className="pointer-events-none absolute -right-32 top-1/3 h-[28rem] w-[28rem] rounded-full bg-foreground/[0.06] blur-3xl"
+      <div className="auth-proof-panel relative hidden overflow-hidden border-l border-border-subtle lg:block">
+        <Image
+          src="/media/gridx-network-case-study.webp"
+          alt=""
+          fill
+          sizes="50vw"
+          className="auth-proof-media object-cover"
           aria-hidden
         />
-        <div className="relative flex h-full flex-col justify-center gap-10 px-16">
-          <Quote className="h-8 w-8 text-subtle" />
-          <p className="text-balance text-2xl font-medium leading-relaxed">
-            &ldquo;One job, one revision, one recorded decision. GRID-X replaced the phone calls,
-            WhatsApp photos and follow-up spreadsheets with a single controlled flow.&rdquo;
-          </p>
-          <div className="space-y-1">
-            <p className="font-medium">GRID-X Control</p>
-            <p className="text-sm text-muted-foreground">
-              Job issue → material issued → production → first article → quality accepted → material
-              reconciled → payment approved
-            </p>
+        <div className="absolute inset-0 grid-pattern opacity-35" aria-hidden />
+        <div className="auth-proof-scrim absolute inset-0" aria-hidden />
+
+        <div className="relative flex min-h-screen flex-col justify-between gap-10 px-10 py-10 xl:px-16 xl:py-14">
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-[0.5625rem] uppercase tracking-[0.13em] text-white/38">
+              Controlled record / live
+            </span>
+            <span className="flex items-center gap-2 rounded-full border border-success/15 bg-success/[0.04] px-3 py-1.5 font-mono text-[0.5rem] uppercase tracking-[0.09em] text-success">
+              <Check className="h-3 w-3" /> Evidence intact
+            </span>
           </div>
-          <dl className="grid grid-cols-3 gap-6 border-t border-border-subtle pt-8">
-            {[
-              { value: '20', label: 'Modules' },
-              { value: '13', label: 'Roles' },
-              { value: '17', label: 'Standard reports' },
-            ].map((stat) => (
-              <div key={stat.label}>
-                <dt className="text-2xl font-semibold tracking-tight">{stat.value}</dt>
-                <dd className="text-sm text-muted-foreground">{stat.label}</dd>
+
+          <div className="max-w-[700px]">
+            <Quote className="h-7 w-7 text-white/24" />
+            <p className="mt-8 text-balance font-display text-[clamp(1.75rem,2.5vw,2.7rem)] font-medium leading-[1.14] tracking-[-0.04em]">
+              One job, one revision, one recorded decision. The calls, loose photos and follow-up
+              spreadsheets become one controlled flow.
+            </p>
+            <div className="mt-8 flex items-center gap-3">
+              <span className="h-px w-10 bg-signal" />
+              <div>
+                <p className="text-sm font-medium">GRID-X Control</p>
+                <p className="mt-1 text-xs text-white/36">One record from allocation to payment</p>
               </div>
-            ))}
-          </dl>
+            </div>
+          </div>
+
+          <div>
+            <div className="auth-flow-rail grid grid-cols-7 gap-1" aria-label="Controlled job flow">
+              {['Issue', 'Material', 'Produce', 'Article', 'Quality', 'Reconcile', 'Pay'].map(
+                (step, index) => (
+                  <div key={step} className="relative pt-5">
+                    <span
+                      className={
+                        index === 6
+                          ? 'absolute left-0 top-0 h-1.5 w-1.5 rounded-full bg-signal'
+                          : 'absolute left-0 top-0 h-1.5 w-1.5 rounded-full bg-white/45'
+                      }
+                    />
+                    <span className="block font-mono text-[0.45rem] uppercase tracking-[0.06em] text-white/28">
+                      0{index + 1}
+                    </span>
+                    <span className="mt-1 block truncate text-[0.5625rem] text-white/48">
+                      {step}
+                    </span>
+                  </div>
+                ),
+              )}
+            </div>
+
+            <dl className="mt-8 grid grid-cols-3 gap-2">
+              {[
+                { value: '20', label: 'Operational modules' },
+                { value: '13', label: 'Controlled roles' },
+                { value: '17', label: 'Standard reports' },
+              ].map((stat, index) => (
+                <div
+                  key={stat.label}
+                  className="rounded-[14px] border border-white/[0.08] bg-black/30 p-4 backdrop-blur-md xl:p-5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <dt className="max-w-[8rem] text-[0.625rem] leading-4 text-white/36">
+                      {stat.label}
+                    </dt>
+                    <span className="font-mono text-[0.45rem] text-white/18">0{index + 1}</span>
+                  </div>
+                  <dd className="mt-5 text-3xl font-light tracking-[-0.05em]">{stat.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         </div>
       </div>
     </div>

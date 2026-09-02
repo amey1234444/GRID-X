@@ -1,10 +1,12 @@
 import Link from 'next/link';
-import { ArrowRight, BadgeCheck, Boxes, Layers, RadioTower, ShieldCheck } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 import { AmbientLines } from '@/components/marketing/ambient-lines';
 import { AppPreview } from '@/components/marketing/app-preview';
+import { ExperienceShowcase } from '@/components/marketing/experience-showcase';
 import { FieldReadinessShowcase } from '@/components/marketing/field-readiness-showcase';
 import { BlueprintFigures, EvidenceVisual } from '@/components/marketing/linear-visuals';
+import { NetworkCaseStudy } from '@/components/marketing/network-case-study';
 import { ProductFilm } from '@/components/marketing/product-film';
 import {
   Eyebrow,
@@ -14,7 +16,7 @@ import {
   Statement,
 } from '@/components/marketing/primitives';
 import { StageRail, type Stage } from '@/components/marketing/stage-rail';
-import { Reveal, StaggerGroup, StaggerItem } from '@/components/motion';
+import { Reveal } from '@/components/motion';
 
 const outcomes = [
   { value: '1 system', label: 'Across operations, engineering, quality and finance' },
@@ -133,30 +135,6 @@ const stages: Stage[] = [
   },
 ];
 
-const personas = [
-  {
-    title: 'Control',
-    label: 'For operations, engineering, quality and finance',
-    detail: 'The full command layer for allocation, release, inspection and payment.',
-    href: '/login',
-    icon: Layers,
-  },
-  {
-    title: 'Partner',
-    label: 'For MSME manufacturing units',
-    detail: 'A mobile-first work queue for jobs, drawings, milestones and invoices.',
-    href: '/partner/login',
-    icon: Boxes,
-  },
-  {
-    title: 'Inspector',
-    label: 'For quality teams in the field',
-    detail: 'Plans, measurements, evidence and rework decisions in one focused flow.',
-    href: '/login',
-    icon: BadgeCheck,
-  },
-];
-
 export default function MarketingHomePage(): React.JSX.Element {
   return (
     <>
@@ -262,7 +240,7 @@ export default function MarketingHomePage(): React.JSX.Element {
       <ProductFilm
         id="network-film"
         eyebrow="Network operations"
-        title="From issued job to verified payment."
+        title="The record moves. The evidence stays attached."
         description="Watch allocation, engineering control, material custody, measured quality and commercial approval move through one connected manufacturing network."
       />
 
@@ -326,56 +304,11 @@ export default function MarketingHomePage(): React.JSX.Element {
 
       <section className="bg-[#080808] py-24 sm:py-32">
         <div className="container">
-          <Reveal className="grid gap-3 lg:grid-cols-[1.65fr_0.85fr]">
-            <article className="editorial-card relative min-h-[480px] overflow-hidden rounded-[18px] p-8 sm:p-12">
-              <div className="absolute -bottom-24 -right-20 h-[420px] w-[420px] rounded-full border-[48px] border-black/[0.05]" />
-              <RadioTower className="h-8 w-8" />
-              <h2 className="relative mt-10 max-w-3xl text-[clamp(2.2rem,3.6vw,3rem)] font-medium leading-[1.04] tracking-[-0.045em]">
-                See one network—not a collection of disconnected vendors.
-              </h2>
-              <p className="absolute bottom-10 left-8 max-w-md text-base leading-7 text-muted-foreground sm:left-12">
-                Shared state gives every team the same operational truth without flattening their
-                responsibilities.
-              </p>
-            </article>
-            <article className="evidence-momentum-card relative flex min-h-[480px] flex-col overflow-hidden rounded-[18px] p-8 sm:p-10">
-              <div className="relative z-10 flex items-center justify-between">
-                <span className="grid h-10 w-10 place-items-center rounded-full border border-signal/25 bg-signal/[0.06]">
-                  <ShieldCheck className="h-4 w-4 text-signal" />
-                </span>
-                <span className="font-mono text-[0.5rem] uppercase tracking-[0.12em] text-white/28">
-                  Evidence loop / live
-                </span>
-              </div>
-              <div className="relative z-10 mt-10 grid grid-cols-3 gap-2" aria-hidden>
-                {['Captured', 'Verified', 'Released'].map((step, index) => (
-                  <div
-                    key={step}
-                    className="rounded-xl border border-white/[0.08] bg-black/20 px-3 py-3"
-                  >
-                    <span
-                      className={
-                        index === 2
-                          ? 'block h-1 w-8 rounded-full bg-signal'
-                          : 'block h-1 w-8 rounded-full bg-white/28'
-                      }
-                    />
-                    <span className="mt-3 block font-mono text-[0.5rem] uppercase tracking-[0.08em] text-white/38">
-                      {step}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <h2 className="relative z-10 mt-auto pt-12 text-[clamp(2rem,3.4vw,2.75rem)] font-medium leading-[1.04] tracking-[-0.04em]">
-                Evidence creates momentum.
-              </h2>
-              <p className="relative z-10 mt-5 text-sm leading-6 text-white/48">
-                Teams act faster because the system makes the next safe decision obvious.
-              </p>
-            </article>
+          <Reveal y={24}>
+            <NetworkCaseStudy />
           </Reveal>
 
-          <Reveal className="mt-24">
+          <Reveal className="mt-20">
             <MetricBand items={outcomes} />
           </Reveal>
         </div>
@@ -392,30 +325,9 @@ export default function MarketingHomePage(): React.JSX.Element {
               else&apos;s workflow.
             </p>
           </Reveal>
-          <StaggerGroup className="mt-16 grid gap-px overflow-hidden rounded-[18px] border border-border-strong bg-border-subtle lg:grid-cols-3">
-            {personas.map((persona) => (
-              <StaggerItem key={persona.title} className="h-full">
-                <article className="plate plate-lit group flex h-full min-h-[320px] flex-col p-7 transition-[background-color,transform] duration-300 ease-out-expo hover:bg-[#121212] lg:hover:-translate-y-0.5">
-                  <span className="grid h-10 w-10 place-items-center rounded-xl border border-brand/25 bg-brand/10 text-brand">
-                    <persona.icon className="h-4 w-4" />
-                  </span>
-                  <p className="mt-12 font-mono text-[0.625rem] uppercase tracking-[0.12em] text-subtle">
-                    {persona.label}
-                  </p>
-                  <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">
-                    GRID-X {persona.title}
-                  </h3>
-                  <p className="mt-3 text-sm leading-6 text-muted-foreground">{persona.detail}</p>
-                  <Link
-                    href={persona.href}
-                    className="mt-auto inline-flex items-center gap-2 pt-8 text-sm font-medium text-brand transition-colors group-hover:text-foreground"
-                  >
-                    Open {persona.title} <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </article>
-              </StaggerItem>
-            ))}
-          </StaggerGroup>
+          <Reveal className="mt-16" y={22}>
+            <ExperienceShowcase />
+          </Reveal>
         </div>
       </section>
 
