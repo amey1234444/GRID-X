@@ -408,52 +408,92 @@
       0 28px 70px -34px rgb(0 0 0 / 1);
   }
 
-  .editorial-card {
-    color: #111;
-    background-color: #e8e8e8;
-    background-image: radial-gradient(circle at 84% 22%, #fff, transparent 46%),
-      linear-gradient(135deg, rgb(255 255 255 / 0.34), transparent 55%);
-  }
-
-  .editorial-card--dark {
-    color: hsl(var(--foreground));
-    background-color: #111;
-    background-image: radial-gradient(circle at 76% 22%, rgb(255 255 255 / 0.055), transparent 38%);
-  }
-
-  .evidence-momentum-card {
-    color: hsl(var(--foreground));
-    background-color: #0d0d0d;
-    background-image: radial-gradient(circle at 82% 12%, rgb(223 249 0 / 0.085), transparent 34%),
-      linear-gradient(145deg, rgb(255 255 255 / 0.035), transparent 42%),
-      repeating-linear-gradient(
-        118deg,
-        transparent 0,
-        transparent 46px,
-        rgb(255 255 255 / 0.017) 47px,
-        transparent 48px
-      );
-    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.07);
-  }
-
-  .evidence-momentum-card::after {
-    position: absolute;
-    right: -8rem;
-    bottom: -10rem;
-    width: 26rem;
-    height: 26rem;
-    content: '';
-    border: 1px solid rgb(255 255 255 / 0.07);
-    border-radius: 9999px;
+  .network-case-card {
+    background-color: #d7d6d1;
     box-shadow:
-      0 0 0 3rem rgb(255 255 255 / 0.012),
-      0 0 0 6rem rgb(255 255 255 / 0.008);
+      inset 0 0 0 1px rgb(255 255 255 / 0.55),
+      0 42px 100px -58px rgb(0 0 0 / 0.95);
+  }
+
+  .network-case-card::after {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    content: '';
+    background-image: repeating-linear-gradient(
+      118deg,
+      transparent 0,
+      transparent 66px,
+      rgb(17 17 17 / 0.035) 67px,
+      transparent 68px
+    );
+    mask-image: linear-gradient(to right, black, transparent 62%);
     pointer-events: none;
   }
 
-  .editorial-card .text-muted-foreground,
-  .editorial-card .text-subtle {
-    color: rgb(17 17 17 / 0.64);
+  .network-case-media {
+    filter: grayscale(1) contrast(0.96) brightness(1.04);
+    mix-blend-mode: multiply;
+  }
+
+  .network-case-scrim {
+    z-index: 1;
+    background: linear-gradient(
+        90deg,
+        rgb(231 230 226 / 0.98) 0%,
+        rgb(231 230 226 / 0.86) 35%,
+        rgb(231 230 226 / 0.14) 68%,
+        transparent 100%
+      ),
+      linear-gradient(0deg, rgb(215 214 209 / 0.84), transparent 38%);
+  }
+
+  .network-case-metric {
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.75),
+      0 18px 38px -28px rgb(17 17 17 / 0.7);
+  }
+
+  .experience-screen {
+    background-image: linear-gradient(to right, rgb(255 255 255 / 0.022) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 0.02) 1px, transparent 1px),
+      radial-gradient(circle at 78% 0%, rgb(255 255 255 / 0.055), transparent 42%);
+    background-size:
+      48px 48px,
+      48px 48px,
+      100% 100%;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.04),
+      0 34px 80px -52px rgb(255 255 255 / 0.16);
+  }
+
+  .auth-proof-panel {
+    background: #080808;
+  }
+
+  .auth-proof-media {
+    opacity: 0.18;
+    filter: grayscale(1) contrast(1.18) brightness(0.64);
+    mix-blend-mode: luminosity;
+  }
+
+  .auth-proof-scrim {
+    background: linear-gradient(90deg, rgb(8 8 8 / 0.98), rgb(8 8 8 / 0.72) 54%, rgb(8 8 8 / 0.88)),
+      linear-gradient(0deg, rgb(8 8 8 / 0.96), transparent 52%);
+  }
+
+  .auth-flow-rail {
+    position: relative;
+  }
+
+  .auth-flow-rail::before {
+    position: absolute;
+    top: 2px;
+    right: 0;
+    left: 0;
+    height: 1px;
+    content: '';
+    background: linear-gradient(90deg, rgb(255 255 255 / 0.24), rgb(223 249 0 / 0.38));
   }
 
   .marketing-film {
@@ -486,7 +526,29 @@
   .quote-card-paper {
     color: #0f0f0f;
     background-color: #f4f4f2;
-    background-image: radial-gradient(circle at 88% 12%, #fff, transparent 42%);
+    background-image: radial-gradient(circle at 88% 12%, #fff, transparent 42%),
+      repeating-linear-gradient(
+        118deg,
+        transparent 0,
+        transparent 60px,
+        rgb(15 15 15 / 0.028) 61px,
+        transparent 62px
+      );
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.72);
+  }
+
+  .quote-card-paper::after {
+    position: absolute;
+    right: -5rem;
+    bottom: -8rem;
+    z-index: -1;
+    width: 22rem;
+    height: 22rem;
+    content: '';
+    border: 1px solid rgb(15 15 15 / 0.055);
+    border-radius: 9999px;
+    box-shadow: 0 0 0 3.5rem rgb(15 15 15 / 0.016);
+    pointer-events: none;
   }
 
   /* The second card is a step darker rather than a different hue: the product is monochrome, and a
