@@ -14,6 +14,8 @@ const windowSchema = z.object({
     .default(() => new Date(Date.now() + 1000 * 60 * 60 * 24 * 56)),
   partnerId: z.string().optional(),
   processCode: z.enum(PROCESS_TYPES).optional(),
+  /** Module 5 management output — capacity by location. */
+  city: z.string().trim().optional(),
 });
 
 @ApiTags('Capacity')
@@ -39,9 +41,25 @@ export class CapacityController {
     return this.capacity.declare(user, body);
   }
 
+  /**
+   * Module 5 — the management view: network totals, capacity by process and by location, and who
+   * is overloaded or idle. The heatmap answers this one row at a time; this answers it as a whole.
+   */
+  @Get('summary')
+  @RequirePermissions(PERMISSIONS.CAPACITY_READ)
+  summary(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(windowSchema)) query: z.infer<typeof windowSchema>,
+  ) {
+    return this.capacity.networkSummary(user, query);
+  }
+
   @Get('heatmap')
   @RequirePermissions(PERMISSIONS.CAPACITY_READ)
-  heatmap(@Query(zodBody(windowSchema)) query: z.infer<typeof windowSchema>) {
-    return this.capacity.heatmap(query);
+  heatmap(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(windowSchema)) query: z.infer<typeof windowSchema>,
+  ) {
+    return this.capacity.heatmap(user, query);
   }
 }

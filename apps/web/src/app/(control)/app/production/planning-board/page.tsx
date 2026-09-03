@@ -30,6 +30,7 @@ export default async function PlanningBoardPage(): Promise<React.JSX.Element> {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Cog"
         title="Planning board"
         description="Live view of every open job by workflow stage — spot bottlenecks and unallocated work at a glance."
       />

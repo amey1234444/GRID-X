@@ -4,17 +4,28 @@ import {
   MACHINE_CONDITIONS,
   OWNERSHIP_STATUSES,
   PARTNER_APPROVAL_STATUSES,
+  PARTNER_DOCUMENT_TYPES,
+  PARTNER_LEVELS,
   PROCESS_TYPES,
 } from '@gridx/shared';
 
 import {
   addPartnerCapabilityAction,
+  addPartnerDocumentAction,
   addPartnerEmployeeAction,
+  addPartnerLocationAction,
   addPartnerMachineAction,
   changePartnerStatusAction,
   recordPartnerAuditAction,
+  removePartnerCapabilityAction,
+  removePartnerEmployeeAction,
+  removePartnerLocationAction,
+  removePartnerMachineAction,
   suspendPartnerAction,
+  updatePartnerAction,
+  verifyPartnerDocumentAction,
 } from '@/app/actions/control';
+import { ActivityTrail } from '@/components/app/activity-trail';
 import { ActionDialog } from '@/components/app/action-dialog';
 import { DataTable } from '@/components/app/data-table';
 import { DetailList } from '@/components/app/detail-list';
@@ -42,10 +53,71 @@ export default async function PartnerDetailPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Factory"
         title={partner.businessName}
         description={`${partner.partnerCode} · ${partner.city}, ${partner.state} · ${partner.company.name}`}
         actions={
           <>
+            <ActionDialog
+              title="Edit partner"
+              description="Only the fields you fill in are changed."
+              triggerLabel="Edit"
+              triggerVariant="outline"
+              action={updatePartnerAction}
+              hidden={{ partnerId: partner.id }}
+              fields={[
+                { name: 'businessName', label: 'Business name', defaultValue: partner.businessName, span: 2 },
+                { name: 'ownerName', label: 'Owner', defaultValue: partner.ownerName },
+                { name: 'phone', label: 'Phone', defaultValue: partner.phone },
+                { name: 'altPhone', label: 'Alternate phone', defaultValue: partner.altPhone ?? undefined },
+                { name: 'email', label: 'Email', defaultValue: partner.email ?? undefined },
+                { name: 'addressLine1', label: 'Address line 1', defaultValue: partner.addressLine1, span: 2 },
+                { name: 'addressLine2', label: 'Address line 2', defaultValue: partner.addressLine2 ?? undefined, span: 2 },
+                { name: 'city', label: 'City', defaultValue: partner.city },
+                { name: 'state', label: 'State', defaultValue: partner.state },
+                { name: 'pincode', label: 'Pincode', defaultValue: partner.pincode },
+                {
+                  name: 'distanceKm',
+                  label: 'Distance (km)',
+                  type: 'number',
+                  step: '0.1',
+                  defaultValue: partner.distanceKm === null ? undefined : String(partner.distanceKm),
+                },
+                {
+                  name: 'level',
+                  label: 'Level',
+                  type: 'select',
+                  options: optionsFrom(PARTNER_LEVELS),
+                  defaultValue: partner.level,
+                },
+                {
+                  name: 'paymentTermsDays',
+                  label: 'Payment terms (days)',
+                  type: 'number',
+                  defaultValue: String(partner.paymentTermsDays),
+                },
+                {
+                  name: 'maxCapacityHours',
+                  label: 'Monthly capacity (hours)',
+                  type: 'number',
+                  defaultValue: String(partner.maxCapacityHours),
+                },
+                {
+                  name: 'maxOpenJobs',
+                  label: 'Max open jobs',
+                  type: 'number',
+                  defaultValue: String(partner.maxOpenJobs),
+                },
+                { name: 'gstNumber', label: 'GST number', defaultValue: partner.gstNumber ?? undefined },
+                { name: 'udyamNumber', label: 'Udyam number', defaultValue: partner.udyamNumber ?? undefined },
+                { name: 'panNumber', label: 'PAN', defaultValue: partner.panNumber ?? undefined },
+                { name: 'bankName', label: 'Bank', defaultValue: partner.bankName ?? undefined },
+                { name: 'bankAccountName', label: 'Account name', defaultValue: partner.bankAccountName ?? undefined },
+                { name: 'bankAccountNo', label: 'Account number', defaultValue: partner.bankAccountNo ?? undefined },
+                { name: 'bankIfsc', label: 'IFSC', defaultValue: partner.bankIfsc ?? undefined },
+                { name: 'notes', label: 'Notes', type: 'textarea', defaultValue: partner.notes ?? undefined, span: 2 },
+              ]}
+            />
             <ActionDialog
               title="Change approval status"
               description="Approval follows the blueprint workflow: draft → submitted → under review → audit → trial → approved → certified → strategic."
@@ -84,6 +156,14 @@ export default async function PartnerDetailPage({
                 },
                 { name: 'findings', label: 'Findings', type: 'textarea', span: 2 },
                 { name: 'nextAuditDate', label: 'Next audit due', type: 'date' },
+                {
+                  name: 'reportFileId',
+                  label: 'Audit report',
+                  type: 'file',
+                  category: 'AUDIT_REPORT',
+                  accept: 'application/pdf,image/*',
+                  span: 2,
+                },
               ]}
             />
             <ActionDialog
@@ -126,7 +206,7 @@ export default async function PartnerDetailPage({
         <TabsList className="flex-wrap">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="capabilities">Capabilities</TabsTrigger>
-          <TabsTrigger value="machines">Machines &amp; people</TabsTrigger>
+          <TabsTrigger value="machines">Workshops, machines &amp; people</TabsTrigger>
           <TabsTrigger value="quality">Audits &amp; components</TabsTrigger>
           <TabsTrigger value="commercial">Commercial</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
@@ -174,6 +254,38 @@ export default async function PartnerDetailPage({
                   { label: 'IFSC', value: partner.bankIfsc ?? '—' },
                 ]}
               />
+              <div className="flex justify-end">
+                <ActionDialog
+                  title="Upload document"
+                  description="Compliance documents are verified by OSWAR before a partner can be approved."
+                  triggerLabel="Upload document"
+                  triggerSize="sm"
+                  action={addPartnerDocumentAction}
+                  hidden={{ partnerId: partner.id }}
+                  fields={[
+                    {
+                      name: 'type',
+                      label: 'Document type',
+                      type: 'select',
+                      required: true,
+                      options: optionsFrom(PARTNER_DOCUMENT_TYPES),
+                      span: 2,
+                    },
+                    {
+                      name: 'fileId',
+                      label: 'File',
+                      type: 'file',
+                      category: 'PARTNER_CERTIFICATE',
+                      accept: 'application/pdf,image/*',
+                      span: 2,
+                    },
+                    { name: 'documentNo', label: 'Document number' },
+                    { name: 'issueDate', label: 'Issue date', type: 'date' },
+                    { name: 'expiryDate', label: 'Expiry date', type: 'date' },
+                    { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
+                  ]}
+                />
+              </div>
               <DataTable
                 columns={[
                   { key: 'type', header: 'Document', render: (row: PartnerDetail['documents'][number]) => humanise(row.type) },
@@ -185,6 +297,24 @@ export default async function PartnerDetailPage({
                     render: (row: PartnerDetail['documents'][number]) => (
                       <StatusBadge status={row.verified ? 'VERIFIED' : 'PENDING'} />
                     ),
+                  },
+                  {
+                    key: 'actions',
+                    header: '',
+                    render: (row: PartnerDetail['documents'][number]) =>
+                      row.verified ? null : (
+                        <ActionDialog
+                          title="Verify document"
+                          description="Confirm the document has been checked against the original."
+                          triggerLabel="Verify"
+                          triggerSize="sm"
+                          triggerVariant="outline"
+                          submitLabel="Mark verified"
+                          action={verifyPartnerDocumentAction}
+                          hidden={{ documentId: row.id, partnerId: partner.id }}
+                          fields={[]}
+                        />
+                      ),
                   },
                 ]}
                 rows={partner.documents}
@@ -241,6 +371,23 @@ export default async function PartnerDetailPage({
                 render: (row: PartnerDetail['capabilities'][number]) =>
                   row.toleranceMm ? `±${row.toleranceMm} mm` : '—',
               },
+              {
+                key: 'actions',
+                header: '',
+                render: (row: PartnerDetail['capabilities'][number]) => (
+                  <ActionDialog
+                    title="Remove capability"
+                    description="The partner can no longer be allocated jobs that need this process."
+                    triggerLabel="Remove"
+                    triggerSize="sm"
+                    triggerVariant="ghost"
+                    submitLabel="Remove"
+                    action={removePartnerCapabilityAction}
+                    hidden={{ partnerId: partner.id, capabilityId: row.id }}
+                    fields={[]}
+                  />
+                ),
+              },
             ]}
             rows={partner.capabilities}
             empty={{ title: 'No capabilities recorded', description: 'Capabilities gate which jobs can be allocated.' }}
@@ -265,6 +412,41 @@ export default async function PartnerDetailPage({
                 { name: 'condition', label: 'Condition', type: 'select', options: optionsFrom(MACHINE_CONDITIONS), defaultValue: 'GOOD' },
                 { name: 'ownership', label: 'Ownership', type: 'select', options: optionsFrom(OWNERSHIP_STATUSES), defaultValue: 'OWNED' },
                 { name: 'quantity', label: 'Quantity', type: 'number', defaultValue: '1' },
+                { name: 'lastServicedAt', label: 'Last serviced', type: 'date' },
+                {
+                  name: 'photoFileId',
+                  label: 'Machine photograph',
+                  type: 'file',
+                  category: 'PHOTOGRAPH',
+                  accept: 'image/*',
+                  span: 2,
+                },
+              ]}
+            />
+            <ActionDialog
+              title="Add workshop"
+              description="A partner working out of more than one address. Material goes to the primary workshop unless a job says otherwise."
+              triggerLabel="Add workshop"
+              triggerSize="sm"
+              triggerVariant="outline"
+              action={addPartnerLocationAction}
+              hidden={{ partnerId: partner.id }}
+              fields={[
+                { name: 'label', label: 'Name for this unit', required: true, placeholder: 'Unit 2 — machining' },
+                { name: 'addressLine1', label: 'Address line 1', required: true },
+                { name: 'addressLine2', label: 'Address line 2' },
+                { name: 'city', label: 'City', required: true },
+                { name: 'state', label: 'State', required: true },
+                { name: 'pincode', label: 'Pincode', required: true },
+                { name: 'latitude', label: 'Latitude', type: 'number', step: 'any' },
+                { name: 'longitude', label: 'Longitude', type: 'number', step: 'any' },
+                {
+                  name: 'isPrimary',
+                  label: 'Make this the primary workshop',
+                  type: 'checkbox',
+                  help: 'Deliveries default here. The first workshop added is primary automatically.',
+                  span: 2,
+                },
               ]}
             />
             <ActionDialog
@@ -284,6 +466,61 @@ export default async function PartnerDetailPage({
           </div>
           <DataTable
             columns={[
+              {
+                key: 'label',
+                header: 'Workshop',
+                render: (row: PartnerDetail['locations'][number]) => (
+                  <span className="block">
+                    <span className="block font-medium">{row.label}</span>
+                    {row.isPrimary ? (
+                      <span className="text-xs text-muted-foreground">Primary — deliveries default here</span>
+                    ) : null}
+                  </span>
+                ),
+              },
+              {
+                key: 'address',
+                header: 'Address',
+                render: (row: PartnerDetail['locations'][number]) =>
+                  [row.addressLine1, row.addressLine2, row.city, row.state, row.pincode]
+                    .filter(Boolean)
+                    .join(', '),
+              },
+              {
+                key: 'coords',
+                header: 'Coordinates',
+                render: (row: PartnerDetail['locations'][number]) =>
+                  row.latitude !== null && row.longitude !== null
+                    ? `${row.latitude.toFixed(4)}, ${row.longitude.toFixed(4)}`
+                    : '—',
+              },
+              {
+                key: 'actions',
+                header: '',
+                render: (row: PartnerDetail['locations'][number]) => (
+                  <ActionDialog
+                    title="Remove workshop"
+                    description="Removing a workshop does not affect jobs already despatched there."
+                    triggerLabel="Remove"
+                    triggerVariant="outline"
+                    triggerSize="sm"
+                    submitLabel="Remove"
+                    action={removePartnerLocationAction}
+                    hidden={{ locationId: row.id, partnerId: partner.id }}
+                    fields={[]}
+                  />
+                ),
+              },
+            ]}
+            rows={partner.locations}
+            empty={{
+              title: 'No additional workshops',
+              description: 'The address on the business profile is the only one on record.',
+            }}
+          />
+
+          <DataTable
+            columns={[
               { key: 'type', header: 'Machine', render: (row: PartnerDetail['machines'][number]) => row.machineType },
               {
                 key: 'make',
@@ -294,6 +531,22 @@ export default async function PartnerDetailPage({
               { key: 'condition', header: 'Condition', render: (row: PartnerDetail['machines'][number]) => <StatusBadge status={row.condition} /> },
               { key: 'ownership', header: 'Ownership', render: (row: PartnerDetail['machines'][number]) => humanise(row.ownership) },
               { key: 'qty', header: 'Qty', align: 'right', render: (row: PartnerDetail['machines'][number]) => formatNumber(row.quantity) },
+              {
+                key: 'actions',
+                header: '',
+                render: (row: PartnerDetail['machines'][number]) => (
+                  <ActionDialog
+                    title="Remove machine"
+                    triggerLabel="Remove"
+                    triggerSize="sm"
+                    triggerVariant="ghost"
+                    submitLabel="Remove"
+                    action={removePartnerMachineAction}
+                    hidden={{ partnerId: partner.id, machineId: row.id }}
+                    fields={[]}
+                  />
+                ),
+              },
             ]}
             rows={partner.machines}
             empty={{ title: 'No machines recorded' }}
@@ -308,6 +561,22 @@ export default async function PartnerDetailPage({
                 header: 'Role',
                 render: (row: PartnerDetail['employees'][number]) =>
                   row.isSupervisor ? <Badge variant="outline">Supervisor</Badge> : 'Operator',
+              },
+              {
+                key: 'actions',
+                header: '',
+                render: (row: PartnerDetail['employees'][number]) => (
+                  <ActionDialog
+                    title="Remove team member"
+                    triggerLabel="Remove"
+                    triggerSize="sm"
+                    triggerVariant="ghost"
+                    submitLabel="Remove"
+                    action={removePartnerEmployeeAction}
+                    hidden={{ partnerId: partner.id, employeeId: row.id }}
+                    fields={[]}
+                  />
+                ),
               },
             ]}
             rows={partner.employees}
@@ -427,6 +696,8 @@ export default async function PartnerDetailPage({
           />
         </TabsContent>
       </Tabs>
+
+      <ActivityTrail entityType="Partner" entityId={partner.id} />
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import {
   BarChart3,
+  Bell,
   Boxes,
   ClipboardCheck,
   ClipboardList,
@@ -15,6 +16,7 @@ import {
   LifeBuoy,
   Network,
   Ruler,
+  Hammer,
   Settings,
   ShieldCheck,
   Truck,
@@ -25,6 +27,7 @@ import {
 
 const ICONS: Record<string, LucideIcon> = {
   BarChart3,
+  Bell,
   Boxes,
   ClipboardCheck,
   ClipboardList,
@@ -38,6 +41,7 @@ const ICONS: Record<string, LucideIcon> = {
   LifeBuoy,
   Network,
   Ruler,
+  Hammer,
   Settings,
   ShieldCheck,
   Truck,

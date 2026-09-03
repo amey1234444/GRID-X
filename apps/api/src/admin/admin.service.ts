@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@gridx/db';
 import {
   CreateUserInput,
@@ -15,8 +15,15 @@ import { z } from 'zod';
 import * as argon2 from 'argon2';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { SettingsService } from '../common/settings.service';
+import { AuthService } from '../auth/auth.service';
 import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
+import {
+  allowedCompanyIds,
+  assertCanWriteToCompany,
+  assertCompanyScope,
+} from '../common/company-scope';
 
 export interface UserFilters extends PaginationInput {
   roleCode?: string;
@@ -37,10 +44,59 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly settings: SettingsService,
+    private readonly auth: AuthService,
   ) {}
 
-  async listUsers(filters: UserFilters): Promise<Paginated<unknown>> {
+  /**
+   * Who this actor may see in the user directory. A partner owner administers only their own
+   * unit's users; an internal user sees only users who share one of their companies, plus the
+   * partner users of partners in those companies (Section 4 and Section 18).
+   */
+  private userScope(actor: RequestUser): Prisma.UserWhereInput {
+    if (actor.partnerId) return { partnerId: actor.partnerId };
+    const ids = allowedCompanyIds(actor);
+    if (!ids) return {};
+    return {
+      OR: [
+        { companies: { some: { companyId: { in: ids } } } },
+        { partner: { companyId: { in: ids } } },
+      ],
+    };
+  }
+
+  /**
+   * Guards who an administrator may create or edit. A partner owner may only touch their own
+   * unit's users; an internal administrator may only grant companies they hold themselves, so
+   * company access cannot be widened by creating an account.
+   */
+  private async assertMayAdminister(
+    actor: RequestUser,
+    isPartnerRole: boolean,
+    partnerId: string | null | undefined,
+    companyIds: string[] | undefined,
+  ): Promise<void> {
+    if (actor.partnerId) {
+      if (!isPartnerRole || partnerId !== actor.partnerId) {
+        throw new ForbiddenException('You can only administer users of your own unit');
+      }
+      return;
+    }
+    if (partnerId) {
+      const partner = await this.prisma.partner.findUniqueOrThrow({
+        where: { id: partnerId },
+        select: { companyId: true },
+      });
+      assertCompanyScope(actor, partner.companyId, 'partner');
+    }
+    for (const companyId of companyIds ?? []) {
+      assertCanWriteToCompany(actor, companyId);
+    }
+  }
+
+  async listUsers(actor: RequestUser, filters: UserFilters): Promise<Paginated<unknown>> {
     const where: Prisma.UserWhereInput = {
+      ...this.userScope(actor),
       ...(filters.roleCode ? { role: { code: filters.roleCode as Prisma.EnumRoleCodeFilter } } : {}),
       ...(filters.status ? { status: filters.status as Prisma.EnumUserStatusFilter } : {}),
       ...(filters.partnerId ? { partnerId: filters.partnerId } : {}),
@@ -91,6 +147,7 @@ export class AdminService {
     if (!role.isPartnerRole && input.partnerId) {
       throw new BadRequestException('Internal users cannot be linked to a partner');
     }
+    await this.assertMayAdminister(actor, role.isPartnerRole, input.partnerId, input.companyIds);
 
     const user = await this.prisma.user.create({
       data: {
@@ -133,6 +190,15 @@ export class AdminService {
       ? await this.prisma.role.findUniqueOrThrow({ where: { code: input.roleCode } })
       : null;
 
+    // Checked against who the user is today and who they would become.
+    await this.assertMayAdminister(actor, before.role.isPartnerRole, before.partnerId, undefined);
+    await this.assertMayAdminister(
+      actor,
+      (role ?? before.role).isPartnerRole,
+      before.partnerId,
+      input.companyIds,
+    );
+
     const user = await this.prisma.user.update({
       where: { id },
       data: {
@@ -167,6 +233,11 @@ export class AdminService {
 
   /** Users are never deleted — suspension keeps the audit trail intact (Section 18). */
   async suspendUser(actor: RequestUser, id: string, reason: string) {
+    const before = await this.prisma.user.findUniqueOrThrow({
+      where: { id },
+      include: { role: true },
+    });
+    await this.assertMayAdminister(actor, before.role.isPartnerRole, before.partnerId, undefined);
     const user = await this.prisma.user.update({
       where: { id },
       data: { status: 'SUSPENDED' },
@@ -195,9 +266,45 @@ export class AdminService {
     }));
   }
 
-  async listCompanies() {
+  /**
+   * Renames a role or rewrites its description.
+   *
+   * The permission matrix itself stays in code on purpose: RoleCode is a fixed enum, every
+   * environment must enforce the same grants, and a matrix editable at runtime is a matrix that can
+   * be quietly widened. What an administrator can legitimately change is how the role reads to the
+   * people assigning it, which is what this covers.
+   */
+  async updateRole(
+    actor: RequestUser,
+    code: string,
+    input: { name?: string; description?: string },
+  ) {
+    const role = await this.prisma.role.findUniqueOrThrow({ where: { code: code as RoleCode } });
+    const updated = await this.prisma.role.update({
+      where: { id: role.id },
+      data: {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.description !== undefined ? { description: input.description } : {}),
+      },
+    });
+    await this.audit.record(actor, {
+      action: 'ROLE_UPDATED',
+      entityType: 'Role',
+      entityId: role.id,
+      before: { name: role.name, description: role.description },
+      after: { name: updated.name, description: updated.description },
+    });
+    return {
+      ...updated,
+      label: ROLE_LABELS[updated.code as RoleCode],
+      permissions: ROLE_PERMISSIONS[updated.code as RoleCode] ?? [],
+    };
+  }
+
+  async listCompanies(actor: RequestUser) {
+    const ids = allowedCompanyIds(actor);
     return this.prisma.company.findMany({
-      where: { isActive: true },
+      where: { isActive: true, ...(ids ? { id: { in: ids } } : {}) },
       orderBy: { name: 'asc' },
     });
   }
@@ -214,8 +321,11 @@ export class AdminService {
     return company;
   }
 
-  async listAuditLogs(filters: AuditFilters): Promise<Paginated<unknown>> {
+  async listAuditLogs(actor: RequestUser, filters: AuditFilters): Promise<Paginated<unknown>> {
+    const ids = allowedCompanyIds(actor);
     const where: Prisma.AuditLogWhereInput = {
+      // Entries with no company are system-level and stay with the Group Admin.
+      ...(ids ? { companyId: { in: ids } } : {}),
       ...(filters.entityType ? { entityType: filters.entityType } : {}),
       ...(filters.entityId ? { entityId: filters.entityId } : {}),
       ...(filters.userId ? { userId: filters.userId } : {}),
@@ -242,22 +352,56 @@ export class AdminService {
     return paginate(data, total, filters);
   }
 
+  /**
+   * Section 7 — the settings catalogue: every setting the platform actually reads, with its
+   * effective value. Settings used to be listed straight from the table, which meant the screen
+   * showed keys nothing honoured and offered no clue what any of them changed.
+   */
   async listSettings() {
-    return this.prisma.systemSetting.findMany({ orderBy: { key: 'asc' } });
+    return this.settings.catalogue();
   }
 
-  async upsertSetting(actor: RequestUser, key: string, value: Prisma.InputJsonValue) {
-    const setting = await this.prisma.systemSetting.upsert({
-      where: { key },
-      create: { key, value },
-      update: { value },
-    });
+  async upsertSetting(actor: RequestUser, key: string, value: unknown) {
+    const before = await this.prisma.systemSetting.findUnique({ where: { key } });
+    const setting = await this.settings.set(key, value);
     await this.audit.record(actor, {
       action: 'SETTING_UPDATED',
       entityType: 'SystemSetting',
-      entityId: setting.id,
-      after: { key, value },
+      entityId: key,
+      before: before ? { key, value: before.value as Prisma.InputJsonValue } : undefined,
+      after: { key, value: setting.value as Prisma.InputJsonValue },
     });
     return setting;
+  }
+
+  /**
+   * Section 18 — an administrator putting a locked-out user back in.
+   *
+   * `updateUser` deliberately never touches the password hash, so before this existed an internal
+   * user who forgot their password had no way back: partners have OTP, staff had nothing.
+   *
+   * Sends a reset link by default. A temporary password is the fallback for a user whose mailbox
+   * is the thing they have lost, and it is shown to the administrator exactly once.
+   */
+  async resetUserPassword(actor: RequestUser, id: string, useTemporaryPassword: boolean) {
+    const target = await this.prisma.user.findUniqueOrThrow({
+      where: { id },
+      include: { role: true },
+    });
+    await this.assertMayAdminister(actor, target.role.isPartnerRole, target.partnerId, undefined);
+
+    if (target.role.isPartnerRole && !target.email) {
+      throw new BadRequestException(
+        `${target.name} signs in with a one-time code sent to their phone, so there is no password to reset.`,
+      );
+    }
+
+    const result = await this.auth.issueAdminPasswordReset(actor.id, id, useTemporaryPassword);
+    return {
+      userId: id,
+      name: target.name,
+      email: target.email,
+      ...result,
+    };
   }
 }

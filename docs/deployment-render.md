@@ -1,5 +1,7 @@
 # Deploying GRID-X on Render
 
+> Part of the [GRID-X documentation](README.md). See also [10 — Operations](10-operations.md).
+
 GRID-X ships a Render Blueprint (`render.yaml`) that provisions three resources:
 
 | Resource | Type | Purpose |
@@ -18,9 +20,10 @@ GRID-X ships a Render Blueprint (`render.yaml`) that provisions three resources:
    before drawings or photos can be uploaded — see step 3.
 5. **Apply**. The database is created first, then both services build.
 
-The API build runs, in order: install → build `@gridx/shared` → generate the
-Prisma client and build `@gridx/db` → build the Nest app → `prisma migrate
-deploy`. Schema migrations therefore always run before the new version starts.
+The API build runs, in order: install -> build `@gridx/shared` -> generate the
+Prisma client and build `@gridx/db` -> build the Nest app. Schema migrations run
+in the API service's Render pre-deploy command, where the service can reach the
+private Postgres hostname, and therefore still finish before the new version starts.
 
 ## 2. Environment variables
 

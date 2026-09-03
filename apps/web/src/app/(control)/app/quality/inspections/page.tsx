@@ -72,6 +72,7 @@ export default async function InspectionsPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="ShieldCheck"
         title="Inspections"
         description="First article, in-process, final and pre-dispatch inspections with accept, reject and rework decisions."
         actions={
@@ -85,6 +86,14 @@ export default async function InspectionsPage({
               { name: 'offeredQuantity', label: 'Offered quantity', type: 'number', required: true },
               { name: 'inspectorId', label: 'Inspector', type: 'select', options: inspectors },
               { name: 'dueAt', label: 'Due at', type: 'date' },
+              {
+                name: 'photographFileIds',
+                label: 'Photographs',
+                type: 'files',
+                category: 'PHOTOGRAPH',
+                accept: 'image/*',
+                span: 2,
+              },
               { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
             ]}
           />

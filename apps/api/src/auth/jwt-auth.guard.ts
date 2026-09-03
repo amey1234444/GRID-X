@@ -8,13 +8,17 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { PermissionCode, permissionsForRole } from '@gridx/shared';
-import { IS_PUBLIC_KEY } from '../common/decorators';
+import { ALLOW_ENROLMENT_KEY, IS_PUBLIC_KEY } from '../common/decorators';
 import { AuthedRequest } from '../common/request-user';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface AccessTokenPayload {
   sub: string;
-  typ: 'access';
+  /**
+   * `access` is a full session. `enrol` is issued to a user whose role requires a second factor
+   * they have not set up yet: it authenticates them, and opens only the enrolment routes.
+   */
+  typ: 'access' | 'enrol';
 }
 
 @Injectable()
@@ -45,7 +49,19 @@ export class JwtAuthGuard implements CanActivate {
     } catch {
       throw new UnauthorizedException('Session expired, please sign in again');
     }
-    if (payload.typ !== 'access') throw new UnauthorizedException('Invalid token type');
+    if (payload.typ === 'enrol') {
+      const allowed = this.reflector.getAllAndOverride<boolean>(ALLOW_ENROLMENT_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]);
+      if (!allowed) {
+        throw new UnauthorizedException(
+          'Your role requires two-factor authentication. Set up an authenticator to continue.',
+        );
+      }
+    } else if (payload.typ !== 'access') {
+      throw new UnauthorizedException('Invalid token type');
+    }
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },

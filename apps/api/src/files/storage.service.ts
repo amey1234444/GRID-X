@@ -5,10 +5,22 @@ import { dirname, join, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  GetObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import sharp from 'sharp';
+import { PDFDocument } from 'pdf-lib';
 import { AppConfig } from '../config/configuration';
+
+/**
+ * A one-page drawing under this size is already small enough to send as-is, so copying it into a
+ * separate preview would only double what we store.
+ */
+const SINGLE_PAGE_PREVIEW_LIMIT_BYTES = 2 * 1024 * 1024;
 
 export interface StoredObject {
   key: string;
@@ -77,6 +89,7 @@ export class StorageService {
 
   /** Compressed preview used for low-bandwidth partner drawing and photo viewing (Section 20). */
   async putPreview(key: string, body: Buffer, mimeType: string): Promise<StoredObject | null> {
+    if (mimeType === 'application/pdf') return this.putPdfPreview(key, body);
     if (!mimeType.startsWith('image/')) return null;
     const preview = await sharp(body)
       .rotate()
@@ -84,6 +97,56 @@ export class StorageService {
       .jpeg({ quality: 70, mozjpeg: true })
       .toBuffer();
     return this.put(`${key}.preview.jpg`, preview, 'image/jpeg');
+  }
+
+  /**
+   * Drawings arrive as PDFs, and until now the preview path skipped them entirely — so the one
+   * file type Section 19 wanted previewed for partners on weak connections was the file type that
+   * never got one. A drawing set is often many pages and several megabytes; the first sheet is
+   * what a partner opens to check they have the right part.
+   *
+   * This extracts that first page into its own small document rather than rasterising it: no
+   * native renderer to install, the result stays vector so it survives zooming on a phone, and
+   * every mobile PDF viewer opens it.
+   */
+  private async putPdfPreview(key: string, body: Buffer): Promise<StoredObject | null> {
+    try {
+      const source = await PDFDocument.load(body, { ignoreEncryption: true });
+      if (source.getPageCount() === 0) return null;
+
+      // A single-page drawing is already the preview; copying it would double the storage.
+      if (source.getPageCount() === 1 && body.byteLength <= SINGLE_PAGE_PREVIEW_LIMIT_BYTES) {
+        return null;
+      }
+
+      const preview = await PDFDocument.create();
+      const [firstPage] = await preview.copyPages(source, [0]);
+      preview.addPage(firstPage);
+      const bytes = await preview.save({ useObjectStreams: true });
+      return this.put(`${key}.preview.pdf`, Buffer.from(bytes), 'application/pdf');
+    } catch (error) {
+      // An encrypted or malformed PDF still has to upload; it just goes without a preview.
+      this.logger.warn(`PDF preview skipped for ${key}: ${String(error)}`);
+      return null;
+    }
+  }
+
+  /**
+   * Whether an object is already stored. Used to reuse derived files — watermarked drawing copies,
+   * previews — instead of regenerating them on every view.
+   */
+  async exists(key: string): Promise<boolean> {
+    if (this.s3) {
+      try {
+        await this.s3.send(
+          new HeadObjectCommand({ Bucket: this.settings.s3.bucket, Key: key }),
+        );
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    return existsSync(this.localPath(key));
   }
 
   async signedUrl(key: string): Promise<string> {

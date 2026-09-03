@@ -5,7 +5,9 @@ import {
   acknowledgeMaterialSchema,
   completeReconciliationSchema,
   createMaterialIssueSchema,
+  materialTransactionQuerySchema,
   paginationSchema,
+  recordMaterialTransactionSchema,
   recordScrapSchema,
   updateConsumptionSchema,
 } from '@gridx/shared';
@@ -21,10 +23,50 @@ const issueQuerySchema = paginationSchema.extend({
   status: z.string().optional(),
 });
 
+const scrapQuerySchema = paginationSchema.extend({
+  partnerId: z.string().optional(),
+  jobId: z.string().optional(),
+});
+
 @ApiTags('Materials')
 @Controller('materials')
 export class MaterialsController {
   constructor(private readonly materials: MaterialsService) {}
+
+  /**
+   * Module 6 step 2 — what the job's bill of material says stores should issue. The issue form is
+   * prefilled from this instead of being typed from scratch.
+   */
+  @Get('jobs/:jobId/requirement')
+  @RequirePermissions(PERMISSIONS.MATERIAL_READ)
+  requirement(@CurrentUser() user: RequestUser, @Param('jobId') jobId: string) {
+    return this.materials.requirementFor(user, jobId);
+  }
+
+  /** Module 6 — the material transaction ledger. */
+  @Get('transactions')
+  @RequirePermissions(PERMISSIONS.MATERIAL_READ)
+  listTransactions(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(materialTransactionQuerySchema))
+    query: z.infer<typeof materialTransactionQuerySchema>,
+  ) {
+    return this.materials.listTransactions(user, query);
+  }
+
+  /**
+   * Records a movement the documented flows do not produce: rejected material going back,
+   * replacement material coming out, unused material returned, shortage or excess found.
+   */
+  @Post('transactions')
+  @RequirePermissions(PERMISSIONS.MATERIAL_TRANSACTION_RECORD)
+  recordTransaction(
+    @CurrentUser() user: RequestUser,
+    @Body(zodBody(recordMaterialTransactionSchema))
+    body: z.infer<typeof recordMaterialTransactionSchema>,
+  ) {
+    return this.materials.recordTransaction(user, body);
+  }
 
   @Get('issues')
   @RequirePermissions(PERMISSIONS.MATERIAL_READ)
@@ -33,6 +75,25 @@ export class MaterialsController {
     @Query(zodBody(issueQuerySchema)) query: z.infer<typeof issueQuerySchema>,
   ) {
     return this.materials.list(user, query);
+  }
+
+  @Get('partner-stock')
+  @RequirePermissions(PERMISSIONS.MATERIAL_READ)
+  partnerStock(
+    @CurrentUser() user: RequestUser,
+    @Query('partnerId') partnerId?: string,
+    @Query('companyId') companyId?: string,
+  ) {
+    return this.materials.partnerStock(user, { partnerId, companyId });
+  }
+
+  @Get('scrap')
+  @RequirePermissions(PERMISSIONS.MATERIAL_READ)
+  listScrap(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(scrapQuerySchema)) query: z.infer<typeof scrapQuerySchema>,
+  ) {
+    return this.materials.listScrap(user, query);
   }
 
   @Get('issues/:id')
@@ -92,7 +153,7 @@ export class MaterialsController {
 
   @Get('jobs/:jobId/reconciliation')
   @RequirePermissions(PERMISSIONS.MATERIAL_READ)
-  reconciliation(@Param('jobId') jobId: string) {
-    return this.materials.reconciliationSummary(jobId);
+  reconciliation(@CurrentUser() user: RequestUser, @Param('jobId') jobId: string) {
+    return this.materials.reconciliationSummary(user, jobId);
   }
 }

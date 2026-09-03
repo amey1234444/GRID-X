@@ -30,6 +30,20 @@ const jobQuerySchema = paginationSchema.extend({
 
 const cancelSchema = z.object({ reason: z.string().min(5) });
 
+const delayQuerySchema = paginationSchema.extend({
+  companyId: z.string().optional(),
+  partnerId: z.string().optional(),
+  reason: z.string().optional(),
+  responsibility: z.string().optional(),
+  openOnly: z.coerce.boolean().optional(),
+});
+
+const clarificationQuerySchema = paginationSchema.extend({
+  companyId: z.string().optional(),
+  partnerId: z.string().optional(),
+  status: z.string().optional(),
+});
+
 @ApiTags('Jobs')
 @Controller('jobs')
 export class JobsController {
@@ -42,6 +56,38 @@ export class JobsController {
     @Query(zodBody(jobQuerySchema)) query: z.infer<typeof jobQuerySchema>,
   ) {
     return this.jobs.list(user, { ...query, status: query.status as never });
+  }
+
+  /**
+   * Section 12's \"get delayed jobs\". Declared before :id so the router does not read \"delays\"
+   * as a job identifier.
+   */
+  @Get('delays')
+  @RequirePermissions(PERMISSIONS.JOB_READ)
+  listDelays(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(delayQuerySchema)) query: z.infer<typeof delayQuerySchema>,
+  ) {
+    return this.jobs.listDelays(user, {
+      ...query,
+      reason: query.reason as never,
+      responsibility: query.responsibility as never,
+    });
+  }
+
+  @Post('delays/:delayId/resolve')
+  @RequirePermissions(PERMISSIONS.JOB_UPDATE)
+  resolveDelay(@CurrentUser() user: RequestUser, @Param('delayId') delayId: string) {
+    return this.jobs.resolveDelay(user, delayId);
+  }
+
+  @Get('clarifications')
+  @RequirePermissions(PERMISSIONS.JOB_READ)
+  listClarifications(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(clarificationQuerySchema)) query: z.infer<typeof clarificationQuerySchema>,
+  ) {
+    return this.jobs.listClarifications(user, { ...query, status: query.status as never });
   }
 
   @Get(':id')
@@ -71,8 +117,8 @@ export class JobsController {
 
   @Get(':id/recommendations')
   @RequirePermissions(PERMISSIONS.JOB_ALLOCATE)
-  recommendations(@Param('id') id: string) {
-    return this.jobs.recommendations(id);
+  recommendations(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.jobs.recommendations(id, user);
   }
 
   @Post(':id/allocate')

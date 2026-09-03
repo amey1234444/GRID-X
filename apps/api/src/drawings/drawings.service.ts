@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@gridx/db';
 import {
@@ -19,7 +20,16 @@ import { SequenceService } from '../audit/sequence.service';
 import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
 import { assertTransition } from '../common/workflow';
+import {
+  allowedCompanyIds,
+  assertCanWriteToCompany,
+  assertCompanyScope,
+  companyWhere,
+} from '../common/company-scope';
 import { StorageService } from '../files/storage.service';
+import { WatermarkContext, WatermarkService } from '../files/watermark.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { SettingsService } from '../common/settings.service';
 
 export interface DrawingAccessContext {
   ipAddress?: string;
@@ -37,6 +47,9 @@ export class DrawingsService {
     private readonly audit: AuditService,
     private readonly sequence: SequenceService,
     private readonly storage: StorageService,
+    private readonly notifications: NotificationsService,
+    private readonly watermarks: WatermarkService,
+    private readonly settings: SettingsService,
   ) {}
 
   async list(
@@ -44,6 +57,7 @@ export class DrawingsService {
     filters: PaginationInput & { componentId?: string; status?: string },
   ): Promise<Paginated<DrawingSummary>> {
     const where: Prisma.DrawingWhereInput = {
+      ...companyWhere(actor),
       ...(filters.componentId ? { componentId: filters.componentId } : {}),
       ...(filters.search
         ? {
@@ -85,6 +99,7 @@ export class DrawingsService {
       drawingNumber: drawing.drawingNumber,
       title: drawing.title,
       componentCode: drawing.component?.componentCode ?? null,
+      currentRevisionId: drawing.currentRevision?.id ?? null,
       currentRevisionCode: drawing.currentRevision?.revisionCode ?? null,
       status: drawing.currentRevision?.status ?? null,
       revisionCount: drawing._count.revisions,
@@ -128,10 +143,12 @@ export class DrawingsService {
       if (visible.length === 0) throw new ForbiddenException('No released revision shared with you');
       return { ...drawing, revisions: visible };
     }
+    assertCompanyScope(actor, drawing.companyId, 'drawing');
     return drawing;
   }
 
   async createDrawing(actor: RequestUser, input: z.infer<typeof createDrawingSchema>) {
+    assertCanWriteToCompany(actor, input.companyId);
     const drawing = await this.prisma.drawing.create({ data: input });
     await this.audit.record(actor, {
       action: 'DRAWING_CREATED',
@@ -228,36 +245,153 @@ export class DrawingsService {
     });
     assertTransition('Drawing revision', revision.status, 'RELEASED', DRAWING_STATUS_TRANSITIONS);
 
-    const released = await this.prisma.$transaction(async (tx) => {
-      await tx.drawingRevision.updateMany({
-        where: {
-          drawingId: revision.drawingId,
-          id: { not: revisionId },
-          status: 'RELEASED',
+    // Revisions of this drawing that are live right now, with the partners working to them and
+    // the open jobs pointing at them. Everything below moves this population onto the new revision.
+    const superseded = await this.prisma.drawingRevision.findMany({
+      where: { drawingId: revision.drawingId, id: { not: revisionId }, status: 'RELEASED' },
+      select: {
+        id: true,
+        revisionCode: true,
+        access: { where: { revokedAt: null }, select: { partnerId: true, jobId: true, mode: true } },
+        jobs: {
+          where: { status: { notIn: ['CLOSED', 'CANCELLED', 'RECEIVED'] } },
+          select: { id: true, jobNumber: true, partnerId: true },
         },
-        data: { status: 'SUPERSEDED', supersededAt: new Date() },
-      });
-      const updated = await tx.drawingRevision.update({
-        where: { id: revisionId },
-        data: {
-          status: 'RELEASED',
-          releasedAt: new Date(),
-          issueDate: input.issueDate ?? new Date(),
-          expiryDate: input.expiryDate,
-        },
-      });
-      await tx.drawing.update({
-        where: { id: revision.drawingId },
-        data: { currentRevisionId: revisionId },
-      });
-      return updated;
+      },
     });
+
+    const { released, carriedJobs, carriedPartners } = await this.prisma.$transaction(
+      async (tx) => {
+        const now = new Date();
+        await tx.drawingRevision.updateMany({
+          where: { drawingId: revision.drawingId, id: { not: revisionId }, status: 'RELEASED' },
+          data: { status: 'SUPERSEDED', supersededAt: now },
+        });
+        const updated = await tx.drawingRevision.update({
+          where: { id: revisionId },
+          data: {
+            status: 'RELEASED',
+            releasedAt: now,
+            issueDate: input.issueDate ?? now,
+            expiryDate: input.expiryDate,
+          },
+        });
+        await tx.drawing.update({
+          where: { id: revision.drawingId },
+          data: { currentRevisionId: revisionId },
+        });
+
+        // Carry every live access grant across, so a partner is never left holding a revision the
+        // viewer will refuse. The old grants are revoked in the same breath.
+        const partnerIds = new Set<string>();
+        for (const old of superseded) {
+          for (const grant of old.access) {
+            partnerIds.add(grant.partnerId);
+            // A nullable jobId makes the compound key unusable for upsert — Postgres treats NULLs
+            // as distinct — so match explicitly, the same way grantAccess does.
+            const existing = await tx.drawingAccess.findFirst({
+              where: { revisionId, partnerId: grant.partnerId, jobId: grant.jobId },
+            });
+            if (existing) {
+              await tx.drawingAccess.update({
+                where: { id: existing.id },
+                data: { revokedAt: null, revokedBy: null, mode: grant.mode },
+              });
+            } else {
+              await tx.drawingAccess.create({
+                data: {
+                  revisionId,
+                  partnerId: grant.partnerId,
+                  jobId: grant.jobId,
+                  mode: grant.mode,
+                  grantedBy: actor.id,
+                },
+              });
+            }
+            await tx.drawingAccessLog.create({
+              data: {
+                revisionId,
+                partnerId: grant.partnerId,
+                userId: actor.id,
+                jobId: grant.jobId,
+                event: 'GRANTED',
+              },
+            });
+          }
+          await tx.drawingAccess.updateMany({
+            where: { revisionId: old.id, revokedAt: null },
+            data: { revokedAt: now, revokedBy: actor.id },
+          });
+        }
+
+        // Roll open jobs onto the new revision. Without this they keep pointing at a superseded
+        // one and the partner's next drawing open is refused with no explanation.
+        const jobs = superseded.flatMap((old) => old.jobs);
+        if (jobs.length > 0) {
+          await tx.gridJob.updateMany({
+            where: { id: { in: jobs.map((job) => job.id) } },
+            data: { drawingRevisionId: revisionId },
+          });
+        }
+        for (const job of jobs) {
+          if (job.partnerId) partnerIds.add(job.partnerId);
+        }
+
+        return { released: updated, carriedJobs: jobs, carriedPartners: [...partnerIds] };
+      },
+    );
+
+    // Section 13 — everyone working to the old revision hears about the change, and has to
+    // acknowledge the new one before the drawing counts as controlled again (Module 3).
+    const changeSummary = superseded.map((old) => old.revisionCode).join(', ');
+    for (const partnerId of input.notifyPartners ? carriedPartners : []) {
+      const jobsForPartner = carriedJobs.filter((job) => job.partnerId === partnerId);
+      await this.notifications.notify({
+        event: 'DRAWING_REVISION_CHANGED',
+        title: `${revision.drawing.drawingNumber} is now at revision ${revision.revisionCode}`,
+        body: [
+          changeSummary
+            ? `Revision ${changeSummary} is superseded and must not be used.`
+            : 'A new revision has been released.',
+          jobsForPartner.length > 0
+            ? `Affected job(s): ${jobsForPartner.map((job) => job.jobNumber).join(', ')}.`
+            : null,
+          revision.changeNote,
+          'Open the drawing and acknowledge the new revision before continuing production.',
+        ]
+          .filter(Boolean)
+          .join(' '),
+        link: '/partner/drawings',
+        entityType: 'DrawingRevision',
+        entityId: revisionId,
+        partnerId,
+        channels: ['IN_APP', 'WHATSAPP'],
+      });
+    }
+
+    if (carriedJobs.length > 0) {
+      await this.notifications.notify({
+        event: 'DRAWING_REVISION_CHANGED',
+        title: `${carriedJobs.length} open job(s) moved to ${revision.drawing.drawingNumber} rev ${revision.revisionCode}`,
+        body: `Jobs ${carriedJobs.map((job) => job.jobNumber).join(', ')} now reference the new revision. Confirm partners have acknowledged it.`,
+        link: '/app/engineering/drawings',
+        entityType: 'DrawingRevision',
+        entityId: revisionId,
+        roleCodes: ['ENGINEERING_USER', 'OPERATIONS_HEAD', 'GRIDX_HEAD'],
+      });
+    }
 
     await this.audit.record(actor, {
       action: 'DRAWING_REVISION_RELEASED',
       entityType: 'DrawingRevision',
       entityId: revisionId,
-      after: { drawingNumber: revision.drawing.drawingNumber, revision: revision.revisionCode },
+      after: {
+        drawingNumber: revision.drawing.drawingNumber,
+        revision: revision.revisionCode,
+        supersededRevisions: superseded.map((old) => old.revisionCode),
+        jobsRolledForward: carriedJobs.map((job) => job.jobNumber),
+        partnersNotified: carriedPartners.length,
+      },
     });
     return released;
   }
@@ -285,6 +419,63 @@ export class DrawingsService {
     return updated;
   }
 
+  /**
+   * When a grant should lapse: the date given, otherwise the configured default from the moment of
+   * granting. Never later than the revision's own expiry — access to a drawing that is no longer
+   * valid is not access to anything.
+   */
+  private async defaultAccessExpiry(
+    requested: Date | null | undefined,
+    revisionExpiry: Date | null,
+  ): Promise<Date | null> {
+    const days = await this.settings.get('drawings.accessExpiryDays');
+    const fallback = days > 0 ? new Date(Date.now() + days * 86_400_000) : null;
+    const candidate = requested ?? fallback;
+    if (!candidate) return revisionExpiry;
+    if (!revisionExpiry) return candidate;
+    return candidate < revisionExpiry ? candidate : revisionExpiry;
+  }
+
+  /**
+   * Module 3 — whether a partner has acknowledged the revision a job is built to.
+   *
+   * Acknowledgement was recorded and then read by nothing: the release notification asked partners
+   * to acknowledge "before continuing production" and no step checked. This is what makes that
+   * sentence true, and it is deliberately readable by other services rather than private.
+   */
+  async assertRevisionAcknowledged(
+    partnerId: string,
+    jobId: string,
+    activity: string,
+  ): Promise<void> {
+    const required = await this.settings.get('drawings.requireAcknowledgementBeforeProduction');
+    if (!required) return;
+
+    const job = await this.prisma.gridJob.findUniqueOrThrow({
+      where: { id: jobId },
+      select: {
+        drawingRevisionId: true,
+        drawingRevision: { select: { revisionCode: true, drawing: { select: { drawingNumber: true } } } },
+      },
+    });
+    // A job with no controlled drawing has nothing to acknowledge.
+    if (!job.drawingRevisionId || !job.drawingRevision) return;
+
+    const acknowledgement = await this.prisma.drawingAcknowledgement.findUnique({
+      where: {
+        revisionId_partnerId: { revisionId: job.drawingRevisionId, partnerId },
+      },
+      select: { id: true },
+    });
+    if (acknowledgement) return;
+
+    throw new BadRequestException(
+      `Acknowledge drawing ${job.drawingRevision.drawing.drawingNumber} revision ` +
+        `${job.drawingRevision.revisionCode} before ${activity}. This confirms you are working to ` +
+        'the current issue.',
+    );
+  }
+
   async grantAccess(
     actor: RequestUser,
     revisionId: string,
@@ -296,6 +487,12 @@ export class DrawingsService {
     if (revision.status !== 'RELEASED') {
       throw new BadRequestException('Only released revisions can be shared with partners');
     }
+
+    // Section 7 — `drawings.accessExpiryDays` existed as a setting the platform never read, so a
+    // grant lived forever unless someone typed a date. It now supplies the default, and the
+    // revision's own expiry caps it: access cannot outlive the drawing it opens.
+    const expiresAt = await this.defaultAccessExpiry(input.expiresAt, revision.expiryDate);
+
     const existing = await this.prisma.drawingAccess.findFirst({
       where: { revisionId, partnerId: input.partnerId, jobId: input.jobId ?? null },
     });
@@ -305,7 +502,7 @@ export class DrawingsService {
           data: {
             revokedAt: null,
             revokedBy: null,
-            expiresAt: input.expiresAt,
+            expiresAt,
             mode: input.mode,
           },
         })
@@ -315,7 +512,7 @@ export class DrawingsService {
             partnerId: input.partnerId,
             jobId: input.jobId,
             grantedBy: actor.id,
-            expiresAt: input.expiresAt,
+            expiresAt,
             mode: input.mode,
           },
         });
@@ -327,6 +524,22 @@ export class DrawingsService {
         jobId: input.jobId,
         event: 'GRANTED',
       },
+    });
+    const drawing = await this.prisma.drawing.findFirstOrThrow({
+      where: { revisions: { some: { id: revisionId } } },
+      select: { drawingNumber: true, title: true },
+    });
+    await this.notifications.notify({
+      event: 'DRAWING_ACCESS_GRANTED',
+      title: `${drawing.drawingNumber} has been shared with you`,
+      body: `${drawing.title} — revision ${revision.revisionCode}, ${
+        input.mode === 'VIEW_ONLY' ? 'view only' : 'view and download'
+      }. Acknowledge it before starting production.`,
+      link: '/partner/drawings',
+      entityType: 'DrawingAccess',
+      entityId: access.id,
+      partnerId: input.partnerId,
+      channels: ['IN_APP', 'WHATSAPP'],
     });
     await this.audit.record(actor, {
       action: 'DRAWING_ACCESS_GRANTED',
@@ -365,25 +578,40 @@ export class DrawingsService {
     revisionId: string,
     action: 'VIEWED' | 'DOWNLOADED',
     context: DrawingAccessContext,
-  ): Promise<{ url: string; revisionCode: string; watermark: string }> {
+  ): Promise<{ url: string; revisionCode: string; watermark: string; watermarked: boolean }> {
     const revision = await this.prisma.drawingRevision.findUniqueOrThrow({
       where: { id: revisionId },
       include: { drawing: true, file: true },
     });
     if (!revision.file) throw new BadRequestException('This revision has no drawing file');
 
+    let access: { mode: string; jobId: string | null } | null = null;
     if (actor.userType === 'PARTNER') {
-      const access = await this.prisma.drawingAccess.findFirst({
+      access = await this.prisma.drawingAccess.findFirst({
         where: {
           revisionId,
           partnerId: actor.partnerId ?? '',
           revokedAt: null,
           OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
         },
+        select: { mode: true, jobId: true },
       });
       if (!access) throw new ForbiddenException('This drawing revision is not shared with you');
       if (revision.status !== 'RELEASED') {
         throw new ForbiddenException('This revision is no longer valid for production');
+      }
+      // Module 3 lists "issue date and expiry date" as a control. The date was written on release
+      // and read by nothing, so a revision that had expired stayed as viewable as a current one.
+      if (revision.expiryDate && revision.expiryDate < new Date()) {
+        throw new ForbiddenException(
+          `This revision expired on ${revision.expiryDate.toDateString()}. ` +
+            'Ask engineering to reissue it before working to it.',
+        );
+      }
+      if (revision.issueDate && revision.issueDate > new Date()) {
+        throw new ForbiddenException(
+          `This revision is not in force until ${revision.issueDate.toDateString()}.`,
+        );
       }
       if (action === 'DOWNLOADED' && access.mode !== 'VIEW_AND_DOWNLOAD') {
         throw new ForbiddenException('Download is not permitted for this drawing');
@@ -395,20 +623,87 @@ export class DrawingsService {
         revisionId,
         userId: actor.id,
         partnerId: actor.partnerId,
+        jobId: access?.jobId ?? null,
         event: action,
         ipAddress: context.ipAddress ?? null,
         userAgent: context.userAgent ?? null,
       },
     });
 
+    const watermarkContext = await this.watermarkContextFor(actor, revision, access?.jobId);
+    const caption = WatermarkService.caption(watermarkContext);
+
+    // Internal users read the controlled original; a partner is only ever handed a copy stamped
+    // with their own name and job number, so a saved or printed sheet stays traceable (Module 3).
+    if (actor.userType !== 'PARTNER') {
+      return {
+        url: await this.storage.signedUrl(revision.file.key),
+        revisionCode: revision.revisionCode,
+        watermark: caption,
+        watermarked: false,
+      };
+    }
+
+    const url = await this.watermarkedUrl(revision.file, watermarkContext);
+    return { url, revisionCode: revision.revisionCode, watermark: caption, watermarked: true };
+  }
+
+  /** Who the copy is for, and what it is being made against. */
+  private async watermarkContextFor(
+    actor: RequestUser,
+    revision: { status: string; revisionCode: string; drawing: { drawingNumber: string } },
+    jobId: string | null | undefined,
+  ): Promise<WatermarkContext> {
+    const [partner, job] = await Promise.all([
+      actor.partnerId
+        ? this.prisma.partner.findUnique({
+            where: { id: actor.partnerId },
+            select: { businessName: true },
+          })
+        : null,
+      jobId
+        ? this.prisma.gridJob.findUnique({ where: { id: jobId }, select: { jobNumber: true } })
+        : null,
+    ]);
+
     return {
-      url: await this.storage.signedUrl(revision.file.key),
+      partnerName: partner?.businessName ?? actor.name,
+      jobNumber: job?.jobNumber ?? null,
+      drawingNumber: revision.drawing.drawingNumber,
       revisionCode: revision.revisionCode,
-      watermark:
-        revision.status === 'RELEASED'
-          ? `${revision.drawing.drawingNumber} Rev ${revision.revisionCode} — ${actor.name}`
-          : `OBSOLETE — DO NOT USE`,
+      obsolete: revision.status !== 'RELEASED',
     };
+  }
+
+  /**
+   * Builds — and caches — the stamped copy. The key is derived from the original checksum and the
+   * watermark text, so the same partner and job reuse one object while a different partner gets
+   * their own, and re-uploading the drawing invalidates both.
+   */
+  private async watermarkedUrl(
+    file: { key: string; mimeType: string; checksum: string | null },
+    context: WatermarkContext,
+  ): Promise<string> {
+    const fingerprint = createHash('sha256')
+      .update(`${file.checksum ?? file.key}|${WatermarkService.caption(context)}`)
+      .digest('hex')
+      .slice(0, 16);
+    const extension = file.mimeType === 'application/pdf' ? 'pdf' : 'jpg';
+    const key = `watermarked/${file.key}.${fingerprint}.${extension}`;
+
+    if (await this.storage.exists(key)) return this.storage.signedUrl(key);
+
+    const original = await this.storage.read(file.key);
+    const stamped = await this.watermarks.apply(original, file.mimeType, context);
+    if (!stamped) {
+      // Never fall back to the clean original: an unstampable format is a controlled-document
+      // failure, not a reason to hand out an unmarked drawing.
+      throw new BadRequestException(
+        'This drawing cannot be watermarked for partner viewing. Ask engineering to re-upload it as a PDF.',
+      );
+    }
+    await this.storage.put(key, stamped.buffer, stamped.mimeType);
+    return this.storage.signedUrl(key);
   }
 
   async acknowledge(
@@ -436,7 +731,12 @@ export class DrawingsService {
     return acknowledgement;
   }
 
-  async accessLog(revisionId: string) {
+  async accessLog(actor: RequestUser, revisionId: string) {
+    const revision = await this.prisma.drawingRevision.findUniqueOrThrow({
+      where: { id: revisionId },
+      select: { drawing: { select: { companyId: true } } },
+    });
+    assertCompanyScope(actor, revision.drawing.companyId, 'drawing');
     return this.prisma.drawingAccessLog.findMany({
       where: { revisionId },
       orderBy: { createdAt: 'desc' },
@@ -450,9 +750,12 @@ export class DrawingsService {
 
   // ---- Engineering changes ----------------------------------------------
 
-  async listEngineeringChanges(filters: PaginationInput) {
+  async listEngineeringChanges(actor: RequestUser, filters: PaginationInput) {
+    const ids = allowedCompanyIds(actor);
+    const where = ids ? { drawing: { companyId: { in: ids } } } : {};
     const [data, total] = await Promise.all([
       this.prisma.engineeringChange.findMany({
+        where,
         ...paginationArgs(filters),
         orderBy: { createdAt: 'desc' },
         include: {
@@ -461,7 +764,7 @@ export class DrawingsService {
           raisedBy: { select: { id: true, name: true } },
         },
       }),
-      this.prisma.engineeringChange.count(),
+      this.prisma.engineeringChange.count({ where }),
     ]);
     return paginate(data, total, filters);
   }

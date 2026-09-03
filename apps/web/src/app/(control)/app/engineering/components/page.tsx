@@ -82,6 +82,7 @@ export default async function ComponentsPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Ruler"
         title="Components"
         description="Outsourced component master: process route, criticality class, inspection level and approved partners."
         actions={

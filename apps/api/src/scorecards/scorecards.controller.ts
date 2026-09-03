@@ -34,9 +34,10 @@ export class ScorecardsController {
   @Get('leaderboard')
   @RequirePermissions(PERMISSIONS.SCORECARD_READ)
   leaderboard(
+    @CurrentUser() user: RequestUser,
     @Query(zodBody(leaderboardQuerySchema)) query: z.infer<typeof leaderboardQuerySchema>,
   ) {
-    return this.scorecards.leaderboard(query);
+    return this.scorecards.leaderboard(user, query);
   }
 
   @Get('partners/:partnerId')

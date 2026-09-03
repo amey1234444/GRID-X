@@ -79,12 +79,28 @@ export class FilesService {
     entityType: string,
     entityId: string,
     caption?: string,
+    /**
+     * Where the photograph was taken, when the device offered it.
+     *
+     * `Photograph.latitude`/`longitude` were columns nothing ever wrote. They matter for the
+     * evidence photographs Module 6 and Module 7 ask for: a dispatch or first-piece photograph
+     * carries much more weight when it can be shown to have been taken at the partner's workshop
+     * rather than anywhere at all.
+     */
+    location?: { latitude?: number | null; longitude?: number | null },
   ): Promise<void> {
     if (fileIds.length === 0) return;
     const files = await this.prisma.storedFile.findMany({ where: { id: { in: fileIds } } });
     if (files.length !== fileIds.length) throw new BadRequestException('Unknown photograph file');
     await this.prisma.photograph.createMany({
-      data: files.map((file) => ({ fileId: file.id, entityType, entityId, caption })),
+      data: files.map((file) => ({
+        fileId: file.id,
+        entityType,
+        entityId,
+        caption,
+        latitude: location?.latitude ?? null,
+        longitude: location?.longitude ?? null,
+      })),
     });
   }
 

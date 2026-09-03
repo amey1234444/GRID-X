@@ -72,6 +72,15 @@ export async function inspectorOptions(): Promise<Option[]> {
   return page.data.map((user) => ({ value: user.id, label: user.name }));
 }
 
+/** Internal users, used to pick owners for corrective actions and similar. */
+export async function userOptions(): Promise<Option[]> {
+  const page = await apiGet<Paginated<UserRow>>('/users?pageSize=200', emptyPage<UserRow>());
+  return page.data.map((user) => ({
+    value: user.id,
+    label: `${user.name} (${user.role.code.replace(/_/g, ' ')})`,
+  }));
+}
+
 /** The default company, used to prefill company-scoped create forms. */
 export async function defaultCompanyId(): Promise<string | undefined> {
   const companies = await apiGet<CompanyRow[]>('/companies', []);

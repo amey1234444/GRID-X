@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency, formatDate, formatNumber, humanise } from '@/lib/format';
 import { optionsFrom } from '@/lib/options';
 import { readPage, readParam, type SearchParams } from '@/lib/query';
-import { partnerOptions } from '@/lib/reference';
+import { partnerOptions, userOptions } from '@/lib/reference';
 import { apiGet } from '@/lib/session';
 import { emptyPage, type NonConformanceRow, type Paginated } from '@/lib/types';
 
@@ -31,9 +31,10 @@ export default async function NonConformancesPage({
     if (value) query.set(key, value);
   }
 
-  const [ncs, partners] = await Promise.all([
+  const [ncs, partners, owners] = await Promise.all([
     apiGet<Paginated<NonConformanceRow>>(`/quality/non-conformances?${query.toString()}`, emptyPage<NonConformanceRow>()),
     partnerOptions(),
+    userOptions(),
   ]);
 
   const byDefect = new Map<string, number>();
@@ -84,12 +85,18 @@ export default async function NonConformancesPage({
               triggerSize="sm"
               triggerVariant="outline"
               action={createCorrectiveActionAction}
-              hidden={{ nonConformanceId: row.id, partnerId: row.partner?.id }}
+              hidden={{ nonConformanceId: row.id }}
               fields={[
-                { name: 'rootCause', label: 'Root cause', type: 'textarea', span: 2 },
-                { name: 'action', label: 'Corrective action', type: 'textarea', required: true, span: 2 },
+                {
+                  name: 'containment',
+                  label: 'Containment action',
+                  type: 'textarea',
+                  required: true,
+                  help: 'What stops the defect reaching the customer right now. Root cause and corrective action are recorded as the 8D progresses.',
+                  span: 2,
+                },
+                { name: 'ownerId', label: 'Owner', type: 'select', options: owners },
                 { name: 'dueDate', label: 'Due date', type: 'date' },
-                { name: 'ownerName', label: 'Owner' },
               ]}
             />
           ) : (
@@ -104,18 +111,20 @@ export default async function NonConformancesPage({
               triggerSize="sm"
               triggerVariant="ghost"
               action={advanceCorrectiveActionAction}
-              hidden={{ correctiveActionId: row.correctiveActions[0].id }}
+              hidden={{ actionId: row.correctiveActions[0].id }}
               fields={[
                 {
-                  name: 'status',
-                  label: 'Status',
+                  name: 'stage',
+                  label: 'Stage',
                   type: 'select',
                   required: true,
                   options: optionsFrom(CORRECTIVE_ACTION_STAGES),
                   span: 2,
                 },
-                { name: 'action', label: 'Action taken', type: 'textarea', span: 2 },
-                { name: 'effectivenessCheck', label: 'Effectiveness check', type: 'textarea', span: 2 },
+                { name: 'containment', label: 'Containment', type: 'textarea', span: 2 },
+                { name: 'rootCause', label: 'Root cause', type: 'textarea', span: 2 },
+                { name: 'correctiveAction', label: 'Corrective action', type: 'textarea', span: 2 },
+                { name: 'verification', label: 'Verification of effectiveness', type: 'textarea', span: 2 },
               ]}
             />
           </span>
@@ -126,6 +135,7 @@ export default async function NonConformancesPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="ShieldCheck"
         title="Non-conformances"
         description="Every rejection with defect type, responsibility, cost impact and corrective action tracking."
       />

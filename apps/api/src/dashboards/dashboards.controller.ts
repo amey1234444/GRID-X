@@ -12,26 +12,26 @@ export class DashboardsController {
 
   @Get('management')
   @RequirePermissions(PERMISSIONS.DASHBOARD_MANAGEMENT)
-  management() {
-    return this.dashboards.management();
+  management(@CurrentUser() user: RequestUser) {
+    return this.dashboards.management(user);
   }
 
   @Get('operations')
   @RequirePermissions(PERMISSIONS.DASHBOARD_OPERATIONS)
-  operations() {
-    return this.dashboards.operations();
+  operations(@CurrentUser() user: RequestUser) {
+    return this.dashboards.operations(user);
   }
 
   @Get('quality')
   @RequirePermissions(PERMISSIONS.DASHBOARD_QUALITY)
-  quality() {
-    return this.dashboards.quality();
+  quality(@CurrentUser() user: RequestUser) {
+    return this.dashboards.quality(user);
   }
 
   @Get('finance')
   @RequirePermissions(PERMISSIONS.DASHBOARD_FINANCE)
-  finance() {
-    return this.dashboards.finance();
+  finance(@CurrentUser() user: RequestUser) {
+    return this.dashboards.finance(user);
   }
 
   @Get('partner')

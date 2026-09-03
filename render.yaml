@@ -7,11 +7,17 @@
 # ---------------------------------------------------------------------------
 
 databases:
+  # The region MUST match the services below. Render's internal hostnames
+  # (dpg-xxxx-a) only resolve inside a single region's private network, so a
+  # Singapore service cannot reach an Oregon database — Prisma fails with
+  # "P1001: Can't reach database server". Omitting this key defaults to Oregon.
   - name: gridx-postgres
     databaseName: gridx
     user: gridx
     plan: basic-256mb
+    region: singapore
     postgresMajorVersion: "16"
+    # Empty allow list = no external connections; only the private network.
     ipAllowList: []
 
 services:
@@ -25,13 +31,27 @@ services:
     region: singapore
     branch: main
     healthCheckPath: /api/health
+    # We install pnpm with npm instead of `corepack enable`: the corepack
+    # bundled with Node 20.x ships an outdated signing key and dies with
+    # "Cannot find matching keyid" when it resolves a pnpm version.
+    #
+    # --prod=false is required: NODE_ENV=production below applies to the build
+    # too, and pnpm reads it as --prod, which skips every devDependency. That
+    # drops typescript, @nestjs/cli, tailwindcss and postcss, so the compilers
+    # fall through to whatever happens to be on the image PATH.
     buildCommand: >-
-      corepack enable &&
-      pnpm install --frozen-lockfile &&
+      npm install -g pnpm@$PNPM_VERSION &&
+      pnpm install --frozen-lockfile --prod=false &&
       pnpm --filter @gridx/shared build &&
       pnpm --filter @gridx/db build:ci &&
-      pnpm --filter @gridx/api build &&
-      pnpm --filter @gridx/db deploy:ci
+      pnpm --filter @gridx/api build
+    preDeployCommand: >-
+      pnpm --filter @gridx/db deploy:ci &&
+      if [ "$RUN_SEED" = "true" ];
+      then echo "--- RUN_SEED=true, seeding database ---";
+      pnpm --filter @gridx/db seed:ci;
+      else echo "--- RUN_SEED is not true, skipping seed ---";
+      fi
     startCommand: pnpm --filter @gridx/api start
     autoDeploy: true
     envVars:
@@ -47,6 +67,15 @@ services:
           property: connectionString
       - key: API_GLOBAL_PREFIX
         value: api
+      # Set RUN_SEED=true and redeploy to load demo data, then set it back to
+      # false. The seed upserts, so it is safe to repeat — but it also rewrites
+      # every passwordHash, so leaving it on would reset passwords each deploy.
+      - key: RUN_SEED
+        value: "false"
+      # Password for every seeded account. Read when the seed runs, so changing
+      # it later has no effect until you seed again.
+      - key: SEED_PASSWORD
+        sync: false
       - key: CORS_ORIGINS
         fromService:
           type: web
@@ -107,8 +136,42 @@ services:
       - key: WHATSAPP_API_TOKEN
         sync: false
       # IMS boundary — GRID-X consumes masters from IMS and pushes back status.
+      # The direct driver connects to the IMS PostgreSQL database; set
+      # IMS_DATABASE_URL in the Render dashboard and leave IMS_DRIVER on auto.
       - key: IMS_ENABLED
         value: "false"
+      - key: IMS_DRIVER
+        value: auto
+      - key: IMS_DATABASE_URL
+        sync: false
+      - key: IMS_DATABASE_SCHEMA
+        value: public
+      - key: IMS_DB_POOL_MAX
+        value: "5"
+      - key: IMS_DB_STATEMENT_TIMEOUT_MS
+        value: "15000"
+      # Managed Postgres providers hand out certificates Node will not verify.
+      - key: IMS_DB_SSL
+        value: no-verify
+      - key: IMS_MAPPING_PROFILE
+        value: prisma
+      # Per-entity overrides as inline JSON — a mounted file is awkward on Render.
+      - key: IMS_MAPPING_JSON
+        sync: false
+      - key: IMS_WRITE_MODE
+        value: outbox
+      - key: IMS_OUTBOX_SCHEMA
+        value: gridx
+      - key: IMS_OUTBOX_TABLE
+        value: ims_outbound_fact
+      - key: IMS_OUTBOX_AUTO_CREATE
+        value: "true"
+      - key: IMS_SYNC_INBOUND_ENABLED
+        value: "true"
+      - key: IMS_SYNC_ENTITIES
+        value: companies,items,products
+      - key: IMS_SYNC_BATCH_SIZE
+        value: "500"
       - key: IMS_BASE_URL
         sync: false
       - key: IMS_API_KEY
@@ -128,9 +191,10 @@ services:
     region: singapore
     branch: main
     healthCheckPath: /
+    # Same corepack and --prod=false workarounds as the API service.
     buildCommand: >-
-      corepack enable &&
-      pnpm install --frozen-lockfile &&
+      npm install -g pnpm@$PNPM_VERSION &&
+      pnpm install --frozen-lockfile --prod=false &&
       pnpm --filter @gridx/shared build &&
       pnpm --filter @gridx/web build
     startCommand: pnpm --filter @gridx/web start
@@ -144,7 +208,13 @@ services:
         value: production
       - key: NEXT_PUBLIC_APP_NAME
         value: GRID-X
-      # Points at the API service; the /api suffix matches API_GLOBAL_PREFIX.
+      # Points at the API service root. The web app appends /api itself, so
+      # Render can wire this automatically from the API service URL.
+      - key: API_URL
+        fromService:
+          type: web
+          name: gridx-api
+          envVarKey: RENDER_EXTERNAL_URL
       - key: NEXT_PUBLIC_API_URL
         fromService:
           type: web

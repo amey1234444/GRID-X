@@ -5,23 +5,41 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0',
+  [
+    'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-input',
+    'text-[0.8125rem] font-medium leading-none tracking-[-0.005em]',
+    'transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out-expo',
+    'active:scale-[0.985]',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+    'disabled:pointer-events-none disabled:opacity-45',
+    '[&_svg]:size-4 [&_svg]:shrink-0',
+  ].join(' '),
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground shadow-subtle hover:bg-primary/90',
-        destructive: 'bg-destructive text-destructive-foreground shadow-subtle hover:bg-destructive/90',
-        outline: 'border border-input bg-background shadow-subtle hover:bg-secondary',
-        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/70',
-        ghost: 'hover:bg-secondary hover:text-secondary-foreground',
-        link: 'text-primary underline-offset-4 hover:underline',
-        success: 'bg-success text-success-foreground shadow-subtle hover:bg-success/90',
+        /*
+         * The one solid action per view: white on black. The inset line is
+         * dark, not light — on a white fill a light sheen is invisible.
+         */
+        default:
+          'bg-primary text-primary-foreground shadow-[0_1px_2px_rgb(0_0_0/0.5),inset_0_-1px_0_hsl(0_0%_0%/0.08)] hover:bg-primary-hover',
+        destructive:
+          'bg-destructive text-destructive-foreground shadow-[0_1px_2px_rgb(0_0_0/0.4)] hover:bg-destructive/90',
+        success: 'bg-success text-success-foreground shadow-[0_1px_2px_rgb(0_0_0/0.4)] hover:bg-success/90',
+        // The workhorse in a dense dark UI: a surface, not an outline.
+        outline:
+          'bg-surface-elevated text-foreground shadow-hairline hover:bg-surface-hover hover:shadow-[inset_0_0_0_1px_hsl(var(--border-strong))]',
+        secondary: 'bg-surface-hover text-secondary-foreground hover:bg-surface-active',
+        ghost: 'text-muted-foreground hover:bg-surface-hover hover:text-foreground',
+        link: 'text-foreground underline-offset-4 hover:underline',
       },
       size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-8 rounded-md px-3 text-xs',
-        lg: 'h-12 rounded-xl px-6 text-base',
-        icon: 'h-10 w-10',
+        default: 'h-9 px-3.5',
+        sm: 'h-8 rounded-control px-2.5 text-xs',
+        xs: 'h-7 rounded-control px-2 text-xs [&_svg]:size-3.5',
+        lg: 'h-11 rounded-lg px-6 text-sm',
+        icon: 'h-9 w-9',
+        'icon-sm': 'h-8 w-8 rounded-control [&_svg]:size-4',
       },
     },
     defaultVariants: { variant: 'default', size: 'default' },

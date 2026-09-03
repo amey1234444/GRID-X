@@ -10,23 +10,59 @@ import { formatDate, formatNumber, humanise } from '@/lib/format';
 import { optionsFrom } from '@/lib/options';
 import { partnerOptions } from '@/lib/reference';
 import { apiGet } from '@/lib/session';
-import type { CapacityDeclarationRow, CapacityHeatmapCell } from '@/lib/types';
+import type {
+  CapacityDeclarationRow,
+  CapacityHeatmapCell,
+  CapacityNetworkSummary,
+  CapacityPartnerLoad,
+} from '@/lib/types';
 
 export const metadata = { title: 'Capacity · GRID-X' };
 
 export default async function CapacityPage(): Promise<React.JSX.Element> {
-  const [declarations, heatmap, partners] = await Promise.all([
+  const [declarations, heatmap, summary, partners] = await Promise.all([
     apiGet<CapacityDeclarationRow[]>('/capacity/declarations', []),
     apiGet<CapacityHeatmapCell[]>('/capacity/heatmap', []),
+    // Module 5 management output. The heatmap answers "who has capacity" one row at a time; this
+    // answers the questions the blueprint actually asks of it.
+    apiGet<CapacityNetworkSummary | null>('/capacity/summary', null),
     partnerOptions(),
   ]);
 
-  const available = heatmap.reduce((sum, row) => sum + row.availableHours, 0);
-  const committed = heatmap.reduce((sum, row) => sum + row.committedHours, 0);
+  const available = summary?.totalCapacityHours ?? 0;
+  const committed = summary?.utilisedHours ?? 0;
+  const loadColumns = [
+    { key: 'partner', header: 'Partner', render: (row: CapacityPartnerLoad) => row.businessName },
+    { key: 'city', header: 'Location', render: (row: CapacityPartnerLoad) => row.city || '—' },
+    {
+      key: 'available',
+      header: 'Declared',
+      align: 'right' as const,
+      render: (row: CapacityPartnerLoad) => formatNumber(row.availableHours),
+    },
+    {
+      key: 'free',
+      header: 'Free',
+      align: 'right' as const,
+      render: (row: CapacityPartnerLoad) => formatNumber(row.freeHours),
+    },
+    {
+      key: 'utilisation',
+      header: 'Utilisation',
+      align: 'right' as const,
+      render: (row: CapacityPartnerLoad) => `${formatNumber(row.utilisationPercent, 1)}%`,
+    },
+    {
+      key: 'bottleneck',
+      header: 'Expected bottleneck',
+      render: (row: CapacityPartnerLoad) => row.expectedBottleneck ?? '—',
+    },
+  ];
 
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Cog"
         title="Capacity planning"
         description="Capacity declared by each partner per process versus the hours GRID-X has already committed."
         actions={
@@ -65,8 +101,129 @@ export default async function CapacityPage(): Promise<React.JSX.Element> {
           value={available === 0 ? '—' : `${formatNumber((committed / available) * 100, 1)}%`}
           tone={available > 0 && committed / available > 0.9 ? 'warning' : 'default'}
         />
-        <StatCard label="Partners declaring" value={formatNumber(new Set(heatmap.map((row) => row.partnerId)).size)} />
+        <StatCard label="Partners declaring" value={formatNumber(summary?.partnersDeclaring ?? 0)} />
       </div>
+
+      {summary ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Overloaded partners</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DataTable
+                columns={loadColumns}
+                rows={summary.overloaded}
+                empty={{
+                  title: 'Nobody is overloaded',
+                  description: 'No partner is above 90% of the capacity they have declared.',
+                }}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Underutilised partners</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DataTable
+                columns={loadColumns}
+                rows={summary.underutilised}
+                empty={{
+                  title: 'Nobody is idle',
+                  description: 'No partner is below 40% of the capacity they have declared.',
+                }}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Capacity by process</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DataTable
+                columns={[
+                  {
+                    key: 'process',
+                    header: 'Process',
+                    render: (row: CapacityNetworkSummary['byProcess'][number]) => humanise(row.processCode),
+                  },
+                  {
+                    key: 'available',
+                    header: 'Declared',
+                    align: 'right',
+                    render: (row: CapacityNetworkSummary['byProcess'][number]) => formatNumber(row.availableHours),
+                  },
+                  {
+                    key: 'free',
+                    header: 'Free',
+                    align: 'right',
+                    render: (row: CapacityNetworkSummary['byProcess'][number]) => formatNumber(row.freeHours),
+                  },
+                  {
+                    key: 'utilisation',
+                    header: 'Utilisation',
+                    align: 'right',
+                    render: (row: CapacityNetworkSummary['byProcess'][number]) => (
+                      <span className={row.utilisationPercent > 90 ? 'font-medium text-destructive' : undefined}>
+                        {formatNumber(row.utilisationPercent, 1)}%
+                      </span>
+                    ),
+                  },
+                ]}
+                rows={summary.byProcess}
+                empty={{ title: 'No capacity declared' }}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Capacity by location</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <DataTable
+                columns={[
+                  {
+                    key: 'city',
+                    header: 'Location',
+                    render: (row: CapacityNetworkSummary['byLocation'][number]) => row.city,
+                  },
+                  {
+                    key: 'partners',
+                    header: 'Partners',
+                    align: 'right',
+                    render: (row: CapacityNetworkSummary['byLocation'][number]) => formatNumber(row.partners),
+                  },
+                  {
+                    key: 'available',
+                    header: 'Declared',
+                    align: 'right',
+                    render: (row: CapacityNetworkSummary['byLocation'][number]) => formatNumber(row.availableHours),
+                  },
+                  {
+                    key: 'free',
+                    header: 'Free',
+                    align: 'right',
+                    render: (row: CapacityNetworkSummary['byLocation'][number]) => formatNumber(row.freeHours),
+                  },
+                  {
+                    key: 'utilisation',
+                    header: 'Utilisation',
+                    align: 'right',
+                    render: (row: CapacityNetworkSummary['byLocation'][number]) =>
+                      `${formatNumber(row.utilisationPercent, 1)}%`,
+                  },
+                ]}
+                rows={summary.byLocation}
+                empty={{ title: 'No capacity declared' }}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader>

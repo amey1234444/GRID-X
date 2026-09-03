@@ -7,7 +7,7 @@
     "node": ">=20.11.0"
   },
   "scripts": {
-    "dev": "pnpm -r --parallel dev",
+    "dev": "node scripts/dev.mjs",
     "dev:api": "pnpm --filter @gridx/api dev",
     "dev:web": "pnpm --filter @gridx/web dev",
     "build": "pnpm --filter @gridx/shared build && pnpm --filter @gridx/db build && pnpm --filter @gridx/api build && pnpm --filter @gridx/web build",
@@ -19,6 +19,9 @@
     "db:migrate": "pnpm --filter @gridx/db migrate",
     "db:seed": "pnpm --filter @gridx/db seed",
     "db:reset": "pnpm --filter @gridx/db reset",
+    "db:studio": "pnpm --filter @gridx/db studio",
+    "ims:introspect": "node scripts/ims-introspect.mjs",
+    "ims:outbox": "node scripts/ims-outbox.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\""
   },
   "devDependencies": {

@@ -1,6 +1,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import {
+  RATE_LIMIT_TIERS,
+  RATE_LIMIT_TIER_KEYS,
+  type RateLimitTier,
+} from '@gridx/shared';
+import { redirect } from 'next/navigation';
 
 import { apiFetch } from '@/lib/session';
 
@@ -27,6 +33,28 @@ function bool(data: FormData, key: string): boolean {
   return data.get(key) === 'on' || data.get(key) === 'true';
 }
 
+/** Ids produced by the FileUpload control, which posts one hidden input per file. */
+function fileIds(data: FormData, key: string): string[] {
+  return data
+    .getAll(key)
+    .filter((value): value is string => typeof value === 'string' && value.trim() !== '');
+}
+
+/**
+ * Reads repeatable rows posted as `prefix.0.field`, `prefix.1.field`, … by the
+ * RepeatableRows control. The row count travels in `prefix.count`.
+ */
+function rows(data: FormData, prefix: string, keys: string[]): Record<string, string>[] {
+  const count = number(data, `${prefix}.count`) ?? 0;
+  const result: Record<string, string>[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const row: Record<string, string> = {};
+    for (const key of keys) row[key] = text(data, `${prefix}.${index}.${key}`) ?? '';
+    result.push(row);
+  }
+  return result;
+}
+
 async function send(
   path: string,
   body: Record<string, unknown>,
@@ -37,6 +65,40 @@ async function send(
   if (result.error) return { error: result.error };
   for (const route of revalidate) revalidatePath(route);
   return { error: null, success: 'Saved' };
+}
+
+/**
+ * A write whose response the caller needs to show — a password reset hands back a one-time secret
+ * that exists nowhere else, so the usual "Saved" is not enough.
+ */
+async function sendJson<T>(
+  path: string,
+  body: Record<string, unknown>,
+  revalidate: string[],
+  method: 'POST' | 'PATCH' = 'POST',
+): Promise<ActionState & { data?: T }> {
+  const result = await apiFetch<T>(path, { method, body: JSON.stringify(body) });
+  if (result.error) return { error: result.error };
+  for (const route of revalidate) revalidatePath(route);
+  return { error: null, data: result.data ?? undefined };
+}
+
+/** DELETE carries no body, so it gets its own helper rather than an unused argument. */
+async function remove(path: string, revalidate: string[]): Promise<ActionState> {
+  const result = await apiFetch<unknown>(path, { method: 'DELETE' });
+  if (result.error) return { error: result.error };
+  for (const route of revalidate) revalidatePath(route);
+  return { error: null, success: 'Removed' };
+}
+
+/**
+ * Drops keys the user left blank so a PATCH only carries the fields actually
+ * edited — the API treats every property present as an intentional change.
+ */
+function changed(entries: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(entries).filter(([, value]) => value !== undefined && value !== ''),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -55,6 +117,73 @@ export async function changePartnerStatusAction(
     { toStatus, reason: text(data, 'reason') },
     ['/app/partners', `/app/partners/${partnerId}`],
   );
+}
+
+export async function updatePartnerAction(_state: ActionState, data: FormData): Promise<ActionState> {
+  const partnerId = text(data, 'partnerId');
+  if (!partnerId) return { error: 'Missing partner' };
+  return send(
+    `/partners/${partnerId}`,
+    changed({
+      businessName: text(data, 'businessName'),
+      ownerName: text(data, 'ownerName'),
+      phone: text(data, 'phone'),
+      altPhone: text(data, 'altPhone'),
+      email: text(data, 'email'),
+      addressLine1: text(data, 'addressLine1'),
+      addressLine2: text(data, 'addressLine2'),
+      city: text(data, 'city'),
+      state: text(data, 'state'),
+      pincode: text(data, 'pincode'),
+      distanceKm: number(data, 'distanceKm'),
+      udyamNumber: text(data, 'udyamNumber'),
+      gstNumber: text(data, 'gstNumber'),
+      panNumber: text(data, 'panNumber'),
+      bankName: text(data, 'bankName'),
+      bankAccountName: text(data, 'bankAccountName'),
+      bankAccountNo: text(data, 'bankAccountNo'),
+      bankIfsc: text(data, 'bankIfsc'),
+      level: text(data, 'level'),
+      paymentTermsDays: number(data, 'paymentTermsDays'),
+      maxCapacityHours: number(data, 'maxCapacityHours'),
+      maxOpenJobs: number(data, 'maxOpenJobs'),
+      notes: text(data, 'notes'),
+    }),
+    ['/app/partners', `/app/partners/${partnerId}`],
+    'PATCH',
+  );
+}
+
+export async function removePartnerCapabilityAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const partnerId = text(data, 'partnerId');
+  const capabilityId = text(data, 'capabilityId');
+  if (!partnerId || !capabilityId) return { error: 'Missing capability' };
+  return remove(`/partners/${partnerId}/capabilities/${capabilityId}`, [
+    `/app/partners/${partnerId}`,
+  ]);
+}
+
+export async function removePartnerMachineAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const machineId = text(data, 'machineId');
+  const partnerId = text(data, 'partnerId');
+  if (!machineId) return { error: 'Missing machine' };
+  return remove(`/partners/machines/${machineId}`, [`/app/partners/${partnerId ?? ''}`]);
+}
+
+export async function removePartnerEmployeeAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const employeeId = text(data, 'employeeId');
+  const partnerId = text(data, 'partnerId');
+  if (!employeeId) return { error: 'Missing team member' };
+  return remove(`/partners/employees/${employeeId}`, [`/app/partners/${partnerId ?? ''}`]);
 }
 
 export async function suspendPartnerAction(_state: ActionState, data: FormData): Promise<ActionState> {
@@ -78,6 +207,7 @@ export async function recordPartnerAuditAction(
       score: number(data, 'score'),
       status: text(data, 'status') ?? 'IN_PROGRESS',
       findings: text(data, 'findings'),
+      reportFileId: text(data, 'reportFileId'),
       nextAuditDate: text(data, 'nextAuditDate'),
     },
     [`/app/partners/${partnerId}`],
@@ -121,7 +251,33 @@ export async function createJobAction(_state: ActionState, data: FormData): Prom
   });
   if (result.error) return { error: result.error };
   revalidatePath('/app/production/jobs');
+  // The full-page form opens the new job; the list dialog just closes.
+  if (bool(data, 'openAfterCreate') && result.data?.id) {
+    redirect(`/app/production/jobs/${result.data.id}`);
+  }
   return { error: null, success: result.data?.id ?? 'Created' };
+}
+
+export async function updateJobAction(_state: ActionState, data: FormData): Promise<ActionState> {
+  const jobId = text(data, 'jobId');
+  if (!jobId) return { error: 'Missing job' };
+  return send(
+    `/jobs/${jobId}`,
+    changed({
+      quantity: number(data, 'quantity'),
+      rate: number(data, 'rate'),
+      dueDate: text(data, 'dueDate'),
+      plannedStartDate: text(data, 'plannedStartDate'),
+      priority: text(data, 'priority'),
+      materialResponsibility: text(data, 'materialResponsibility'),
+      deliveryLocation: text(data, 'deliveryLocation'),
+      customerProject: text(data, 'customerProject'),
+      sourceRef: text(data, 'sourceRef'),
+      notes: text(data, 'notes'),
+    }),
+    ['/app/production/jobs', `/app/production/jobs/${jobId}`],
+    'PATCH',
+  );
 }
 
 export async function allocateJobAction(_state: ActionState, data: FormData): Promise<ActionState> {
@@ -210,6 +366,7 @@ export async function answerClarificationAction(
   if (!clarificationId || !answer) return { error: 'Type your answer' };
   return send(`/jobs/clarifications/${clarificationId}/answer`, { answer }, [
     `/app/production/jobs/${jobId ?? ''}`,
+    '/app/production/clarifications',
   ]);
 }
 
@@ -230,6 +387,32 @@ export async function cancelJobAction(_state: ActionState, data: FormData): Prom
   return send(`/jobs/${jobId}/cancel`, { reason }, [`/app/production/jobs/${jobId}`, '/app/production/jobs']);
 }
 
+/** Closes out a delay from the Production - Delays queue once the job has recovered. */
+export async function resolveDelayAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const delayId = text(data, 'delayId');
+  if (!delayId) return { error: 'The delay could not be identified' };
+  return send(`/jobs/delays/${delayId}/resolve`, {}, ['/app/production/delays']);
+}
+
+/**
+ * Renames a role or rewrites how it reads. The permission matrix behind it stays in code, so this
+ * changes what people assigning the role see, not what the role can do.
+ */
+export async function updateRoleAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const code = text(data, 'code');
+  const name = text(data, 'name');
+  const description = text(data, 'description');
+  if (!code) return { error: 'The role could not be identified' };
+  if (!name) return { error: 'A role needs a name' };
+  return send(`/roles/${code}`, { name, description }, ['/app/admin/roles'], 'PATCH');
+}
+
 // ---------------------------------------------------------------------------
 // Materials
 // ---------------------------------------------------------------------------
@@ -239,12 +422,25 @@ export async function createMaterialIssueAction(
   data: FormData,
 ): Promise<ActionState> {
   const jobId = text(data, 'jobId');
-  const itemId = text(data, 'itemId');
-  const quantity = number(data, 'quantity');
-  const issueWeightKg = number(data, 'issueWeightKg');
-  if (!jobId || !itemId || !quantity || !issueWeightKg) {
-    return { error: 'Job, item, quantity and issued weight are required' };
-  }
+  if (!jobId) return { error: 'Select the job this material is issued against' };
+
+  const items = rows(data, 'items', ['itemId', 'quantity', 'uom', 'issueWeightKg', 'batchNumber', 'heatNumber'])
+    .filter((row) => row.itemId)
+    .map((row) => ({
+      itemId: row.itemId,
+      quantity: Number(row.quantity),
+      uom: row.uom || 'KG',
+      issueWeightKg: Number(row.issueWeightKg),
+      batchNumber: row.batchNumber || undefined,
+      heatNumber: row.heatNumber || undefined,
+    }));
+
+  if (items.length === 0) return { error: 'Add at least one material line' };
+  const invalid = items.find(
+    (item) => !Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.issueWeightKg) || item.issueWeightKg <= 0,
+  );
+  if (invalid) return { error: 'Every material line needs a quantity and an issued weight' };
+
   return send(
     '/materials/issues',
     {
@@ -253,17 +449,8 @@ export async function createMaterialIssueAction(
       vehicleNumber: text(data, 'vehicleNumber'),
       driverName: text(data, 'driverName'),
       remarks: text(data, 'remarks'),
-      photographFileIds: [],
-      items: [
-        {
-          itemId,
-          quantity,
-          uom: text(data, 'uom') ?? 'KG',
-          issueWeightKg,
-          batchNumber: text(data, 'batchNumber'),
-          heatNumber: text(data, 'heatNumber'),
-        },
-      ],
+      photographFileIds: fileIds(data, 'photographFileIds'),
+      items,
     },
     ['/app/materials/issues'],
   );
@@ -283,7 +470,7 @@ export async function acknowledgeMaterialAction(
       shortageWeightKg: number(data, 'shortageWeightKg') ?? 0,
       damageRemarks: text(data, 'damageRemarks'),
       signatureName: text(data, 'signatureName'),
-      photographFileIds: [],
+      photographFileIds: fileIds(data, 'photographFileIds'),
     },
     ['/app/materials/issues', `/app/materials/issues/${issueId}`, '/partner/material'],
   );
@@ -354,17 +541,37 @@ export async function requestInspectionAction(
   const jobId = text(data, 'jobId');
   const offeredQuantity = number(data, 'offeredQuantity');
   if (!jobId || !offeredQuantity) return { error: 'Enter the quantity offered for inspection' };
-  return send(
-    '/quality/inspections',
-    {
+
+  const created = await apiFetch<{ id: string }>('/quality/inspections', {
+    method: 'POST',
+    body: JSON.stringify({
       jobId,
       type: text(data, 'type') ?? 'FINAL',
       offeredQuantity,
+      inspectionPlanId: text(data, 'inspectionPlanId'),
       remarks: text(data, 'remarks'),
-      photographFileIds: [],
-    },
-    ['/app/quality/inspections', '/partner/inspections', `/partner/jobs/${jobId}`],
-  );
+      photographFileIds: fileIds(data, 'photographFileIds'),
+    }),
+  });
+  if (created.error) return { error: created.error };
+
+  // Requesting and assigning are two API calls; doing both here means the
+  // inspector picked on the form is actually recorded against the inspection.
+  const inspectorId = text(data, 'inspectorId');
+  if (inspectorId && created.data?.id) {
+    const assigned = await apiFetch<unknown>(`/quality/inspections/${created.data.id}/assign`, {
+      method: 'POST',
+      body: JSON.stringify({ inspectorId, dueAt: text(data, 'dueAt') }),
+    });
+    if (assigned.error) {
+      return { error: `Inspection raised, but assigning the inspector failed: ${assigned.error}` };
+    }
+  }
+
+  for (const route of ['/app/quality/inspections', '/partner/inspections', `/partner/jobs/${jobId}`, '/inspector']) {
+    revalidatePath(route);
+  }
+  return { error: null, success: 'Saved' };
 }
 
 export async function assignInspectionAction(
@@ -402,6 +609,21 @@ export async function saveInspectionResultsAction(
   if (!inspectionId) return { error: 'Missing inspection' };
   const count = number(data, 'resultCount') ?? 0;
   const results: Record<string, unknown>[] = [];
+  if (count === 0) {
+    const characteristicName = text(data, 'characteristicName');
+    if (!characteristicName) return { error: 'Record at least one characteristic' };
+    results.push({
+      characteristicId: text(data, 'characteristicId'),
+      characteristicName,
+      specification: text(data, 'specification'),
+      actualValue: text(data, 'actualValue'),
+      numericValue: number(data, 'numericValue'),
+      measuringInstrument: text(data, 'measuringInstrument'),
+      verdict: text(data, 'verdict') ?? 'PASS',
+      sampleNumber: number(data, 'sampleNumber') ?? 1,
+      remarks: text(data, 'remarks'),
+    });
+  }
   for (let index = 0; index < count; index += 1) {
     const characteristicName = text(data, `results.${index}.characteristicName`);
     if (!characteristicName) continue;
@@ -420,7 +642,11 @@ export async function saveInspectionResultsAction(
   if (results.length === 0) return { error: 'Record at least one characteristic' };
   return send(
     `/quality/inspections/${inspectionId}/results`,
-    { inspectedQuantity: number(data, 'inspectedQuantity'), results, photographFileIds: [] },
+    {
+      inspectedQuantity: number(data, 'inspectedQuantity'),
+      results,
+      photographFileIds: fileIds(data, 'photographFileIds'),
+    },
     [`/app/quality/inspections/${inspectionId}`, `/inspector/${inspectionId}`],
   );
 }
@@ -449,13 +675,15 @@ export async function completeInspectionAction(
       reworkInstructions: text(data, 'reworkInstructions'),
       reworkDueDate: text(data, 'reworkDueDate'),
       deviationNote: text(data, 'deviationNote'),
-      photographFileIds: [],
+      photographFileIds: fileIds(data, 'photographFileIds'),
     },
     [
       `/app/quality/inspections/${inspectionId}`,
       '/app/quality/inspections',
       '/inspector',
       `/inspector/${inspectionId}`,
+      // Acceptance changes the job's accepted/rejected quantities.
+      ...(text(data, 'jobId') ? [`/app/production/jobs/${text(data, 'jobId')}`] : []),
     ],
   );
 }
@@ -466,7 +694,13 @@ export async function updateReworkAction(_state: ActionState, data: FormData): P
   if (!reworkId || !status) return { error: 'Select a status' };
   return send(
     `/quality/rework/${reworkId}`,
-    { status, remarks: text(data, 'remarks') },
+    {
+      status,
+      completedQuantity: number(data, 'completedQuantity'),
+      scrappedQuantity: number(data, 'scrappedQuantity'),
+      actualCost: number(data, 'actualCost'),
+      remarks: text(data, 'remarks'),
+    },
     ['/app/quality/rework', '/inspector/rework', '/partner/inspections'],
     'PATCH',
   );
@@ -491,6 +725,11 @@ export async function createCorrectiveActionAction(
   );
 }
 
+/**
+ * 8D progression. The API keys the record by id and the step by `stage`, so both
+ * are read here under those names rather than the display labels used on screen.
+ */
+
 export async function advanceCorrectiveActionAction(
   _state: ActionState,
   data: FormData,
@@ -507,7 +746,11 @@ export async function advanceCorrectiveActionAction(
       correctiveAction: text(data, 'correctiveAction'),
       verification: text(data, 'verification'),
     },
-    ['/app/quality/non-conformances', '/inspector/non-conformances'],
+    [
+      '/app/quality/non-conformances',
+      '/app/quality/corrective-actions',
+      '/inspector/non-conformances',
+    ],
     'PATCH',
   );
 }
@@ -543,7 +786,14 @@ export async function createShipmentAction(_state: ActionState, data: FormData):
       expectedDeliveryAt: text(data, 'expectedDeliveryAt'),
       transportCost: number(data, 'transportCost') ?? 0,
       remarks: text(data, 'remarks'),
-      items: [],
+      items: rows(data, 'items', ['jobId', 'description', 'quantity', 'weightKg'])
+        .filter((row) => row.description)
+        .map((row) => ({
+          jobId: row.jobId || undefined,
+          description: row.description,
+          quantity: Number(row.quantity) || 0,
+          weightKg: Number(row.weightKg) || 0,
+        })),
     },
     ['/app/logistics/shipments'],
   );
@@ -606,6 +856,7 @@ export async function createToolAction(_state: ActionState, data: FormData): Pro
       calibrationRequired: bool(data, 'calibrationRequired'),
       calibrationFrequencyDays: number(data, 'calibrationFrequencyDays'),
       replacementValue: number(data, 'replacementValue') ?? 0,
+      photoFileId: text(data, 'photoFileId'),
     },
     ['/app/tooling'],
   );
@@ -694,6 +945,7 @@ export async function submitInvoiceAction(_state: ActionState, data: FormData): 
       periodFrom: text(data, 'periodFrom'),
       periodTo: text(data, 'periodTo'),
       jobIds,
+      fileId: text(data, 'fileId'),
       taxPercent: number(data, 'taxPercent') ?? 0,
     },
     ['/app/commercial/invoices', '/partner/invoices'],
@@ -767,13 +1019,40 @@ export async function createDeductionAction(_state: ActionState, data: FormData)
   return send(
     '/commercials/adjustments',
     { partnerId, invoiceId: text(data, 'invoiceId'), type, reason, amount },
-    ['/app/commercial/invoices'],
+    ['/app/commercial/invoices', '/app/commercial/incentives'],
   );
 }
 
 // ---------------------------------------------------------------------------
 // Capacity, scorecards, drawings, IMS and administration
 // ---------------------------------------------------------------------------
+
+/** Standing bonus/penalty rules applied when partner invoices are built. */
+export async function createIncentiveRuleAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const type = text(data, 'type');
+  const name = text(data, 'name');
+  if (!type || !name) return { error: 'Give the rule a name and a type' };
+  const percentage = number(data, 'percentage');
+  const fixedAmount = number(data, 'fixedAmount');
+  if (percentage === undefined && fixedAmount === undefined) {
+    return { error: 'Set either a percentage or a fixed amount' };
+  }
+  return send(
+    '/commercials/incentive-rules',
+    {
+      partnerId: text(data, 'partnerId'),
+      type,
+      name,
+      percentage,
+      fixedAmount,
+      condition: text(data, 'condition'),
+    },
+    ['/app/commercial/incentives'],
+  );
+}
 
 export async function declareCapacityAction(_state: ActionState, data: FormData): Promise<ActionState> {
   const processCode = text(data, 'processCode');
@@ -871,14 +1150,23 @@ export async function acknowledgeRevisionAction(
 export async function imsSyncAction(_state: ActionState, data: FormData): Promise<ActionState> {
   const direction = text(data, 'direction');
   const entity = text(data, 'entity');
-  if (!direction || !entity) return { error: 'Select an entity to sync' };
-  return send(
-    direction === 'pull' ? '/ims/pull' : '/ims/push',
-    direction === 'pull'
-      ? { entity, companyId: text(data, 'companyId') }
-      : { entity, companyId: text(data, 'companyId'), from: text(data, 'from'), to: text(data, 'to') },
-    ['/app/ims'],
-  );
+  if (!direction) return { error: 'Missing sync direction' };
+
+  // Sweeps and retries act on the whole boundary, so they carry no entity.
+  if (direction === 'sync-all') return send('/ims/sync', {}, ['/app/ims']);
+  if (direction === 'retry') return send('/ims/retry', {}, ['/app/ims']);
+
+  if (!entity) return { error: 'Select an entity to sync' };
+  if (direction === 'reset-cursor') return send('/ims/cursors/reset', { entity }, ['/app/ims']);
+  if (direction === 'pull') {
+    // Full by default: an operator pulling by hand is usually correcting something the
+    // incremental sweep got wrong, and a watermark would hide exactly the rows they want.
+    return send('/ims/pull', { entity, incremental: false }, ['/app/ims']);
+  }
+
+  const recordRef = text(data, 'recordRef');
+  if (!recordRef) return { error: 'A GRID-X record id is required to push to IMS' };
+  return send('/ims/push', { entity, recordRef }, ['/app/ims']);
 }
 
 export async function createUserAction(_state: ActionState, data: FormData): Promise<ActionState> {
@@ -903,6 +1191,32 @@ export async function createUserAction(_state: ActionState, data: FormData): Pro
       companyIds,
     },
     ['/app/admin/users'],
+  );
+}
+
+export async function updateUserAction(_state: ActionState, data: FormData): Promise<ActionState> {
+  const userId = text(data, 'userId');
+  if (!userId) return { error: 'Missing user' };
+  const companyIds = data
+    .getAll('companyIds')
+    .filter((value): value is string => typeof value === 'string');
+  return send(
+    `/users/${userId}`,
+    {
+      ...changed({
+        name: text(data, 'name'),
+        email: text(data, 'email'),
+        phone: text(data, 'phone'),
+        roleCode: text(data, 'roleCode'),
+        designation: text(data, 'designation'),
+        language: text(data, 'language'),
+        status: text(data, 'status'),
+      }),
+      twoFactorEnabled: bool(data, 'twoFactorEnabled'),
+      ...(companyIds.length > 0 ? { companyIds } : {}),
+    },
+    ['/app/admin/users'],
+    'PATCH',
   );
 }
 
@@ -933,22 +1247,194 @@ export async function createCompanyAction(_state: ActionState, data: FormData): 
   );
 }
 
+/**
+ * Section 7 — writes one catalogued setting.
+ *
+ * The value arrives typed by the control the catalogue chose, so this no longer guesses at JSON:
+ * a checkbox posts on/off, a number posts a number, and a role list posts one entry per checked
+ * role. The API rejects any key that is not in the catalogue.
+ */
+/**
+ * A rate-limit tier is two settings — an allowance and the window it is counted over — and they
+ * only make sense together. Writing them in one submit stops a half-applied change leaving, say,
+ * 5 attempts per 1 minute standing while the operator goes looking for the second field.
+ */
+export async function updateRateLimitTierAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const tier = text(data, 'tier');
+  if (!tier || !RATE_LIMIT_TIERS.includes(tier as RateLimitTier)) {
+    return { error: 'Unknown rate-limit tier' };
+  }
+  const keys = RATE_LIMIT_TIER_KEYS[tier as RateLimitTier];
+
+  const limit = number(data, 'limit');
+  const windowMinutes = number(data, 'windowMinutes');
+  if (limit === undefined) return { error: 'Enter how many requests are allowed' };
+  if (windowMinutes === undefined) return { error: 'Enter the window in minutes' };
+
+  const revalidate = ['/app/admin/settings', '/app/admin/users'];
+
+  // The allowance first: if the window write fails, the tighter of the two is what is left
+  // standing rather than a wide-open limit.
+  const limitResult = await send(`/settings/${keys.limit}`, { value: limit }, [], 'PATCH');
+  if (limitResult.error) return limitResult;
+
+  const windowResult = await send(
+    `/settings/${keys.window}`,
+    { value: windowMinutes },
+    revalidate,
+    'PATCH',
+  );
+  if (windowResult.error) {
+    return {
+      error: `The allowance was saved but the window was not: ${windowResult.error}`,
+    };
+  }
+  return { error: null, success: 'Saved' };
+}
+
 export async function updateSettingAction(_state: ActionState, data: FormData): Promise<ActionState> {
   const key = text(data, 'key');
-  const raw = text(data, 'value');
-  if (!key || raw === undefined) return { error: 'Provide a value' };
-  let value: unknown = raw;
-  try {
-    value = JSON.parse(raw);
-  } catch {
+  const type = text(data, 'type');
+  if (!key) return { error: 'Provide a setting key' };
+
+  let value: unknown;
+  if (type === 'boolean') {
+    value = data.get('value') !== null;
+  } else if (type === 'number') {
+    const raw = number(data, 'value');
+    if (raw === undefined) return { error: 'Enter a number' };
     value = raw;
+  } else if (type === 'roleList') {
+    value = data.getAll('value').map(String).filter(Boolean);
+  } else {
+    value = text(data, 'value');
   }
+
   return send(`/settings/${key}`, { value }, ['/app/admin/settings'], 'PATCH');
+}
+
+/**
+ * Section 18 — an administrator putting a locked-out user back in.
+ *
+ * A link is the default. A temporary password is the fallback for someone whose mailbox is the
+ * thing they have lost, and the response carries it once for the administrator to pass on.
+ */
+export async function resetUserPasswordAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const id = text(data, 'id');
+  if (!id) return { error: 'Select a user' };
+  const useTemporaryPassword = data.get('useTemporaryPassword') !== null;
+
+  const result = await sendJson<{
+    temporaryPassword: string | null;
+    resetUrl: string | null;
+    emailed: boolean;
+    expiresInMinutes: number;
+    email: string | null;
+  }>(`/users/${id}/reset-password`, { useTemporaryPassword }, ['/app/admin/users'], 'POST');
+
+  if (result.error) return { error: result.error };
+  const payload = result.data;
+  if (payload?.temporaryPassword) {
+    return {
+      error: null,
+      success:
+        `Temporary password: ${payload.temporaryPassword} — read it out, then have them change it. ` +
+        'Every other session for this user has been signed out.',
+    };
+  }
+  if (payload?.emailed) {
+    return {
+      error: null,
+      success: `A reset link has been emailed to ${payload.email}. It expires in ${payload.expiresInMinutes} minutes.`,
+    };
+  }
+  return {
+    error: null,
+    success: payload?.resetUrl
+      ? `Email is not configured, so pass this link on yourself: ${payload.resetUrl}`
+      : 'Reset issued.',
+  };
+}
+
+/**
+ * Module 6 — records a movement the issue, consumption, scrap and reconciliation flows do not
+ * produce: rejected material going back, replacement material coming out, unused material
+ * returned, or a shortage or excess found at the partner.
+ */
+export async function recordMaterialTransactionAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const jobId = text(data, 'jobId');
+  const itemId = text(data, 'itemId');
+  const type = text(data, 'type');
+  const quantityKg = number(data, 'quantityKg');
+  if (!jobId || !itemId || !type) return { error: 'Choose an item and a movement type' };
+  if (quantityKg === undefined || quantityKg <= 0) return { error: 'Enter a weight in kilograms' };
+
+  return send(
+    '/materials/transactions',
+    {
+      jobId,
+      itemId,
+      type,
+      quantityKg,
+      batchNumber: text(data, 'batchNumber'),
+      heatNumber: text(data, 'heatNumber'),
+      replacesTransactionId: text(data, 'replacesTransactionId'),
+      reference: text(data, 'reference'),
+      remarks: text(data, 'remarks'),
+      photographFileIds: fileIds(data, 'photographFileIds'),
+    },
+    [`/app/production/jobs/${jobId}`, '/app/materials/partner-stock'],
+    'POST',
+  );
 }
 
 // ---------------------------------------------------------------------------
 // Partner onboarding and profile
 // ---------------------------------------------------------------------------
+
+/** Module 1 — an additional workshop for a partner working out of more than one address. */
+export async function addPartnerLocationAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const id = text(data, 'partnerId');
+  if (!id) return { error: 'Select a partner' };
+  return send(
+    `/partners/${id}/locations`,
+    {
+      label: text(data, 'label'),
+      addressLine1: text(data, 'addressLine1'),
+      addressLine2: text(data, 'addressLine2'),
+      city: text(data, 'city'),
+      state: text(data, 'state'),
+      pincode: text(data, 'pincode'),
+      latitude: number(data, 'latitude'),
+      longitude: number(data, 'longitude'),
+      isPrimary: data.get('isPrimary') !== null,
+    },
+    [`/app/partners/${id}`],
+    'POST',
+  );
+}
+
+export async function removePartnerLocationAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const locationId = text(data, 'locationId');
+  const partnerId = text(data, 'partnerId');
+  if (!locationId) return { error: 'Select a location' };
+  return remove(`/partners/locations/${locationId}`, [`/app/partners/${partnerId}`]);
+}
 
 export async function createPartnerAction(_state: ActionState, data: FormData): Promise<ActionState> {
   const companyId = text(data, 'companyId');
@@ -1045,8 +1531,46 @@ export async function addPartnerMachineAction(
       condition: text(data, 'condition') ?? 'GOOD',
       ownership: text(data, 'ownership') ?? 'OWNED',
       quantity: number(data, 'quantity') ?? 1,
+      photoFileId: text(data, 'photoFileId'),
+      lastServicedAt: text(data, 'lastServicedAt'),
     },
     [`/app/partners/${partnerId}`],
+  );
+}
+
+/** Compliance documents — Udyam, GST, ISO certificates and similar. */
+export async function addPartnerDocumentAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const partnerId = text(data, 'partnerId');
+  const type = text(data, 'type');
+  if (!partnerId || !type) return { error: 'Select the document type' };
+  return send(
+    `/partners/${partnerId}/documents`,
+    {
+      type,
+      documentNo: text(data, 'documentNo'),
+      fileId: text(data, 'fileId'),
+      issueDate: text(data, 'issueDate'),
+      expiryDate: text(data, 'expiryDate'),
+      remarks: text(data, 'remarks'),
+    },
+    [`/app/partners/${partnerId}`],
+  );
+}
+
+export async function verifyPartnerDocumentAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const documentId = text(data, 'documentId');
+  const partnerId = text(data, 'partnerId');
+  if (!documentId) return { error: 'Missing document' };
+  return send(
+    `/partners/documents/${documentId}/verify`,
+    {},
+    partnerId ? [`/app/partners/${partnerId}`] : ['/app/partners'],
   );
 }
 
@@ -1105,6 +1629,87 @@ export async function createComponentAction(
     },
     ['/app/engineering/components'],
   );
+}
+
+export async function updateComponentAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const componentId = text(data, 'componentId');
+  if (!componentId) return { error: 'Missing component' };
+  return send(
+    `/components/${componentId}`,
+    changed({
+      componentCode: text(data, 'componentCode'),
+      name: text(data, 'name'),
+      productId: text(data, 'productId'),
+      drawingNumber: text(data, 'drawingNumber'),
+      materialGrade: text(data, 'materialGrade'),
+      theoreticalWeightKg: number(data, 'theoreticalWeightKg'),
+      primaryProcess: text(data, 'primaryProcess'),
+      inspectionLevel: text(data, 'inspectionLevel'),
+      criticality: text(data, 'criticality'),
+      standardCycleTimeMinutes: number(data, 'standardCycleTimeMinutes'),
+      standardConversionRate: number(data, 'standardConversionRate'),
+      packagingRequirement: text(data, 'packagingRequirement'),
+      outsourcingEligibilityScore: number(data, 'outsourcingEligibilityScore'),
+      scrapAllowancePercent: number(data, 'scrapAllowancePercent'),
+    }),
+    ['/app/engineering/components', `/app/engineering/components/${componentId}`],
+    'PATCH',
+  );
+}
+
+/** Bill of material lines: which items a component consumes, per unit. */
+export async function addComponentItemAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const componentId = text(data, 'componentId');
+  const itemId = text(data, 'itemId');
+  const quantityPerUnit = number(data, 'quantityPerUnit');
+  if (!componentId || !itemId || !quantityPerUnit) {
+    return { error: 'Select an item and the quantity consumed per unit' };
+  }
+  return send(
+    `/components/${componentId}/items`,
+    { itemId, quantityPerUnit, uom: text(data, 'uom') ?? 'KG' },
+    [`/app/engineering/components/${componentId}`],
+  );
+}
+
+export async function removeComponentItemAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const itemId = text(data, 'componentItemId');
+  const componentId = text(data, 'componentId');
+  if (!itemId) return { error: 'Missing bill of material line' };
+  return remove(`/components/items/${itemId}`, [`/app/engineering/components/${componentId ?? ''}`]);
+}
+
+export async function removeComponentProcessAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const processId = text(data, 'componentProcessId');
+  const componentId = text(data, 'componentId');
+  if (!processId) return { error: 'Missing routing step' };
+  return remove(`/components/processes/${processId}`, [
+    `/app/engineering/components/${componentId ?? ''}`,
+  ]);
+}
+
+export async function removeApprovedPartnerAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const approvalId = text(data, 'approvalId');
+  const componentId = text(data, 'componentId');
+  if (!approvalId) return { error: 'Missing approval' };
+  return remove(`/components/approved-partners/${approvalId}`, [
+    `/app/engineering/components/${componentId ?? ''}`,
+  ]);
 }
 
 export async function approvePartnerComponentAction(
@@ -1234,11 +1839,37 @@ export async function createInspectionPlanAction(
   const companyId = text(data, 'companyId');
   const componentId = text(data, 'componentId');
   const name = text(data, 'name');
-  const characteristic = text(data, 'characteristic');
-  const specification = text(data, 'specification');
-  if (!companyId || !componentId || !name || !characteristic || !specification) {
-    return { error: 'Component, plan name and the first characteristic are required' };
+  if (!companyId || !componentId || !name) {
+    return { error: 'Component and plan name are required' };
   }
+
+  const characteristics = rows(data, 'characteristics', [
+    'characteristic',
+    'specification',
+    'unit',
+    'measuringInstrument',
+    'nominalValue',
+    'upperTolerance',
+    'lowerTolerance',
+    'isCritical',
+  ])
+    .filter((row) => row.characteristic && row.specification)
+    .map((row, index) => ({
+      sequence: index + 1,
+      characteristic: row.characteristic,
+      specification: row.specification,
+      unit: row.unit || undefined,
+      measuringInstrument: row.measuringInstrument || undefined,
+      nominalValue: row.nominalValue === '' ? undefined : Number(row.nominalValue),
+      upperTolerance: row.upperTolerance === '' ? undefined : Number(row.upperTolerance),
+      lowerTolerance: row.lowerTolerance === '' ? undefined : Number(row.lowerTolerance),
+      isCritical: row.isCritical === 'true',
+    }));
+
+  if (characteristics.length === 0) {
+    return { error: 'Add at least one characteristic with a specification' };
+  }
+
   return send(
     '/quality/plans',
     {
@@ -1247,19 +1878,53 @@ export async function createInspectionPlanAction(
       name,
       inspectionType: text(data, 'inspectionType') ?? 'FINAL',
       samplingPlan: text(data, 'samplingPlan'),
-      characteristics: [
-        {
-          sequence: 1,
-          characteristic,
-          specification,
-          unit: text(data, 'unit'),
-          measuringInstrument: text(data, 'measuringInstrument'),
-          isCritical: bool(data, 'isCritical'),
-        },
-      ],
+      // Module 8 — how much of the lot must actually be measured. Blank falls back to the
+      // component's inspection level rather than to "whatever the inspector felt like".
+      samplePercent: number(data, 'samplePercent'),
+      minSampleSize: number(data, 'minSampleSize'),
+      characteristics,
     },
     ['/app/engineering/inspection-plans'],
   );
+}
+
+/** Plans grow over time: characteristics can be appended after creation. */
+export async function addPlanCharacteristicAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const planId = text(data, 'planId');
+  const characteristic = text(data, 'characteristic');
+  const specification = text(data, 'specification');
+  if (!planId || !characteristic || !specification) {
+    return { error: 'A characteristic and its specification are required' };
+  }
+  return send(
+    `/quality/plans/${planId}/characteristics`,
+    {
+      sequence: number(data, 'sequence') ?? 1,
+      characteristic,
+      specification,
+      unit: text(data, 'unit'),
+      measuringInstrument: text(data, 'measuringInstrument'),
+      nominalValue: number(data, 'nominalValue'),
+      upperTolerance: number(data, 'upperTolerance'),
+      lowerTolerance: number(data, 'lowerTolerance'),
+      isCritical: bool(data, 'isCritical'),
+    },
+    ['/app/engineering/inspection-plans'],
+  );
+}
+
+export async function removePlanCharacteristicAction(
+  _state: ActionState,
+  data: FormData,
+): Promise<ActionState> {
+  const characteristicId = text(data, 'characteristicId');
+  if (!characteristicId) return { error: 'Missing characteristic' };
+  return remove(`/quality/plans/characteristics/${characteristicId}`, [
+    '/app/engineering/inspection-plans',
+  ]);
 }
 
 export async function createReworkAction(_state: ActionState, data: FormData): Promise<ActionState> {
@@ -1294,7 +1959,13 @@ export async function recordProofOfDeliveryAction(
   if (!shipmentId || !receivedBy) return { error: 'Who received the shipment?' };
   return send(
     `/logistics/shipments/${shipmentId}/proof-of-delivery`,
-    { receivedBy, receivedAt: text(data, 'receivedAt'), remarks: text(data, 'remarks') },
+    {
+      receivedBy,
+      receivedAt: text(data, 'receivedAt'),
+      signatureFileId: text(data, 'signatureFileId'),
+      photoFileId: text(data, 'photoFileId'),
+      remarks: text(data, 'remarks'),
+    },
     ['/app/logistics/shipments', `/app/logistics/shipments/${shipmentId}`],
   );
 }
@@ -1305,11 +1976,15 @@ export async function decideDeviationAction(
 ): Promise<ActionState> {
   const deviationId = text(data, 'deviationId');
   const status = text(data, 'status');
+  const inspectionId = text(data, 'inspectionId');
   if (!deviationId || !status) return { error: 'Select a decision' };
   return send(
     `/quality/deviations/${deviationId}`,
     { status, decisionNote: text(data, 'decisionNote') },
-    ['/app/quality/inspections'],
+    [
+      '/app/quality/inspections',
+      ...(inspectionId ? [`/app/quality/inspections/${inspectionId}`, `/inspector/${inspectionId}`] : []),
+    ],
     'PATCH',
   );
 }
@@ -1317,10 +1992,18 @@ export async function decideDeviationAction(
 export async function createRevisionAction(_state: ActionState, data: FormData): Promise<ActionState> {
   const drawingId = text(data, 'drawingId');
   const revisionCode = text(data, 'revisionCode');
+  const fileId = text(data, 'fileId');
   if (!drawingId || !revisionCode) return { error: 'A revision code is required' };
+  if (!fileId) return { error: 'Upload the drawing file for this revision' };
   return send(
     `/drawings/${drawingId}/revisions`,
-    { revisionCode, changeNote: text(data, 'changeNote') },
+    {
+      revisionCode,
+      fileId,
+      changeNote: text(data, 'changeNote'),
+      issueDate: text(data, 'issueDate'),
+      expiryDate: text(data, 'expiryDate'),
+    },
     ['/app/engineering/drawings', `/app/engineering/drawings/${drawingId}`],
   );
 }

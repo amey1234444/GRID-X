@@ -5,12 +5,14 @@ import {
   ROLE_CODES,
   createCompanySchema,
   createUserSchema,
+  adminResetPasswordSchema,
   paginationSchema,
+  updateRoleSchema,
+  updateSettingSchema,
   updateUserSchema,
 } from '@gridx/shared';
-import { Prisma } from '@gridx/db';
 import { z } from 'zod';
-import { CurrentUser, RequirePermissions } from '../common/decorators';
+import { CurrentUser, RateLimit, RequirePermissions } from '../common/decorators';
 import { zodBody } from '../common/zod-validation.pipe';
 import { RequestUser } from '../common/request-user';
 import { AdminService } from './admin.service';
@@ -29,16 +31,6 @@ const auditQuerySchema = paginationSchema.extend({
 });
 
 const suspendUserSchema = z.object({ reason: z.string().trim().min(5) });
-const jsonValueSchema: z.ZodType<Prisma.InputJsonValue> = z.lazy(() =>
-  z.union([
-    z.string(),
-    z.number(),
-    z.boolean(),
-    z.array(jsonValueSchema),
-    z.record(jsonValueSchema),
-  ]),
-);
-const settingSchema = z.object({ value: jsonValueSchema });
 
 @ApiTags('Administration')
 @Controller()
@@ -47,8 +39,11 @@ export class AdminController {
 
   @Get('users')
   @RequirePermissions(PERMISSIONS.USER_READ)
-  listUsers(@Query(zodBody(userQuerySchema)) query: z.infer<typeof userQuerySchema>) {
-    return this.admin.listUsers(query);
+  listUsers(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(userQuerySchema)) query: z.infer<typeof userQuerySchema>,
+  ) {
+    return this.admin.listUsers(user, query);
   }
 
   @Post('users')
@@ -80,15 +75,40 @@ export class AdminController {
     return this.admin.suspendUser(user, id, body.reason);
   }
 
+  /**
+   * Section 18 — password recovery for a user who cannot start one themselves. Rate limited
+   * because it changes credentials, even though the caller is already an administrator.
+   */
+  @RateLimit('signup')
+  @Post('users/:id/reset-password')
+  @RequirePermissions(PERMISSIONS.USER_MANAGE)
+  resetUserPassword(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body(zodBody(adminResetPasswordSchema)) body: z.infer<typeof adminResetPasswordSchema>,
+  ) {
+    return this.admin.resetUserPassword(user, id, body.useTemporaryPassword);
+  }
+
   @Get('roles')
   @RequirePermissions(PERMISSIONS.USER_READ)
   listRoles() {
     return this.admin.listRoles();
   }
 
+  @Patch('roles/:code')
+  @RequirePermissions(PERMISSIONS.ROLE_MANAGE)
+  updateRole(
+    @CurrentUser() user: RequestUser,
+    @Param('code') code: string,
+    @Body(zodBody(updateRoleSchema)) body: z.infer<typeof updateRoleSchema>,
+  ) {
+    return this.admin.updateRole(user, code, body);
+  }
+
   @Get('companies')
-  listCompanies() {
-    return this.admin.listCompanies();
+  listCompanies(@CurrentUser() user: RequestUser) {
+    return this.admin.listCompanies(user);
   }
 
   @Post('companies')
@@ -102,8 +122,11 @@ export class AdminController {
 
   @Get('audit-logs')
   @RequirePermissions(PERMISSIONS.AUDIT_LOG_READ)
-  listAuditLogs(@Query(zodBody(auditQuerySchema)) query: z.infer<typeof auditQuerySchema>) {
-    return this.admin.listAuditLogs(query);
+  listAuditLogs(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(auditQuerySchema)) query: z.infer<typeof auditQuerySchema>,
+  ) {
+    return this.admin.listAuditLogs(user, query);
   }
 
   @Get('settings')
@@ -117,7 +140,7 @@ export class AdminController {
   upsertSetting(
     @CurrentUser() user: RequestUser,
     @Param('key') key: string,
-    @Body(zodBody(settingSchema)) body: z.infer<typeof settingSchema>,
+    @Body(zodBody(updateSettingSchema)) body: z.infer<typeof updateSettingSchema>,
   ) {
     return this.admin.upsertSetting(user, key, body.value);
   }

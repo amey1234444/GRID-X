@@ -9,6 +9,7 @@ import {
   recordPaymentAction,
   scheduleInvoiceAction,
 } from '@/app/actions/control';
+import { ActivityTrail } from '@/components/app/activity-trail';
 import { ActionDialog } from '@/components/app/action-dialog';
 import { DataTable } from '@/components/app/data-table';
 import { DetailList } from '@/components/app/detail-list';
@@ -39,6 +40,7 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Wallet"
         title={invoice.invoiceNumber}
         description={`${invoice.partner.businessName} · ${formatDate(invoice.periodFrom)} → ${formatDate(invoice.periodTo)}`}
         actions={
@@ -270,6 +272,8 @@ export default async function InvoiceDetailPage({ params }: { params: { id: stri
           </CardContent>
         </Card>
       </div>
+
+      <ActivityTrail entityType="PartnerInvoice" entityId={invoice.id} />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import {
   PERMISSIONS,
@@ -9,6 +9,7 @@ import {
   createInspectionPlanSchema,
   createReworkSchema,
   decideDeviationSchema,
+  inspectionCharacteristicSchema,
   paginationSchema,
   requestInspectionSchema,
   saveInspectionResultsSchema,
@@ -31,6 +32,16 @@ const inspectionQuerySchema = paginationSchema.extend({
 const ncQuerySchema = paginationSchema.extend({ jobId: z.string().optional() });
 const reworkQuerySchema = paginationSchema.extend({ status: z.string().optional() });
 
+const capaQuerySchema = paginationSchema.extend({
+  stage: z.string().optional(),
+  ownerId: z.string().optional(),
+  overdue: z.coerce.boolean().optional(),
+});
+
+const deviationQuerySchema = paginationSchema.extend({
+  status: z.string().optional(),
+});
+
 @ApiTags('Quality')
 @Controller('quality')
 export class QualityController {
@@ -38,8 +49,8 @@ export class QualityController {
 
   @Get('plans')
   @RequirePermissions(PERMISSIONS.INSPECTION_READ)
-  listPlans(@Query('componentId') componentId?: string) {
-    return this.quality.listPlans(componentId);
+  listPlans(@CurrentUser() user: RequestUser, @Query('componentId') componentId?: string) {
+    return this.quality.listPlans(user, componentId);
   }
 
   @Post('plans')
@@ -49,6 +60,26 @@ export class QualityController {
     @Body(zodBody(createInspectionPlanSchema)) body: z.infer<typeof createInspectionPlanSchema>,
   ) {
     return this.quality.createPlan(user, body);
+  }
+
+  @Post('plans/:id/characteristics')
+  @RequirePermissions(PERMISSIONS.INSPECTION_PLAN_MANAGE)
+  addPlanCharacteristic(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body(zodBody(inspectionCharacteristicSchema))
+    body: z.infer<typeof inspectionCharacteristicSchema>,
+  ) {
+    return this.quality.addPlanCharacteristic(user, id, body);
+  }
+
+  @Delete('plans/characteristics/:characteristicId')
+  @RequirePermissions(PERMISSIONS.INSPECTION_PLAN_MANAGE)
+  removePlanCharacteristic(
+    @CurrentUser() user: RequestUser,
+    @Param('characteristicId') characteristicId: string,
+  ) {
+    return this.quality.removePlanCharacteristic(user, characteristicId);
   }
 
   @Get('inspections')
@@ -148,6 +179,24 @@ export class QualityController {
     return this.quality.updateReworkStatus(user, id, body);
   }
 
+  @Get('corrective-actions')
+  @RequirePermissions(PERMISSIONS.INSPECTION_READ)
+  listCorrectiveActions(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(capaQuerySchema)) query: z.infer<typeof capaQuerySchema>,
+  ) {
+    return this.quality.listCorrectiveActions(user, query);
+  }
+
+  @Get('deviations')
+  @RequirePermissions(PERMISSIONS.INSPECTION_READ)
+  listDeviations(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(deviationQuerySchema)) query: z.infer<typeof deviationQuerySchema>,
+  ) {
+    return this.quality.listDeviations(user, query);
+  }
+
   @Post('corrective-actions')
   @RequirePermissions(PERMISSIONS.CORRECTIVE_ACTION_MANAGE)
   createCorrectiveAction(
@@ -168,8 +217,13 @@ export class QualityController {
     return this.quality.advanceCorrectiveAction(user, id, body);
   }
 
+  /**
+   * Accepting a component that misses its specification is an engineering call, not an inspection
+   * one — Module 8 lists \"accepted with deviation\" and \"hold for engineering review\" side by
+   * side for that reason. DEVIATION_APPROVE is held by ENGINEERING_USER alone.
+   */
   @Patch('deviations/:id')
-  @RequirePermissions(PERMISSIONS.CORRECTIVE_ACTION_MANAGE)
+  @RequirePermissions(PERMISSIONS.DEVIATION_APPROVE)
   decideDeviation(
     @CurrentUser() user: RequestUser,
     @Param('id') id: string,

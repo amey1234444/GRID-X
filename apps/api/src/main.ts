@@ -6,6 +6,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
+import { SentryService } from './common/sentry.service';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -17,7 +18,7 @@ async function bootstrap(): Promise<void> {
     credentials: true,
   });
   app.setGlobalPrefix(config.get<string>('globalPrefix') ?? 'api');
-  app.useGlobalFilters(new AllExceptionsFilter());
+  app.useGlobalFilters(new AllExceptionsFilter(app.get(SentryService)));
   app.enableShutdownHooks();
 
   const swagger = new DocumentBuilder()

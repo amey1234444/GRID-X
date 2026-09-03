@@ -84,6 +84,7 @@ export interface DrawingRow {
   drawingNumber: string;
   title: string;
   componentCode: string | null;
+  currentRevisionId: string | null;
   currentRevisionCode: string | null;
   status: string | null;
   revisionCount: number;
@@ -124,6 +125,9 @@ export interface InspectionPlanRow {
   name: string;
   inspectionType: string;
   samplingPlan: string | null;
+  /** Module 8 — enforced sampling. Null falls back to the component's inspection level. */
+  samplePercent: number | null;
+  minSampleSize: number | null;
   version: number;
   isActive: boolean;
   component: { componentCode: string; name: string };
@@ -272,6 +276,12 @@ export interface RateRow {
   component: { id: string; componentCode: string; name: string };
 }
 
+/** Headline figures the rates endpoint computes over the whole filtered set. */
+export interface RateSummary {
+  active: number;
+  averageRate: number | null;
+}
+
 export interface InvoiceRow {
   id: string;
   invoiceNumber: string;
@@ -342,11 +352,20 @@ export interface CompanyRow {
   isActive: boolean;
 }
 
+/**
+ * Section 7 — one entry from the settings catalogue. Settings used to be free-form rows read
+ * straight from the table; the API now returns only keys the platform actually reads, each with
+ * the rule it governs and whether it is still at its default.
+ */
 export interface SettingRow {
-  id: string;
   key: string;
+  label: string;
+  description: string;
+  group: 'security' | 'rateLimits' | 'governance' | 'drawings' | 'materials' | 'commercial';
+  type: 'boolean' | 'number' | 'roleList';
   value: unknown;
-  updatedAt: string;
+  isDefault: boolean;
+  default: unknown;
 }
 
 export interface AuditLogRow {
@@ -407,10 +426,52 @@ export interface CapacityDeclarationRow {
   process: { id: string; code: string; name: string };
 }
 
+/**
+ * Module 5 management output: the network view of capacity — totals, capacity by process and by
+ * location, and who is overloaded or idle.
+ */
+export interface CapacityNetworkSummary {
+  totalCapacityHours: number;
+  utilisedHours: number;
+  freeHours: number;
+  utilisationPercent: number;
+  partnersDeclaring: number;
+  byProcess: {
+    processCode: string;
+    availableHours: number;
+    committedHours: number;
+    freeHours: number;
+    utilisationPercent: number;
+  }[];
+  byLocation: {
+    city: string;
+    partners: number;
+    availableHours: number;
+    committedHours: number;
+    freeHours: number;
+    utilisationPercent: number;
+  }[];
+  overloaded: CapacityPartnerLoad[];
+  underutilised: CapacityPartnerLoad[];
+}
+
+export interface CapacityPartnerLoad {
+  partnerId: string;
+  partnerCode: string;
+  businessName: string;
+  city: string;
+  availableHours: number;
+  committedHours: number;
+  freeHours: number;
+  utilisationPercent: number;
+  expectedBottleneck: string | null;
+}
+
 export interface CapacityHeatmapCell {
   partnerId: string;
   partnerCode: string;
   businessName: string;
+  city: string;
   processCode: string;
   periodStart: string;
   periodEnd: string;
@@ -443,8 +504,52 @@ export interface ReportResult {
 export interface ImsStatus {
   enabled: boolean;
   configured: boolean;
+  /** Transport in force: a direct PostgreSQL connection, the IMS REST API, or nothing. */
+  driver: 'database' | 'http' | 'disabled';
+  writeMode: 'outbox' | 'http' | 'none';
   baseUrl?: string;
+  /** Password-redacted connection string, so an operator can confirm the target IMS. */
+  databaseUrl?: string;
+  schema?: string;
+  outboxTable?: string;
+  mappingProfile: string;
+  mappingOverrides: string[];
+  mappingWarnings: string[];
   timeoutMs: number;
+  statementTimeoutMs: number;
+  inboundSyncEnabled: boolean;
+  syncEntities: string[];
+  batchSize: number;
+}
+
+export interface ImsHealth {
+  driver: 'database' | 'http' | 'disabled';
+  reachable: boolean;
+  latencyMs?: number;
+  serverVersion?: string;
+  message?: string;
+}
+
+export interface ImsEntityIntrospection {
+  entity: string;
+  table: string;
+  tableExists: boolean;
+  missingColumns: string[];
+  unmappedColumns: string[];
+  status: 'ok' | 'degraded' | 'broken';
+}
+
+export interface ImsIntrospection {
+  schema: string;
+  tables: string[];
+  entities: ImsEntityIntrospection[];
+  issues: Array<{ entity: string; severity: 'error' | 'warning'; message: string }>;
+}
+
+export interface ImsCursorRow {
+  entity: string;
+  watermark: string;
+  syncedAt: string;
 }
 
 export interface ImsLogRow {
@@ -505,6 +610,19 @@ export interface PartnerDetail {
     maxWeightKg: number | null;
     toleranceMm: number | null;
     monthlyCapacityHours: number;
+  }[];
+  /** Module 1 — additional workshops. The primary one is where material goes by default. */
+  locations: {
+    id: string;
+    label: string;
+    addressLine1: string;
+    addressLine2: string | null;
+    city: string;
+    state: string;
+    pincode: string;
+    latitude: number | null;
+    longitude: number | null;
+    isPrimary: boolean;
   }[];
   machines: {
     id: string;
@@ -796,3 +914,204 @@ export const emptyPartnerDashboard = (): PartnerDashboard => ({
   paymentsDue: 0,
   jobs: [],
 });
+
+/** Production → Delays. One recorded delay, with the job it belongs to (Module 7). */
+export interface DelayRow {
+  id: string;
+  jobId: string;
+  jobNumber: string;
+  componentCode: string;
+  componentName: string;
+  partnerId: string | null;
+  partnerName: string | null;
+  jobStatus: string;
+  dueDate: string | null;
+  reason: string;
+  responsibility: string;
+  delayDays: number;
+  detail: string | null;
+  expectedCompletionDate: string | null;
+  reportedByName: string | null;
+  reportedAt: string;
+  resolvedAt: string | null;
+}
+
+/** Production → Clarifications. A partner's question and its answer (Module 7). */
+export interface ClarificationRow {
+  id: string;
+  jobId: string;
+  jobNumber: string;
+  componentCode: string;
+  componentName: string;
+  partnerId: string | null;
+  partnerName: string | null;
+  dueDate: string | null;
+  question: string;
+  answer: string | null;
+  status: string;
+  raisedByName: string | null;
+  raisedAt: string;
+  answeredByName: string | null;
+  answeredAt: string | null;
+  openForDays: number | null;
+}
+
+/** Section 7 screen 5 — the cross-partner capability matrix. */
+export interface CapabilityMatrix {
+  processes: string[];
+  partners: {
+    id: string;
+    partnerCode: string;
+    businessName: string;
+    city: string;
+    category: string;
+    approvalStatus: string;
+    allocatable: boolean;
+    capabilities: Record<string, { approved: boolean; capacityHours: number }>;
+  }[];
+  coverage: { process: string; approvedPartners: number; allocatablePartners: number }[];
+}
+
+/** Quality → Corrective actions. Module 8's CAPA workflow, across all non-conformances. */
+export interface CorrectiveActionRow {
+  id: string;
+  caNumber: string;
+  stage: string;
+  dueDate: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  ownerName: string | null;
+  ncNumber: string;
+  defectType: string;
+  quantityAffected: number;
+  jobId: string | null;
+  jobNumber: string | null;
+  partnerName: string | null;
+  overdueDays: number | null;
+}
+
+/** Materials → Partner stock. OSWAR material currently held in partner workshops. */
+export interface PartnerStock {
+  rows: {
+    partnerId: string;
+    partnerName: string;
+    jobId: string;
+    jobNumber: string;
+    jobStatus: string;
+    itemId: string;
+    itemCode: string;
+    itemName: string;
+    issuedKg: number;
+    consumedKg: number;
+    scrapReturnedKg: number;
+    balanceKg: number;
+    oldestIssueDate: string | null;
+    daysHeld: number | null;
+  }[];
+  totals: { issuedKg: number; balanceKg: number; partners: number };
+}
+
+/** Materials → Scrap. The scrap-return register (Module 6). */
+export interface ScrapRow {
+  id: string;
+  jobId: string;
+  jobNumber: string;
+  partnerName: string | null;
+  itemCode: string;
+  itemName: string;
+  scrapWeightKg: number;
+  returnedWeightKg: number;
+  outstandingKg: number;
+  scrapPercent: number;
+  challanNumber: string | null;
+  returnedAt: string;
+}
+
+/** Commercial → Approvals. One stage sign-off on a partner invoice (Module 11). */
+export interface PaymentApprovalRow {
+  id: string;
+  stage: string;
+  approved: boolean;
+  remarks: string | null;
+  approverName: string | null;
+  createdAt: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  invoiceStatus: string;
+  netAmount: number;
+  partnerName: string | null;
+}
+
+/** Partners → Machines. The network-wide machine register (Module 1). */
+export interface MachineRow {
+  id: string;
+  partnerId: string;
+  partnerName: string;
+  city: string;
+  machineType: string;
+  make: string | null;
+  model: string | null;
+  size: string | null;
+  capacity: string | null;
+  accuracy: string | null;
+  condition: string;
+  ownership: string;
+  quantity: number;
+  lastServicedAt: string | null;
+}
+
+/** Partners → Audits. Every partner audit, newest first (Module 1). */
+export interface PartnerAuditRow {
+  id: string;
+  partnerId: string;
+  partnerName: string;
+  city: string;
+  auditDate: string;
+  auditType: string;
+  score: number | null;
+  status: string;
+  findings: string | null;
+  auditorName: string | null;
+  nextAuditDate: string | null;
+}
+
+/** Module 6 step 2 — what a job's bill of material says stores should issue. */
+export interface MaterialRequirement {
+  jobId: string;
+  jobNumber: string;
+  quantity: number;
+  componentCode: string;
+  componentName: string;
+  scrapAllowancePercent: number;
+  hasBillOfMaterial: boolean;
+  lines: {
+    itemId: string;
+    itemCode?: string;
+    itemName?: string;
+    uom: string;
+    quantityPerUnit: number;
+    netQuantity: number;
+    scrapAllowanceQuantity: number;
+    grossQuantity: number;
+    grossWeightKg: number | null;
+    alreadyIssued: number;
+    outstanding: number;
+  }[];
+}
+
+/** Module 6 — one movement of material in or out of a partner's custody. */
+export interface MaterialTransactionRow {
+  id: string;
+  type: string;
+  quantityKg: number;
+  directionKg: number;
+  batchNumber: string | null;
+  heatNumber: string | null;
+  reference: string | null;
+  remarks: string | null;
+  occurredAt: string;
+  item: { code: string; name: string; uom: string };
+  job: { jobNumber: string } | null;
+  partner: { partnerCode: string; businessName: string } | null;
+  recordedBy: { name: string } | null;
+}
