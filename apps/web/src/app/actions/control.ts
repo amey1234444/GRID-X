@@ -1150,10 +1150,20 @@ export async function acknowledgeRevisionAction(
 export async function imsSyncAction(_state: ActionState, data: FormData): Promise<ActionState> {
   const direction = text(data, 'direction');
   const entity = text(data, 'entity');
-  if (!direction || !entity) return { error: 'Select an entity to sync' };
+  if (!direction) return { error: 'Missing sync direction' };
+
+  // Sweeps and retries act on the whole boundary, so they carry no entity.
+  if (direction === 'sync-all') return send('/ims/sync', {}, ['/app/ims']);
+  if (direction === 'retry') return send('/ims/retry', {}, ['/app/ims']);
+
+  if (!entity) return { error: 'Select an entity to sync' };
+  if (direction === 'reset-cursor') return send('/ims/cursors/reset', { entity }, ['/app/ims']);
   if (direction === 'pull') {
-    return send('/ims/pull', { entity }, ['/app/ims']);
+    // Full by default: an operator pulling by hand is usually correcting something the
+    // incremental sweep got wrong, and a watermark would hide exactly the rows they want.
+    return send('/ims/pull', { entity, incremental: false }, ['/app/ims']);
   }
+
   const recordRef = text(data, 'recordRef');
   if (!recordRef) return { error: 'A GRID-X record id is required to push to IMS' };
   return send('/ims/push', { entity, recordRef }, ['/app/ims']);

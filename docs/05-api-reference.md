@@ -299,13 +299,24 @@ Contents are described in [08 — Dashboards and reports](08-dashboards-reports.
 
 | Method | Path | Permission | Description |
 | --- | --- | --- | --- |
-| GET | `/ims/status` | `ims:sync` | Whether the integration is enabled and configured |
-| GET | `/ims/entities` | `ims:sync` | The inbound and outbound entity catalogues |
+| GET | `/ims/status` | `ims:sync` | Transport in force, write mode, mapping profile, sync settings. The connection string comes back with its password redacted |
+| GET | `/ims/health` | `ims:sync` | Live probe: reachable, latency, server version |
+| GET | `/ims/entities` | `ims:sync` | The inbound and outbound entity catalogues, and which inbound ones are persisted |
+| GET | `/ims/mapping` | `ims:sync` | The effective table/column mapping the direct driver reads through |
+| GET | `/ims/introspect` | `ims:sync` | The mapping checked against the live IMS schema: missing tables, missing columns, unmapped columns. Direct driver only |
+| GET | `/ims/preview` | `ims:sync` | Reads rows for one entity without persisting anything |
 | GET | `/ims/logs` | `ims:sync` | The sync log, newest first |
-| POST | `/ims/pull` | `ims:sync` | Pulls a master entity (companies, items, products persisted; the rest read-through) |
+| GET | `/ims/cursors` | `ims:sync` | Per-entity incremental watermarks |
+| POST | `/ims/cursors/reset` | `ims:sync` | Clears one watermark so the next sync reads in full |
+| POST | `/ims/pull` | `ims:sync` | Pulls one master entity (companies, items, products persisted; the rest read-through). `incremental` honours the watermark; `records` accepts a payload posted directly |
+| POST | `/ims/sync` | `ims:sync` | Pulls every entity in `IMS_SYNC_ENTITIES` incrementally, the sweep the scheduler runs |
 | POST | `/ims/push` | `ims:sync` | Pushes one outbound fact by record reference |
 | POST | `/ims/retry` | `ims:sync` | Replays failed outbound deliveries now |
 | GET | `/ims/orders` | `job:create` | Live sales-order or work-order lookup for job creation |
+| GET | `/ims/stock` | `material:read` | Live IMS warehouse balances, read-through, for material issue |
+
+Full treatment of the boundary — connection, mapping, outbox, runbook — is
+[13 — IMS integration](13-ims-integration.md).
 
 ---
 

@@ -122,9 +122,10 @@ session cookie, and all writes go through server actions in
               │  (Prisma)      │ │  storage │ │  email/WhatsApp │
               └────────────────┘ └──────────┘ └─────────────────┘
                              │
-                   ┌─────────▼──────────┐
-                   │  OSWAR IMS (HTTP)  │  masters in, outsourcing facts out
-                   └────────────────────┘
+                   ┌───────────────────────┐
+                   │  OSWAR IMS PostgreSQL │  masters in (read-only SELECT),
+                   │  (or the IMS REST API)│  facts out (gridx outbox table)
+                   └───────────────────────┘
 ```
 
 The browser never holds a bearer token. Access and refresh tokens live in `httpOnly`
@@ -181,7 +182,10 @@ system rather than an afterthought.
   partner's standing category only moves on a period that can actually judge them.
 * **IMS is a boundary, not a copy.** Only masters GRID-X genuinely needs (companies,
   items, products) are persisted. Stock, purchase orders and sales orders are read
-  through, so GRID-X never becomes a second source of truth.
+  through, so GRID-X never becomes a second source of truth. The connection is direct to
+  the IMS database, but strictly one-way: reads run in a `READ ONLY` transaction and
+  outbound facts go to a table GRID-X owns, never into an IMS table whose invariants
+  GRID-X does not know. See [13 — IMS integration](13-ims-integration.md).
 * **Documents that leave the system stay traceable.** A partner never receives the clean
   original of a drawing — only a copy watermarked with their name, the job number and the
   revision, composited into the file itself.

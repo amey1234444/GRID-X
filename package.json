@@ -20,6 +20,8 @@
     "db:seed": "pnpm --filter @gridx/db seed",
     "db:reset": "pnpm --filter @gridx/db reset",
     "db:studio": "pnpm --filter @gridx/db studio",
+    "ims:introspect": "node scripts/ims-introspect.mjs",
+    "ims:outbox": "node scripts/ims-outbox.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\""
   },
   "devDependencies": {

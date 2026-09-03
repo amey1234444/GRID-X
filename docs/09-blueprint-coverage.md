@@ -111,6 +111,15 @@ persisted and the rest are read-through, so GRID-X never duplicates inventory,
 purchase-order or customer data. All seven outbound facts are pushed, with a retry
 worker, exponential backoff and abandonment after eight attempts. **Built.**
 
+The blueprint says *"initially, both systems may share the same database"*. GRID-X takes
+the middle position: a **direct, read-only PostgreSQL connection** to the IMS database,
+through a configurable table/column mapping — the latency and simplicity of a shared
+database, without GRID-X owning a migration against a schema it does not control.
+Outbound facts go to `gridx.ims_outbound_fact`, a table GRID-X owns inside the IMS
+database, so GRID-X never writes to a table the IMS owns. The REST transport is kept and
+is one variable away (`IMS_DRIVER=http`). See
+[13 — IMS integration](13-ims-integration.md).
+
 ## Section 11 — Core database entities
 
 Every entity named in the blueprint exists, plus the supporting infrastructure it

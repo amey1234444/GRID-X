@@ -504,8 +504,52 @@ export interface ReportResult {
 export interface ImsStatus {
   enabled: boolean;
   configured: boolean;
+  /** Transport in force: a direct PostgreSQL connection, the IMS REST API, or nothing. */
+  driver: 'database' | 'http' | 'disabled';
+  writeMode: 'outbox' | 'http' | 'none';
   baseUrl?: string;
+  /** Password-redacted connection string, so an operator can confirm the target IMS. */
+  databaseUrl?: string;
+  schema?: string;
+  outboxTable?: string;
+  mappingProfile: string;
+  mappingOverrides: string[];
+  mappingWarnings: string[];
   timeoutMs: number;
+  statementTimeoutMs: number;
+  inboundSyncEnabled: boolean;
+  syncEntities: string[];
+  batchSize: number;
+}
+
+export interface ImsHealth {
+  driver: 'database' | 'http' | 'disabled';
+  reachable: boolean;
+  latencyMs?: number;
+  serverVersion?: string;
+  message?: string;
+}
+
+export interface ImsEntityIntrospection {
+  entity: string;
+  table: string;
+  tableExists: boolean;
+  missingColumns: string[];
+  unmappedColumns: string[];
+  status: 'ok' | 'degraded' | 'broken';
+}
+
+export interface ImsIntrospection {
+  schema: string;
+  tables: string[];
+  entities: ImsEntityIntrospection[];
+  issues: Array<{ entity: string; severity: 'error' | 'warning'; message: string }>;
+}
+
+export interface ImsCursorRow {
+  entity: string;
+  watermark: string;
+  syncedAt: string;
 }
 
 export interface ImsLogRow {

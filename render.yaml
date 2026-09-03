@@ -136,8 +136,42 @@ services:
       - key: WHATSAPP_API_TOKEN
         sync: false
       # IMS boundary — GRID-X consumes masters from IMS and pushes back status.
+      # The direct driver connects to the IMS PostgreSQL database; set
+      # IMS_DATABASE_URL in the Render dashboard and leave IMS_DRIVER on auto.
       - key: IMS_ENABLED
         value: "false"
+      - key: IMS_DRIVER
+        value: auto
+      - key: IMS_DATABASE_URL
+        sync: false
+      - key: IMS_DATABASE_SCHEMA
+        value: public
+      - key: IMS_DB_POOL_MAX
+        value: "5"
+      - key: IMS_DB_STATEMENT_TIMEOUT_MS
+        value: "15000"
+      # Managed Postgres providers hand out certificates Node will not verify.
+      - key: IMS_DB_SSL
+        value: no-verify
+      - key: IMS_MAPPING_PROFILE
+        value: prisma
+      # Per-entity overrides as inline JSON — a mounted file is awkward on Render.
+      - key: IMS_MAPPING_JSON
+        sync: false
+      - key: IMS_WRITE_MODE
+        value: outbox
+      - key: IMS_OUTBOX_SCHEMA
+        value: gridx
+      - key: IMS_OUTBOX_TABLE
+        value: ims_outbound_fact
+      - key: IMS_OUTBOX_AUTO_CREATE
+        value: "true"
+      - key: IMS_SYNC_INBOUND_ENABLED
+        value: "true"
+      - key: IMS_SYNC_ENTITIES
+        value: companies,items,products
+      - key: IMS_SYNC_BATCH_SIZE
+        value: "500"
       - key: IMS_BASE_URL
         sync: false
       - key: IMS_API_KEY
