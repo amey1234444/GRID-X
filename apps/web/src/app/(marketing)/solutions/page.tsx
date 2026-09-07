@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
-import { Check } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
 import {
   ClosingCTA,
-  EvidenceReceipt,
   LinkCards,
   PageHero,
   SectionHeading,
   TextLink,
 } from '@/components/marketing/editorial';
+import { MarketingImage } from '@/components/marketing/imagery';
 import { RoleExplorer } from '@/components/marketing/showcases';
 
 export const metadata: Metadata = {
@@ -88,7 +88,11 @@ export default function SolutionsPage(): React.JSX.Element {
         primary={{ href: '#workflows', label: 'Explore team workflows' }}
         secondary={{ href: '/platform', label: 'See all modules' }}
       >
-        <EvidenceReceipt />
+        <MarketingImage
+          kind="workshop"
+          priority
+          caption="One operation. Many hands moving it forward."
+        />
       </PageHero>
       <section className="m-section" id="workflows">
         <div className="m-container">
@@ -103,14 +107,19 @@ export default function SolutionsPage(): React.JSX.Element {
                 <p className="m-eyebrow">{solution.label}</p>
                 <h3>{solution.title}</h3>
                 <p>{solution.detail}</p>
-                <ul className="m-check-list">
-                  {solution.points.map((point) => (
-                    <li key={point}>
-                      <Check size={15} aria-hidden="true" />
-                      {point}
-                    </li>
-                  ))}
-                </ul>
+                <details className="m-disclosure">
+                  <summary>
+                    Explore the workflow <ChevronDown size={16} aria-hidden="true" />
+                  </summary>
+                  <ul className="m-check-list">
+                    {solution.points.map((point) => (
+                      <li key={point}>
+                        <Check size={15} aria-hidden="true" />
+                        {point}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
                 <div className="m-actions">
                   <TextLink href={solution.href}>{solution.link}</TextLink>
                 </div>
@@ -132,7 +141,7 @@ export default function SolutionsPage(): React.JSX.Element {
           ))}
         </div>
       </section>
-      <section className="m-section">
+      <section className="m-section m-tone-soft">
         <div className="m-container">
           <SectionHeading
             label="On screen and on the floor"
@@ -155,18 +164,21 @@ export default function SolutionsPage(): React.JSX.Element {
                 title: 'Bring the partner into the record.',
                 detail: 'Explore onboarding, mobile workflows and scorecards.',
                 href: '/partners',
+                image: 'workshop',
               },
               {
                 label: 'System integration',
                 title: 'Keep ownership clear.',
                 detail: 'Understand IMS, data imports and reporting boundaries.',
                 href: '/integrations',
+                image: 'network',
               },
               {
                 label: 'Rollout',
                 title: 'Build on a working flow.',
                 detail: 'Compare the scope of Pilot, Network and Group stages.',
                 href: '/pricing',
+                image: 'precision',
               },
             ]}
           />

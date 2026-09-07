@@ -65,7 +65,7 @@ export function ProductFilm({
     }
   };
   return (
-    <section className="m-section" id={id}>
+    <section className="m-section m-tone-dark" id={id}>
       <div className="m-container m-film-layout">
         <div>
           <p className="m-eyebrow">{eyebrow}</p>

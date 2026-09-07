@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { MotionControl } from './motion-lines';
 import { Wordmark } from '@/components/brand';
 
 const columns = [
@@ -54,7 +55,7 @@ export function MarketingFooter(): React.JSX.Element {
         </div>
         <div className="m-footer-bottom">
           <p>© {new Date().getFullYear()} OSWAR Rotocorp</p>
-          <p>From issued job to verified payment.</p>
+          <MotionControl />
         </div>
       </div>
     </footer>

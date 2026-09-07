@@ -1,3 +1,4 @@
+import { MarketingImage, type ImageKind } from '@/components/marketing/imagery';
 import type { Metadata } from 'next';
 import {
   ClosingCTA,
@@ -35,20 +36,7 @@ export default function ResourcesPage(): React.JSX.Element {
               </p>
               <TextLink href="/resources/partner-onboarding">Read the onboarding guide</TextLink>
             </div>
-            <div className="m-checklist-preview">
-              {[
-                'Prepare the business record',
-                'Declare the working capability',
-                'Complete the assessment',
-                'Run a controlled trial',
-                'Review the approval category',
-              ].map((step, i) => (
-                <div key={step}>
-                  <span>0{i + 1}</span>
-                  {step}
-                </div>
-              ))}
-            </div>
+            <MarketingImage kind="workshop" caption="Inside the partner workflow." />
           </article>
           <SectionHeading
             label="Practical reading"
@@ -60,6 +48,11 @@ export default function ResourcesPage(): React.JSX.Element {
               title: guide.title,
               detail: guide.description,
               href: `/resources/${guide.slug}`,
+              image: (guide.slug === 'partner-onboarding'
+                ? 'workshop'
+                : guide.slug === 'drawing-control'
+                  ? 'precision'
+                  : 'network') as ImageKind,
             }))}
           />
         </div>
