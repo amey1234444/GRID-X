@@ -1,3 +1,5 @@
+import { ChevronDown } from 'lucide-react';
+import { MarketingImage } from '@/components/marketing/imagery';
 import type { Metadata } from 'next';
 import {
   ClosingCTA,
@@ -55,51 +57,45 @@ export default function PricingPage(): React.JSX.Element {
           <SectionHeading
             label="Three stages"
             title="The right scope, in the right order."
-            description="Each stage adds operational depth to a working foundation. Compare the capabilities without repeating a long checklist."
+            description="Start with a working foundation. Add deeper controls as your operation grows."
           />
           <div className="m-rollout-cards">
             {stages.map((stage, i) => (
-              <article key={stage.label} className="m-rollout-card">
+              <article
+                key={stage.label}
+                className={`m-rollout-card${i === 1 ? ' m-tone-dark' : ''}`}
+              >
                 <div className="m-rollout-top">
                   <span className="m-caption">{stage.label}</span>
                   {i === 1 && <span className="m-badge">Full platform</span>}
                 </div>
+                <div className="m-rollout-progress" aria-label={`Stage ${i + 1} of 3`}>
+                  {[0, 1, 2].map((part) => (
+                    <span key={part} data-filled={part <= i} />
+                  ))}
+                </div>
                 <h3>{stage.title}</h3>
                 <p>{stage.description}</p>
                 <div className="m-rollout-scope">
-                  Scope<strong>{stage.scope}</strong>
+                  Includes<strong>{stage.scope}</strong>
                 </div>
+                <details className="m-disclosure">
+                  <summary>
+                    When to move forward <ChevronDown size={16} aria-hidden="true" />
+                  </summary>
+                  <p>{stage.gate}</p>
+                </details>
               </article>
             ))}
           </div>
           <RolloutComparison />
         </div>
       </section>
-      <section className="m-section">
-        <div className="m-container">
-          <SectionHeading
-            label="Progress measured in working outcomes"
-            title="A clear checkpoint at every stage."
-            description="Agree what success looks like before expanding the scope."
-          />
-          <div className="m-rollout-gates">
-            {stages.map((stage) => (
-              <article key={stage.label}>
-                <span className="m-caption">{stage.label}</span>
-                <h3>{stage.title}</h3>
-                <p>{stage.gate}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section className="m-section">
+      <section className="m-section m-tone-soft">
         <div className="m-container m-split-story">
           <div>
             <p className="m-eyebrow">Before the first job</p>
-            <h2>Prepare the records that make the flow work.</h2>
-          </div>
-          <div>
+            <h2>Build on a prepared foundation.</h2>
             <p>
               Start with partner profiles, components, released drawings and rate cards. Use
               validated imports where appropriate, and make the ownership of each record clear.
@@ -108,6 +104,10 @@ export default function PricingPage(): React.JSX.Element {
             <br />
             <TextLink href="/integrations">Explore imports and integrations</TextLink>
           </div>
+          <MarketingImage
+            kind="precision"
+            caption="A considered start makes the next step clearer."
+          />
         </div>
       </section>
       <FAQ items={rolloutQuestions} title="Plan the rollout with clarity." />

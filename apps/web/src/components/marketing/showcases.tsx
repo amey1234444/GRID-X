@@ -4,6 +4,7 @@ import Link from 'next/link';
 import {
   ArrowRight,
   Check,
+  ChevronDown,
   ClipboardCheck,
   FileCheck2,
   LockKeyhole,
@@ -12,6 +13,7 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DrawingReceipt, EvidenceReceipt, TextLink } from './editorial';
 
 const workflows = [
   {
@@ -96,8 +98,10 @@ export function WorkflowExplorer(): React.JSX.Element {
           <TabsContent key={stage.id} value={stage.id} className="m-workflow-content">
             <div className="m-workflow-grid">
               <div className="m-workflow-copy">
-                <h3>{stage.title}</h3>
-                <p>{stage.description}</p>
+                <div className="m-workflow-lead">
+                  <h3>{stage.title}</h3>
+                  <p>{stage.description}</p>
+                </div>
                 <div className="m-table-scroll">
                   <table className="m-table">
                     <caption className="sr-only">{stage.label}: illustrative job records</caption>
@@ -124,8 +128,10 @@ export function WorkflowExplorer(): React.JSX.Element {
                   </table>
                 </div>
               </div>
-              <aside className="m-workflow-aside">
-                <h4>What moves the work forward</h4>
+              <details className="m-disclosure m-workflow-aside">
+                <summary>
+                  Checks behind this decision <ChevronDown size={16} aria-hidden="true" />
+                </summary>
                 <ul className="m-check-list">
                   {stage.checks.map((check) => (
                     <li key={check}>
@@ -135,7 +141,7 @@ export function WorkflowExplorer(): React.JSX.Element {
                   ))}
                 </ul>
                 <p>{stage.rule}</p>
-              </aside>
+              </details>
             </div>
           </TabsContent>
         ))}
@@ -231,6 +237,75 @@ export function PartnerWorkspace(): React.JSX.Element {
   );
 }
 
+export function PartnerRecordExplorer(): React.JSX.Element {
+  return (
+    <Tabs defaultValue="drawings">
+      <TabsList className="m-role-tabs" aria-label="Explore the partner record">
+        <TabsTrigger value="drawings">Released drawings</TabsTrigger>
+        <TabsTrigger value="material">Material receipts</TabsTrigger>
+        <TabsTrigger value="payments">Payment clarity</TabsTrigger>
+      </TabsList>
+      <TabsContent value="drawings">
+        <div className="m-split-story">
+          <div>
+            <p className="m-eyebrow">Clear instructions</p>
+            <h2>The right revision. Within reach.</h2>
+            <p>
+              Open the drawing released for your job. Superseded revisions lock, and every view and
+              acknowledgement stays on the record.
+            </p>
+            <TextLink href="/resources/drawing-control">Explore drawing control</TextLink>
+          </div>
+          <DrawingReceipt />
+        </div>
+      </TabsContent>
+      <TabsContent value="material">
+        <div className="m-split-story">
+          <div>
+            <p className="m-eyebrow">A shared material trail</p>
+            <h2>Record what actually arrived.</h2>
+            <p>
+              Acknowledge the received weight and any shortage at receipt. Consumption, scrap and
+              returns stay connected to the same job.
+            </p>
+            <TextLink href="/resources/material-reconciliation">Understand reconciliation</TextLink>
+          </div>
+          <figure className="m-module-record">
+            <figcaption className="m-caption">ILLUSTRATIVE RECEIPT / CH-8842</figcaption>
+            <h4>Acknowledged at the partner unit</h4>
+            {[
+              ['Issued weight', '1,240 kg'],
+              ['Received weight', '1,232 kg'],
+              ['Receipt difference', '8 kg'],
+              ['Variance status', 'Recorded at receipt'],
+            ].map(([label, value]) => (
+              <div className="m-data-row" key={label}>
+                <span>{label}</span>
+                <strong>{value}</strong>
+              </div>
+            ))}
+            <blockquote>The issued and received quantities remain visible together.</blockquote>
+          </figure>
+        </div>
+      </TabsContent>
+      <TabsContent value="payments">
+        <div className="m-split-story">
+          <div>
+            <p className="m-eyebrow">Visible payment progress</p>
+            <h2>Know what is ready. See what comes next.</h2>
+            <p>
+              Follow accepted quantity, deductions and invoice status. See a scheduled payment date
+              when finance sets one.
+            </p>
+            <TextLink href="/partner/login">Open your payment records</TextLink>
+          </div>
+          <EvidenceReceipt />
+        </div>
+      </TabsContent>
+    </Tabs>
+  );
+}
+
 const onboarding = [
   {
     id: 'registration',
@@ -296,15 +371,12 @@ const onboarding = [
 
 export function OnboardingJourney(): React.JSX.Element {
   return (
-    <Tabs defaultValue="registration" className="m-onboarding">
+    <Tabs defaultValue="registration" orientation="vertical" className="m-onboarding">
       <TabsList className="m-onboarding-tabs" aria-label="Explore the five onboarding steps">
         {onboarding.map((step, i) => (
           <TabsTrigger key={step.id} value={step.id} className="m-onboarding-step">
             <span>{String(i + 1).padStart(2, '0')}</span>
-            <span>
-              {step.title}
-              <small>{step.short}</small>
-            </span>
+            <span>{step.title}</span>
             <ArrowRight size={16} aria-hidden="true" />
           </TabsTrigger>
         ))}
@@ -411,14 +483,19 @@ export function RoleExplorer(): React.JSX.Element {
             <div>
               <h3>{role.title}</h3>
               <p>{role.detail}</p>
-              <ul className="m-check-list">
-                {role.points.map((point) => (
-                  <li key={point}>
-                    <Check size={15} aria-hidden="true" />
-                    {point}
-                  </li>
-                ))}
-              </ul>
+              <details className="m-disclosure">
+                <summary>
+                  What’s in this workspace <ChevronDown size={16} aria-hidden="true" />
+                </summary>
+                <ul className="m-check-list">
+                  {role.points.map((point) => (
+                    <li key={point}>
+                      <Check size={15} aria-hidden="true" />
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+              </details>
               <Link className="m-text-link" href={role.href}>
                 {role.cta}
                 <ArrowRight size={15} aria-hidden="true" />
@@ -505,7 +582,10 @@ const comparison = [
 ] as const;
 export function RolloutComparison(): React.JSX.Element {
   return (
-    <>
+    <details className="m-disclosure m-comparison-disclosure">
+      <summary>
+        Compare all rollout capabilities <ChevronDown size={18} aria-hidden="true" />
+      </summary>
       <div
         className="m-table-scroll"
         tabIndex={0}
@@ -557,6 +637,6 @@ export function RolloutComparison(): React.JSX.Element {
         Each stage builds on the previous one. Rollout scope is agreed for the operation; the stages
         shown here are not published subscription prices.
       </p>
-    </>
+    </details>
   );
 }

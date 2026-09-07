@@ -1,6 +1,8 @@
+import { MarketingImage } from '@/components/marketing/imagery';
 import type { Metadata } from 'next';
 import {
   Check,
+  ChevronDown,
   FileLock2,
   KeyRound,
   Layers3,
@@ -10,7 +12,6 @@ import {
 } from 'lucide-react';
 import {
   ClosingCTA,
-  DrawingReceipt,
   FAQ,
   PageHero,
   SectionHeading,
@@ -96,7 +97,11 @@ export default function SecurityPage(): React.JSX.Element {
         primary={{ href: '#controls', label: 'Explore the controls' }}
         secondary={{ href: '/platform', label: 'See the platform' }}
       >
-        <DrawingReceipt />
+        <MarketingImage
+          kind="precision"
+          priority
+          caption="Care in the details. Control at every handoff."
+        />
       </PageHero>
       <section className="m-section" id="controls">
         <div className="m-container">
@@ -111,20 +116,25 @@ export default function SecurityPage(): React.JSX.Element {
                 <Icon size={24} strokeWidth={1.4} aria-hidden="true" />
                 <h3>{title}</h3>
                 <p>{detail}</p>
-                <ul className="m-check-list">
-                  {points.map((point) => (
-                    <li key={point}>
-                      <Check size={15} aria-hidden="true" />
-                      {point}
-                    </li>
-                  ))}
-                </ul>
+                <details className="m-disclosure">
+                  <summary>
+                    Control details <ChevronDown size={16} aria-hidden="true" />
+                  </summary>
+                  <ul className="m-check-list">
+                    {points.map((point) => (
+                      <li key={point}>
+                        <Check size={15} aria-hidden="true" />
+                        {point}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               </article>
             ))}
           </div>
         </div>
       </section>
-      <section className="m-section">
+      <section className="m-section m-tone-dark">
         <div className="m-container m-split-story">
           <div>
             <p className="m-eyebrow">Access, in practice</p>
@@ -132,10 +142,6 @@ export default function SecurityPage(): React.JSX.Element {
             <p>
               A drawing view has context: a person, a job and a revision. The access log connects
               that context to a recorded event.
-            </p>
-            <p>
-              When a revision changes, the history remains useful for understanding what was
-              available and acknowledged at the time.
             </p>
             <TextLink href="/resources/drawing-control">Explore drawing control</TextLink>
           </div>

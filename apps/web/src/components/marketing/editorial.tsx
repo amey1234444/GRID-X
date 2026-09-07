@@ -8,6 +8,8 @@ import {
   LockKeyhole,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { MotionLines } from './motion-lines';
+import { MarketingImage, type ImageKind } from './imagery';
 
 export function SectionHeading({
   label,
@@ -74,6 +76,7 @@ export function PageHero({
 }): React.JSX.Element {
   return (
     <section className={`m-hero${centered ? ' m-hero-centered' : ''}`}>
+      <MotionLines />
       <div className="m-container">
         <div className={children ? 'm-hero-grid' : 'm-hero-copy'}>
           <div>
@@ -118,7 +121,8 @@ export function ClosingCTA({
   partner?: boolean;
 }): React.JSX.Element {
   return (
-    <section className="m-closing">
+    <section className="m-closing m-tone-dark">
+      <MotionLines />
       <div className="m-container m-closing-inner">
         <div>
           <p className="m-eyebrow">{label}</p>
@@ -257,12 +261,13 @@ export function DrawingReceipt(): React.JSX.Element {
 export function LinkCards({
   items,
 }: {
-  items: { label: string; title: string; detail: string; href: string }[];
+  items: { label: string; title: string; detail: string; href: string; image?: ImageKind }[];
 }): React.JSX.Element {
   return (
     <div className={`m-link-cards${items.length === 2 ? ' m-link-cards-pair' : ''}`}>
       {items.map((item) => (
         <Link key={item.href} href={item.href} className="m-link-card">
+          {item.image && <MarketingImage kind={item.image} />}
           <span className="m-caption">{item.label}</span>
           <h3>{item.title}</h3>
           <p>{item.detail}</p>

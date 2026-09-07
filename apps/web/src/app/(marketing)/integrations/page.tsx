@@ -1,3 +1,4 @@
+import { MarketingImage } from '@/components/marketing/imagery';
 import type { Metadata } from 'next';
 import { ArrowRight, Database, FileInput, FileOutput, RefreshCw } from 'lucide-react';
 import { ClosingCTA, FAQ, PageHero, SectionHeading } from '@/components/marketing/editorial';
@@ -43,9 +44,14 @@ export default function IntegrationsPage(): React.JSX.Element {
         description="Bring the right records into the partner workflow. Keep IMS responsible for internal operations while GRID-X coordinates external manufacturing."
         primary={{ href: '#data-flow', label: 'Explore the data flow' }}
         secondary={{ href: '/pricing', label: 'See rollout scope' }}
-        centered
-      />
-      <section className="m-section" id="data-flow">
+      >
+        <MarketingImage
+          kind="network"
+          priority
+          caption="Connect the records. Keep ownership clear."
+        />
+      </PageHero>
+      <section className="m-section m-tone-soft" id="data-flow">
         <div className="m-container">
           <SectionHeading
             label="The operational boundary"

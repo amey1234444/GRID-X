@@ -1,3 +1,4 @@
+import { MarketingImage, type ImageKind } from '@/components/marketing/imagery';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { ClosingCTA, LinkCards, SectionHeading, TextLink } from '@/components/marketing/editorial';
@@ -29,6 +30,17 @@ export default function GuidePage({ params }: { params: { slug: string } }): Rea
               <span>GRID-X · Practical workflow guide</span>
             </div>
           </div>
+          <MarketingImage
+            kind={
+              guide.slug === 'partner-onboarding'
+                ? 'workshop'
+                : guide.slug === 'drawing-control'
+                  ? 'precision'
+                  : 'network'
+            }
+            priority
+            className="m-article-cover"
+          />
         </div>
       </header>
       <div className="m-section">
@@ -75,6 +87,11 @@ export default function GuidePage({ params }: { params: { slug: string } }): Rea
                 title: item.title,
                 detail: item.description,
                 href: `/resources/${item.slug}`,
+                image: (item.slug === 'partner-onboarding'
+                  ? 'workshop'
+                  : item.slug === 'drawing-control'
+                    ? 'precision'
+                    : 'network') as ImageKind,
               }))}
           />
         </div>

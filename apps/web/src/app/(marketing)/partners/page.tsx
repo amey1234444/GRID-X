@@ -1,14 +1,18 @@
 import type { Metadata } from 'next';
-import { Check, Gauge, Languages, Smartphone, Wallet, WifiOff } from 'lucide-react';
+import { ChevronDown, Gauge, Languages, Smartphone, Wallet, WifiOff } from 'lucide-react';
 import {
   ClosingCTA,
-  DrawingReceipt,
   FAQ,
   PageHero,
   SectionHeading,
   TextLink,
 } from '@/components/marketing/editorial';
-import { OnboardingJourney, PartnerWorkspace } from '@/components/marketing/showcases';
+import { MarketingImage } from '@/components/marketing/imagery';
+import {
+  OnboardingJourney,
+  PartnerWorkspace,
+  PartnerRecordExplorer,
+} from '@/components/marketing/showcases';
 
 export const metadata: Metadata = {
   title: 'For partners',
@@ -56,7 +60,7 @@ export default function PartnersPage(): React.JSX.Element {
         primary={{ href: '/partner/login', label: 'Open the partner app' }}
         secondary={{ href: '#onboarding', label: 'How onboarding works' }}
       >
-        <PartnerWorkspace />
+        <MarketingImage kind="workshop" priority caption="Built for the people making the parts." />
       </PageHero>
       <section className="m-section">
         <div className="m-container">
@@ -65,81 +69,28 @@ export default function PartnersPage(): React.JSX.Element {
             title="Less chasing. More clarity."
             description="Useful information, close to the work. Every benefit supports a decision you make during the day."
           />
-          <div className="m-benefits">
-            {benefits.map(({ Icon, title, detail }) => (
-              <article key={title} className="m-benefit">
-                <Icon size={21} strokeWidth={1.5} aria-hidden="true" />
-                <div>
-                  <h3>{title}</h3>
+          <div className="m-partner-benefit-layout">
+            <div className="m-benefit-accordion">
+              {benefits.map(({ Icon, title, detail }, i) => (
+                <details key={title} open={i === 0}>
+                  <summary>
+                    <Icon size={20} aria-hidden="true" />
+                    <span>{title}</span>
+                    <ChevronDown size={16} aria-hidden="true" />
+                  </summary>
                   <p>{detail}</p>
-                </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-      <section className="m-section">
-        <div className="m-container m-split-story">
-          <div>
-            <p className="m-eyebrow">01 / Clear instructions</p>
-            <h2>The released drawing, every time.</h2>
-            <p>
-              Open the revision released for your job. When a revision is superseded, the previous
-              one locks and the record keeps the change visible.
-            </p>
-            <div className="m-story-points">
-              <div>
-                <Check />
-                Job-specific drawing access.
-              </div>
-              <div>
-                <Check />
-                Views and acknowledgements on record.
-              </div>
-              <div>
-                <Check />
-                Revision status your team can check.
-              </div>
+                </details>
+              ))}
             </div>
-            <TextLink href="/resources/drawing-control">Read the drawing control guide</TextLink>
+            <div className="m-record-stage">
+              <PartnerWorkspace />
+            </div>
           </div>
-          <DrawingReceipt />
         </div>
       </section>
-      <section className="m-section">
-        <div className="m-container m-split-story">
-          <div>
-            <p className="m-eyebrow">02 / Shared material record</p>
-            <h2>Record what actually arrived.</h2>
-            <p>
-              Acknowledge the received weight and record shortage or damage at receipt. Keep the
-              difference visible where it occurred.
-            </p>
-            <p>
-              Consumption, scrap and unused returns stay connected to the job for reconciliation.
-            </p>
-            <TextLink href="/resources/material-reconciliation">
-              Understand material reconciliation
-            </TextLink>
-          </div>
-          <figure className="m-module-record">
-            <figcaption className="m-caption">ILLUSTRATIVE RECEIPT / CH-8842</figcaption>
-            <h4>Acknowledged at the partner unit</h4>
-            {[
-              ['Issued weight', '1,240 kg'],
-              ['Received weight', '1,232 kg'],
-              ['Receipt difference', '8 kg'],
-              ['Variance status', 'Recorded at receipt'],
-            ].map(([label, value]) => (
-              <div className="m-data-row" key={label}>
-                <span>{label}</span>
-                <strong>{value}</strong>
-              </div>
-            ))}
-            <blockquote>
-              The received quantity and the issued quantity remain visible together.
-            </blockquote>
-          </figure>
+      <section className="m-section m-tone-soft">
+        <div className="m-container">
+          <PartnerRecordExplorer />
         </div>
       </section>
       <section className="m-section" id="onboarding">
@@ -152,7 +103,7 @@ export default function PartnersPage(): React.JSX.Element {
           <OnboardingJourney />
         </div>
       </section>
-      <section className="m-section" id="scorecards">
+      <section className="m-section m-tone-dark" id="scorecards">
         <div className="m-container m-split-story">
           <div>
             <p className="m-eyebrow">03 / Visible performance</p>
@@ -160,10 +111,6 @@ export default function PartnersPage(): React.JSX.Element {
             <p>
               Seven KPIs inform the partner scorecard. Review the underlying jobs and see how
               quality, delivery, material efficiency and responsiveness contribute.
-            </p>
-            <p>
-              Category reviews use the same operational evidence. Your team can see where
-              improvement matters.
             </p>
             <TextLink href="/partner/login">Open your partner workspace</TextLink>
           </div>
