@@ -1,120 +1,256 @@
-import { ChevronDown } from 'lucide-react';
-import { MarketingImage } from '@/components/marketing/imagery';
 import type { Metadata } from 'next';
-import {
-  ClosingCTA,
-  FAQ,
-  PageHero,
-  SectionHeading,
-  TextLink,
-} from '@/components/marketing/editorial';
-import { RolloutComparison } from '@/components/marketing/showcases';
-import { rolloutQuestions } from '@/components/marketing/content';
+import Link from 'next/link';
+import { ArrowRight, Check } from 'lucide-react';
+
+import { AmbientLines } from '@/components/marketing/ambient-lines';
+import { DisclosureList, type DisclosureItem } from '@/components/marketing/disclosure-list';
+import { Eyebrow, MetricBand, Statement } from '@/components/marketing/primitives';
+import { Reveal, StaggerGroup, StaggerItem } from '@/components/motion';
+import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: 'Rollout',
+  title: 'Pricing',
   description:
-    'Compare GRID-X rollout scope across Pilot, Network and Group stages. Start with one plant and extend the operational flow.',
+    'How GRID-X rolls out: prove the controlled flow on one plant first, then extend into capacity, logistics, tooling and the wider group.',
 };
-const stages = [
+
+/**
+ * The rollout page.
+ *
+ * This is not a self-serve product with a card form, so pricing is presented as what it actually
+ * is — a sequenced rollout. Each stage names what has to be working before the next one is worth
+ * starting, which is the honest version of a pricing table for a platform of this shape.
+ */
+
+const tiers = [
   {
-    label: '01 / Pilot',
-    title: 'Prove the core flow.',
-    description: 'One company, one plant and the first group of partner units.',
-    scope: 'Jobs, drawings, material issue, quality and invoice status.',
-    gate: 'A job goes out with a released drawing, returns inspected and is invoiced from accepted quantity.',
+    name: 'Pilot',
+    price: 'MVP rollout',
+    description: 'One company, one plant and the first cohort of partner units.',
+    gate: 'Ends when a job can go out and come back without leaving the system.',
+    features: [
+      'Users, roles and partner onboarding',
+      'Components, drawings and revision control',
+      'Jobs, material issue and milestones',
+      'Inspection, rework and job closure',
+      'Basic invoice and payment status',
+      'Partner scorecard and management dashboard',
+    ],
   },
   {
-    label: '02 / Network',
-    title: 'Connect the operation.',
-    description: 'Extend the controlled flow across the partner network.',
-    scope: 'Capacity, reconciliation, logistics, tooling, reporting and IMS.',
-    gate: 'Allocation, material reconciliation and payment approvals follow a shared operational record.',
+    name: 'Network',
+    price: 'Full platform',
+    highlight: true,
+    description: 'The complete blueprint across every module and every partner.',
+    gate: 'Ends when allocation, reconciliation and payment all run unattended.',
+    features: [
+      'Everything in Pilot',
+      'Capacity planning and allocation scoring',
+      'Material reconciliation and deductions',
+      'Logistics, shipments and proof of delivery',
+      'Tooling, fixtures, gauges and calibration',
+      'All seventeen standard reports with CSV export',
+      'IMS integration boundary',
+    ],
   },
   {
-    label: '03 / Group',
-    title: 'Bring every plant together.',
-    description: 'A common view across OSWAR Rotocorp, Oswal Engineers and the wider group.',
-    scope: 'Company separation, group dashboards and audit configuration.',
-    gate: 'Group teams read consolidated results while each plant and company retains its data boundaries.',
+    name: 'Group',
+    price: 'Multi-company',
+    description: 'Oswal Engineers, OSWAR Rotocorp and future group companies together.',
+    gate: 'Ends when every plant reads the same numbers without a consolidation step.',
+    features: [
+      'Everything in Network',
+      'Multi-company and multi-plant separation',
+      'Group-level management dashboards',
+      'Consolidated partner concentration analysis',
+      'Dedicated audit and retention configuration',
+    ],
+  },
+];
+
+const sequencing = [
+  { value: '3', label: 'Stages, each with a working system at the end of it' },
+  { value: '14', label: 'Modules, delivered in the order the work moves' },
+  { value: '1 plant', label: 'Proves the flow before the network scales onto it' },
+  { value: '17', label: 'Standard reports, live by the end of stage two' },
+];
+
+const questions: DisclosureItem[] = [
+  {
+    title: 'Why is this sequenced rather than priced per seat?',
+    detail:
+      'The value of GRID-X is a controlled flow, and a half-built flow controls nothing. Each stage is scoped so that the system is genuinely usable at the end of it, rather than becoming useful only once everything ships.',
+  },
+  {
+    title: 'What has to be true before stage two starts?',
+    detail:
+      'A job issued in GRID-X reaches a partner with a released drawing, comes back inspected, and gets invoiced from accepted quantity — without anyone maintaining a parallel spreadsheet.',
+  },
+  {
+    title: 'Do partner units pay anything?',
+    detail:
+      'No. The partner app is part of the platform. Partner units need a browser and a phone; there is no licence, no store install and no hardware to buy.',
+  },
+  {
+    title: 'What happens to the data already in spreadsheets?',
+    detail:
+      'Components, items, partners and rate cards load through the bulk import, which validates per row and reports what it rejected rather than failing the whole file.',
+  },
+  {
+    title: 'How does this sit alongside IMS?',
+    detail:
+      'IMS stays the system of record for internal inventory and in-house manufacturing. GRID-X owns the external distributed manufacturing record and pulls work orders across the boundary.',
+  },
+  {
+    title: 'Can a stage be reordered?',
+    detail:
+      'Within limits. Logistics and tooling can move earlier if the operation needs them, but drawing control and material custody have to land first — everything downstream depends on the record they create.',
   },
 ];
 
 export default function PricingPage(): React.JSX.Element {
   return (
     <>
-      <PageHero
-        label="A considered rollout"
-        title="Start with one plant."
-        accent="Grow with the network."
-        description="Prove a complete job flow first. Then extend into deeper controls and group visibility, with a clear outcome at every stage."
-        primary={{ href: '#scope', label: 'Compare rollout scope' }}
-        secondary={{ href: '/platform', label: 'Explore the product' }}
-        centered
-      />
-      <section className="m-section" id="scope">
-        <div className="m-container">
-          <SectionHeading
-            label="Three stages"
-            title="The right scope, in the right order."
-            description="Start with a working foundation. Add deeper controls as your operation grows."
-          />
-          <div className="m-rollout-cards">
-            {stages.map((stage, i) => (
-              <article
-                key={stage.label}
-                className={`m-rollout-card${i === 1 ? ' m-tone-dark' : ''}`}
-              >
-                <div className="m-rollout-top">
-                  <span className="m-caption">{stage.label}</span>
-                  {i === 1 && <span className="m-badge">Full platform</span>}
-                </div>
-                <div className="m-rollout-progress" aria-label={`Stage ${i + 1} of 3`}>
-                  {[0, 1, 2].map((part) => (
-                    <span key={part} data-filled={part <= i} />
-                  ))}
-                </div>
-                <h3>{stage.title}</h3>
-                <p>{stage.description}</p>
-                <div className="m-rollout-scope">
-                  Includes<strong>{stage.scope}</strong>
-                </div>
-                <details className="m-disclosure">
-                  <summary>
-                    When to move forward <ChevronDown size={16} aria-hidden="true" />
-                  </summary>
-                  <p>{stage.gate}</p>
-                </details>
-              </article>
-            ))}
-          </div>
-          <RolloutComparison />
-        </div>
-      </section>
-      <section className="m-section m-tone-soft">
-        <div className="m-container m-split-story">
-          <div>
-            <p className="m-eyebrow">Before the first job</p>
-            <h2>Build on a prepared foundation.</h2>
-            <p>
-              Start with partner profiles, components, released drawings and rate cards. Use
-              validated imports where appropriate, and make the ownership of each record clear.
+      <section className="relative overflow-hidden border-b border-border-subtle bg-[#080808] py-24 sm:py-32">
+        <AmbientLines variant="routes" className="opacity-30" />
+        <div className="container relative">
+          <Reveal className="max-w-4xl">
+            <Eyebrow>Rollout</Eyebrow>
+            <Statement
+              as="h1"
+              className="mt-7"
+              lead="Start with one plant. Scale to the whole group."
+              trail="Delivery is sequenced deliberately — prove the controlled flow first, then extend it."
+            />
+            <p className="mt-8 max-w-2xl text-[1.0625rem] leading-relaxed text-muted-foreground">
+              A platform that governs drawings, material and payments is not something to switch on
+              everywhere at once. Each stage ends with a system that works on its own terms.
             </p>
-            <TextLink href="/resources/partner-onboarding">Read the onboarding guide</TextLink>
-            <br />
-            <TextLink href="/integrations">Explore imports and integrations</TextLink>
-          </div>
-          <MarketingImage
-            kind="precision"
-            caption="A considered start makes the next step clearer."
-          />
+            <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/login"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-foreground px-7 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+              >
+                Open GRID-X <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/platform"
+                className="inline-flex h-12 items-center justify-center rounded-full border border-border-strong bg-surface px-7 text-sm font-semibold transition-colors hover:bg-surface-hover"
+              >
+                See the product
+              </Link>
+            </div>
+          </Reveal>
         </div>
       </section>
-      <FAQ items={rolloutQuestions} title="Plan the rollout with clarity." />
-      <ClosingCTA
-        title="Build from a working first plant."
-        description="Explore the modules and decide which operational flow should go live first."
-      />
+
+      <section className="section-graphite border-b border-border-subtle py-24 sm:py-32">
+        <div className="container">
+          <Reveal className="grid gap-10 lg:grid-cols-[0.7fr_1.3fr] lg:gap-24">
+            <h2 className="type-hero">The stages</h2>
+            <p className="max-w-2xl text-[clamp(1.125rem,1.8vw,1.5rem)] leading-[1.45] tracking-[-0.025em] text-muted-foreground">
+              Each one names what has to be working before the next is worth starting.
+            </p>
+          </Reveal>
+
+          <StaggerGroup className="mt-20 grid gap-px overflow-hidden rounded-[18px] border border-border-strong bg-border-subtle lg:grid-cols-3">
+            {tiers.map((tier) => (
+              <StaggerItem key={tier.name} className="h-full">
+                <article
+                  className={cn(
+                    'plate plate-lit flex h-full flex-col p-7 sm:p-8',
+                    tier.highlight ? 'plate-raised' : '',
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="type-label">{tier.name}</span>
+                    {tier.highlight ? (
+                      <span className="rounded-full border border-brand/30 bg-brand/10 px-2.5 py-1 font-mono text-[0.5625rem] uppercase tracking-[0.1em] text-brand">
+                        Recommended
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <p className="mt-6 font-display text-[1.75rem] font-medium leading-none tracking-[-0.04em]">
+                    {tier.price}
+                  </p>
+                  <p className="mt-3 text-[0.9375rem] leading-relaxed text-muted-foreground">
+                    {tier.description}
+                  </p>
+
+                  <ul className="mt-7 space-y-2.5 border-t border-border-subtle pt-6">
+                    {tier.features.map((feature) => (
+                      <li
+                        key={feature}
+                        className="flex gap-2.5 text-[0.8125rem] leading-relaxed text-muted-foreground"
+                      >
+                        <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" aria-hidden />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <p className="mt-auto border-t border-border-subtle pt-6 text-[0.8125rem] leading-relaxed text-subtle">
+                    {tier.gate}
+                  </p>
+                </article>
+              </StaggerItem>
+            ))}
+          </StaggerGroup>
+        </div>
+      </section>
+
+      <section className="border-b border-border-subtle bg-[#080808] py-24 sm:py-32">
+        <div className="container">
+          <Reveal className="max-w-3xl">
+            <Eyebrow>Sequencing</Eyebrow>
+            <Statement
+              className="mt-7"
+              lead="No stage ends in a half-built system."
+              trail="Each one is usable on the day it lands."
+            />
+          </Reveal>
+          <Reveal className="mt-16">
+            <MetricBand items={sequencing} />
+          </Reveal>
+        </div>
+      </section>
+
+      <section className="section-grid border-b border-border-subtle py-24 sm:py-32">
+        <div className="container">
+          <Reveal>
+            <DisclosureList label="Common questions" items={questions} />
+          </Reveal>
+        </div>
+      </section>
+
+      <section className="relative overflow-hidden bg-[#080808] py-28 sm:py-36">
+        <AmbientLines variant="routes" className="opacity-30" />
+        <div className="container relative text-center">
+          <Reveal className="mx-auto max-w-4xl">
+            <p className="font-mono text-[0.625rem] uppercase tracking-[0.14em] text-signal">
+              One plant, then the network
+            </p>
+            <h2 className="mt-8 text-balance font-display text-[clamp(2.5rem,4.8vw,4rem)] font-medium leading-[1] tracking-[-0.045em]">
+              Start where the flow is provable.
+            </h2>
+            <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row">
+              <Link
+                href="/login"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-foreground px-7 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+              >
+                Open GRID-X <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/partners"
+                className="inline-flex h-12 items-center justify-center rounded-full border border-border-strong bg-surface px-7 text-sm font-semibold transition-colors hover:bg-surface-hover"
+              >
+                For partner units
+              </Link>
+            </div>
+          </Reveal>
+        </div>
+      </section>
     </>
   );
 }
