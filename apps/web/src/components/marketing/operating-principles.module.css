@@ -1,0 +1,563 @@
+/*
+ * Operating principles — an art-directed canvas rather than a card grid.
+ *
+ * The composition is absolute at desktop, measured against the 1672 x 941
+ * canvas it was drawn on, so the cards hold their relationship to the timeline
+ * as the viewport scales. Below 980px it drops the art direction entirely and
+ * becomes a vertical flow; shrinking this layout any further only makes it
+ * unreadable.
+ *
+ * Every property here is prefixed --op-. The design system already owns
+ * --surface, --border and --muted globally, and globals.css applies
+ * `border-color: hsl(var(--border))` to `*` — redefining --border on this
+ * section would resolve to hsl(rgba(...)), which is invalid, and every
+ * descendant would quietly fall back to currentColor.
+ */
+.section {
+  --op-bg: #080909;
+  --op-surface: rgba(13, 14, 14, 0.78);
+  --op-surface-hover: #f1f1ee;
+  --op-text: #f0f0ed;
+  --op-easing: cubic-bezier(0.22, 1, 0.36, 1);
+
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: var(--op-bg);
+  color: var(--op-text);
+  isolation: isolate;
+}
+
+.stage {
+  position: relative;
+  width: min(100%, 1672px);
+  aspect-ratio: 1672 / 941;
+  min-height: 760px;
+  margin: 0 auto;
+  overflow: hidden;
+  background:
+    radial-gradient(700px 460px at 4% 0%, rgba(255,255,255,.065), transparent 64%),
+    radial-gradient(680px 420px at 94% 92%, rgba(255,255,255,.025), transparent 70%),
+    #080909;
+}
+
+.stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, transparent 54%, rgba(0,0,0,.35) 100%);
+}
+
+.backgroundGrid {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: .12;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 132px 88px;
+  mask-image: radial-gradient(ellipse at 57% 51%, #000 0%, rgba(0,0,0,.65) 40%, transparent 78%);
+}
+
+.header {
+  position: absolute;
+  z-index: 5;
+  left: 4.45%;
+  top: 7.25%;
+  width: 53%;
+}
+
+.kicker {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  width: fit-content;
+  color: rgba(255,255,255,.60);
+  font-size: clamp(9px, .7vw, 12px);
+  font-weight: 500;
+  letter-spacing: .33em;
+  line-height: 1;
+}
+
+.kickerRule {
+  display: inline-block;
+  width: 50px;
+  height: 1px;
+  background: rgba(255,255,255,.34);
+}
+
+.title {
+  margin: 27px 0 12px;
+  max-width: 860px;
+  color: #efefec;
+  font-family: var(--font-display), var(--font-sans), Inter, "Helvetica Neue", Arial, sans-serif;
+  font-size: clamp(36px, 3.56vw, 60px);
+  font-weight: 400;
+  letter-spacing: -.045em;
+  line-height: 1.02;
+}
+
+.subtitle {
+  margin: 0;
+  color: rgba(255,255,255,.60);
+  font-family: var(--font-sans), Inter, "Helvetica Neue", Arial, sans-serif;
+  font-size: clamp(14px, 1.24vw, 20px);
+  font-weight: 400;
+  letter-spacing: -.015em;
+  line-height: 1.46;
+}
+
+.sideNote {
+  position: absolute;
+  z-index: 5;
+  top: 11.25%;
+  right: 4.35%;
+  display: flex;
+  gap: 24px;
+  align-items: stretch;
+  color: rgba(255,255,255,.47);
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: clamp(8px, .67vw, 11px);
+  letter-spacing: .29em;
+  line-height: 2.3;
+}
+
+.sideNoteRule {
+  width: 1px;
+  min-height: 76px;
+  background: rgba(255,255,255,.34);
+}
+
+.sideNote div {
+  display: flex;
+  flex-direction: column;
+}
+
+.flow {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.flowBase,
+.connector {
+  fill: none;
+  stroke: rgba(255,255,255,.34);
+  stroke-width: 1.25;
+  vector-effect: non-scaling-stroke;
+}
+
+.connector {
+  stroke: rgba(255,255,255,.24);
+}
+
+.flowRunner {
+  fill: none;
+  stroke: rgba(255,255,255,.9);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-dasharray: 48 952;
+  stroke-dashoffset: 0;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 4px rgba(255,255,255,.34));
+  animation: op-flow-dash 7.8s linear infinite;
+}
+
+@keyframes op-flow-dash {
+  to {
+    stroke-dashoffset: -1000;
+  }
+}
+
+.runnerDot {
+  fill: #f5f5f2;
+  opacity: .95;
+}
+
+.node circle {
+  fill: #0a0b0b;
+  stroke: rgba(255,255,255,.58);
+  stroke-width: 1.25;
+  vector-effect: non-scaling-stroke;
+}
+
+.node text {
+  fill: rgba(255,255,255,.92);
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: .04em;
+}
+
+.card {
+  --card-bg: var(--op-surface);
+  --card-text: rgba(255,255,255,.93);
+  --card-body: rgba(255,255,255,.62);
+  --card-meta: rgba(255,255,255,.58);
+  --card-border: rgba(255,255,255,.16);
+
+  position: absolute;
+  z-index: 6;
+  width: 18.35%;
+  min-height: 23.7%;
+  padding: 25px 28px 22px;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 1px solid var(--card-border);
+  border-radius: 13px;
+  outline: none;
+  background: var(--card-bg);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.018),
+    0 24px 70px rgba(0,0,0,.20);
+  color: var(--card-text);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition:
+    background-color .55s var(--op-easing),
+    border-color .55s var(--op-easing),
+    color .55s var(--op-easing),
+    transform .55s var(--op-easing),
+    box-shadow .55s var(--op-easing);
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,.24), transparent 34%);
+  transition: opacity .55s var(--op-easing);
+}
+
+.cardTop {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.iconBox {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border: 1px solid var(--card-border);
+  border-radius: 11px;
+  transition:
+    border-color .55s var(--op-easing),
+    background-color .55s var(--op-easing),
+    transform .55s var(--op-easing);
+}
+
+.icon {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: var(--card-text);
+  stroke-width: 1.45;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke .55s var(--op-easing);
+}
+
+.cardNumber {
+  padding-top: 4px;
+  color: var(--card-meta);
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .15em;
+  transition: color .55s var(--op-easing);
+}
+
+.cardEyebrow {
+  position: relative;
+  z-index: 1;
+  display: block;
+  margin-top: 18px;
+  color: var(--card-meta);
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: clamp(9px, .7vw, 11px);
+  font-weight: 500;
+  letter-spacing: .27em;
+  transition: color .55s var(--op-easing);
+}
+
+.card h3 {
+  position: relative;
+  z-index: 1;
+  margin: 10px 0 8px;
+  color: var(--card-text);
+  font-family: var(--font-display), var(--font-sans), Inter, "Helvetica Neue", Arial, sans-serif;
+  font-size: clamp(18px, 1.36vw, 24px);
+  font-weight: 450;
+  letter-spacing: -.034em;
+  line-height: 1.08;
+  transition: color .55s var(--op-easing);
+}
+
+.card p {
+  position: relative;
+  z-index: 1;
+  max-width: 255px;
+  margin: 0;
+  color: var(--card-body);
+  font-family: var(--font-sans), Inter, "Helvetica Neue", Arial, sans-serif;
+  font-size: clamp(13px, 1.02vw, 17px);
+  line-height: 1.52;
+  letter-spacing: -.012em;
+  transition: color .55s var(--op-easing);
+}
+
+.hoverArrow {
+  position: absolute;
+  right: 22px;
+  bottom: 18px;
+  z-index: 1;
+  color: #111;
+  font-size: 19px;
+  opacity: 0;
+  transform: translate(-8px, 8px);
+  transition:
+    opacity .45s var(--op-easing),
+    transform .55s var(--op-easing);
+}
+
+.cardOne {
+  left: 3.5%;
+  top: 34.8%;
+}
+
+.cardTwo {
+  left: 22.8%;
+  top: 63.8%;
+}
+
+.cardThree {
+  left: 41.0%;
+  top: 33.0%;
+}
+
+.cardFour {
+  left: 57.8%;
+  top: 64.6%;
+}
+
+.cardFive {
+  left: 76.0%;
+  top: 31.7%;
+  width: 19.5%;
+}
+
+.card:is(:hover, :focus-visible) {
+  --card-bg: var(--op-surface-hover);
+  --card-text: #0b0b0b;
+  --card-body: rgba(0,0,0,.66);
+  --card-meta: rgba(0,0,0,.54);
+  --card-border: rgba(0,0,0,.18);
+
+  transform: translateY(-7px);
+  box-shadow:
+    0 22px 70px rgba(0,0,0,.34),
+    0 0 0 1px rgba(255,255,255,.06);
+}
+
+.card:is(:hover, :focus-visible)::before {
+  opacity: 1;
+}
+
+.card:is(:hover, :focus-visible) .iconBox {
+  background: rgba(0,0,0,.035);
+  transform: rotate(-2deg) scale(1.025);
+}
+
+.card:is(:hover, :focus-visible) .hoverArrow {
+  opacity: .82;
+  transform: translate(0, 0);
+}
+
+.card:focus-visible {
+  outline: 2px solid rgba(255,255,255,.9);
+  outline-offset: 4px;
+}
+
+.bottomLeft,
+.bottomRight {
+  position: absolute;
+  z-index: 5;
+  color: rgba(255,255,255,.44);
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: clamp(8px, .62vw, 10px);
+  letter-spacing: .28em;
+  line-height: 2.05;
+}
+
+.bottomLeft {
+  left: 4.35%;
+  bottom: 6.9%;
+  display: flex;
+  flex-direction: column;
+}
+
+.smallRule {
+  width: 36px;
+  height: 1px;
+  margin-bottom: 12px;
+  background: rgba(255,255,255,.48);
+}
+
+.bottomRight {
+  right: 4.5%;
+  bottom: 6.7%;
+  display: flex;
+  align-items: stretch;
+  gap: 24px;
+}
+
+.verticalRule {
+  width: 1px;
+  background: rgba(255,255,255,.40);
+}
+
+.bottomRight div {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===========================================
+   RESPONSIVE — switches from the art-directed
+   desktop composition to a clean vertical flow.
+   =========================================== */
+@media (max-width: 980px) {
+  .stage {
+    aspect-ratio: auto;
+    min-height: 0;
+    padding: 72px 24px 80px;
+    box-sizing: border-box;
+  }
+
+  .header,
+  .sideNote,
+  .card,
+  .bottomLeft,
+  .bottomRight {
+    position: relative;
+    inset: auto;
+  }
+
+  .header {
+    width: 100%;
+  }
+
+  .title {
+    margin-top: 22px;
+    font-size: clamp(40px, 8.5vw, 64px);
+  }
+
+  .subtitle br {
+    display: none;
+  }
+
+  .sideNote {
+    margin-top: 36px;
+    justify-content: flex-start;
+  }
+
+  .flow {
+    display: none;
+  }
+
+  .cards {
+    position: relative;
+    z-index: 6;
+    display: grid;
+    gap: 18px;
+    margin-top: 58px;
+  }
+
+  .card {
+    width: 100%;
+    min-height: 0;
+    padding: 24px;
+    border-radius: 12px;
+  }
+
+  .card + .card::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: -19px;
+    width: 1px;
+    height: 18px;
+    background: rgba(255,255,255,.24);
+  }
+
+  .card h3 {
+    font-size: 22px;
+  }
+
+  .card p {
+    font-size: 15px;
+  }
+
+  .bottomLeft {
+    margin-top: 58px;
+  }
+
+  .bottomRight {
+    margin-top: 30px;
+  }
+}
+
+@media (max-width: 560px) {
+  .stage {
+    padding: 54px 18px 64px;
+  }
+
+  .kickerRule {
+    width: 34px;
+  }
+
+  .title {
+    font-size: 38px;
+  }
+
+  .iconBox {
+    width: 52px;
+    height: 52px;
+  }
+
+  .sideNote {
+    gap: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flowRunner {
+    animation: none;
+    stroke-dasharray: none;
+    opacity: .26;
+  }
+
+  .runnerDot {
+    display: none;
+  }
+
+  .card,
+  .iconBox,
+  .hoverArrow,
+  .card::before {
+    transition-duration: .01ms !important;
+  }
+}

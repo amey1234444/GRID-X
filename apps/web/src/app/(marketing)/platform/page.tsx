@@ -1,21 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import {
-  ArrowRight,
-  ClipboardCheck,
-  FileLock2,
-  Gauge,
-  Layers,
-  PackageSearch,
-  Wallet,
-} from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 import { AmbientLines } from '@/components/marketing/ambient-lines';
 import { ExperienceShowcase } from '@/components/marketing/experience-showcase';
 import { ModuleExplorer, type ProductModule } from '@/components/marketing/module-explorer';
+import { OperatingPrinciples } from '@/components/marketing/operating-principles';
 import {
   Eyebrow,
-  FeatureBand,
   MetricBand,
   MiniRow,
   MiniSurface,
@@ -225,34 +217,6 @@ const explorerModules: ProductModule[] = modules.map(
   }),
 );
 
-const surface = [
-  {
-    icon: <Layers />,
-    title: 'One record',
-    detail:
-      'Every module writes to the same job, so no screen holds a private version of the truth.',
-  },
-  {
-    icon: <FileLock2 />,
-    title: 'Controlled by default',
-    detail: 'Access is scoped, time-bound and logged rather than granted and forgotten.',
-  },
-  {
-    icon: <ClipboardCheck />,
-    title: 'Evidence at each gate',
-    detail: 'Work advances on a recorded result, never on an assurance.',
-  },
-  {
-    icon: <Gauge />,
-    title: 'Continuously scored',
-    detail: 'Partner performance updates as the work happens, not at review time.',
-  },
-  {
-    icon: <Wallet />,
-    title: 'Audited to payment',
-    detail: 'The trail runs unbroken from released drawing to approved payment.',
-  },
-];
 
 const scale = [
   { value: '14', label: 'Modules covering the full outsourcing lifecycle' },
@@ -354,7 +318,7 @@ export default function PlatformPage(): React.JSX.Element {
         linkLabel="Explore the control modules"
       />
 
-      <FeatureBand items={surface} />
+      <OperatingPrinciples />
 
       <section
         id="modules"
