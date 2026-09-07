@@ -195,20 +195,23 @@ sync, it does not block closing a job or approving an invoice.
 
 ```dotenv
 IMS_ENABLED=true
-IMS_DATABASE_URL="postgresql://gridx_ims:••••@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres"
+IMS_DATABASE_URL="postgresql://gridx_ims:••••@ep-xxxx-pooler.REGION.aws.neon.tech/neondb"
 IMS_DATABASE_SCHEMA=ims
-IMS_DB_SSL=no-verify
 IMS_ORG_ID="<the OSWAR organisation's uuid>"
 ```
 
-All four are required, and two of them are the usual reason a first attempt reads
-nothing:
+Three notes, two of which are the usual reason a first attempt reads nothing:
 
-* **`IMS_DATABASE_SCHEMA=ims`, not `public`.** The IMS shares a Supabase database with
-  the CRM, which owns `public`; every IMS table lives in `ims`. Its own `DATABASE_URL`
-  carries `?schema=ims`. A wrong schema here reads as "no tables found".
-* **`IMS_DB_SSL=no-verify`.** Supabase serves a certificate Node will not verify against
-  its bundled root store. The connection is still encrypted; only the chain is unchecked. `IMS_DRIVER` defaults to `auto`, which sees a database URL and picks
+* **`IMS_DATABASE_SCHEMA=ims`, not `public`.** The IMS keeps every table in the `ims`
+  schema; its own `DATABASE_URL` carries `?schema=ims`. A wrong schema here reads as
+  "no tables found".
+* **Strip the IMS's query parameters from the URL.** `?schema=` is Prisma-only (GRID-X
+  uses `IMS_DATABASE_SCHEMA`), `sslmode=` is overridden by the explicit `ssl` option
+  GRID-X builds from `IMS_DB_SSL`, and node-postgres does not implement
+  `channel_binding=`. Keep the host, database and credentials.
+* **Prefer the pooler endpoint** (`-pooler` in the host) for GRID-X's many short reads.
+  If the pooler rejects the connection over the `statement_timeout` startup parameter,
+  use the direct host instead. `IMS_DRIVER` defaults to `auto`, which sees a database URL and picks
 the direct driver; `IMS_MAPPING_PROFILE` defaults to `oswar`; `IMS_WRITE_MODE` defaults
 to `outbox`; the scheduled inbound sync turns itself on.
 

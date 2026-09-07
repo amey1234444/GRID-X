@@ -152,17 +152,17 @@ services:
       # rather than pulling every organisation's materials into GRID-X.
       - key: IMS_ORG_ID
         sync: false
-      # The OSWAR IMS lives in the "ims" schema, not public — that belongs to the
-      # CRM on the same Supabase database.
+      # The OSWAR IMS keeps every table in the "ims" schema, not public.
       - key: IMS_DATABASE_SCHEMA
         value: ims
       - key: IMS_DB_POOL_MAX
         value: "5"
       - key: IMS_DB_STATEMENT_TIMEOUT_MS
         value: "15000"
-      # Managed Postgres providers hand out certificates Node will not verify.
+      # Neon presents a publicly-trusted certificate, so full verification works.
+      # Drop to no-verify only if a certificate error appears in the logs.
       - key: IMS_DB_SSL
-        value: no-verify
+        value: require
       - key: IMS_MAPPING_PROFILE
         value: oswar
       # Per-entity overrides as inline JSON — a mounted file is awkward on Render.
