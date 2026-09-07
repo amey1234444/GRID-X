@@ -60,6 +60,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }):
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`${inter.variable} ${interTight.variable} ${ibmPlexMono.variable} font-sans`}>
+        {/*
+          Framer Motion serialises the hidden half of a reveal into the markup —
+          every <Reveal> ships as style="opacity:0;transform:translateY(16px)"
+          and is only cleared once the bundle runs. Without this the marketing
+          pages render almost entirely blank to anyone whose JavaScript has not
+          arrived: no-JS visitors, a failed or blocked chunk, and the crawlers
+          that do not execute scripts. The reveal is decoration; the copy is the
+          product.
+        */}
+        <noscript>
+          {/* Set as raw HTML deliberately: React escapes text children, and a
+              <style> element's contents are raw text to the parser, so the
+              quotes in the attribute selector would arrive as &quot; and the
+              rule would never match. */}
+          <style
+            dangerouslySetInnerHTML={{
+              __html: '[style*="opacity:0"]{opacity:1!important;transform:none!important}',
+            }}
+          />
+        </noscript>
         <ThemeProvider>
           <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
           <Toaster position="top-right" theme="dark" richColors closeButton />

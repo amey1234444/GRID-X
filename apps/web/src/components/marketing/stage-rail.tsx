@@ -112,7 +112,7 @@ export function StageRail({ stages }: { stages: Stage[] }): React.JSX.Element {
               if (node) sectionRefs.current.set(stage.id, node);
               else sectionRefs.current.delete(stage.id);
             }}
-            className="linear-frame relative scroll-mt-28 space-y-8 overflow-hidden rounded-[18px] border border-border-strong p-5 sm:p-8 lg:p-10"
+            className="linear-frame relative scroll-mt-24 space-y-8 overflow-hidden rounded-[18px] border border-border-strong p-5 sm:p-8 lg:p-10"
           >
             <div className="flex items-start gap-4 sm:gap-6">
               <span className="mt-1 font-mono text-[0.75rem] font-medium text-brand">

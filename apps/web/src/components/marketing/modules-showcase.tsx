@@ -80,6 +80,10 @@ export function ModulesShowcase({ modules }: { modules: ShowcaseModule[] }): Rea
       <div className={styles.grid} aria-hidden />
       <div className={styles.noise} aria-hidden />
 
+      <div className={styles.heroPhoto} aria-hidden>
+        <div className={styles.heroPhotoImage} />
+      </div>
+
       <div className={styles.inner}>
         <header className={styles.hero}>
           <div className={styles.heroContent}>
@@ -94,10 +98,6 @@ export function ModulesShowcase({ modules }: { modules: ShowcaseModule[] }): Rea
               <br className={styles.desktopBreak} />
               decision to outsource through to the payment that closes it.
             </p>
-          </div>
-
-          <div className={styles.heroPhoto} aria-hidden>
-            <div className={styles.heroPhotoImage} />
           </div>
 
           <BlueprintWireframe />

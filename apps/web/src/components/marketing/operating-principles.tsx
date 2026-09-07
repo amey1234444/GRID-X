@@ -126,9 +126,9 @@ const nodes = [
 export function OperatingPrinciples(): React.JSX.Element {
   return (
     <section className={styles.section} aria-labelledby="operating-principles-title">
-      <div className={styles.stage}>
-        <div className={styles.backgroundGrid} aria-hidden />
+      <div className={styles.backgroundGrid} aria-hidden />
 
+      <div className={styles.stage}>
         <header className={styles.header}>
           <div className={styles.kicker}>
             <span>OPERATING PRINCIPLES</span>

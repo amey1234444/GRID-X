@@ -31,7 +31,8 @@
   --op-surface: rgba(13, 14, 14, 0.78);
   --op-surface-hover: #f1f1ee;
   --op-text: #f0f0ed;
-  --op-easing: cubic-bezier(0.22, 1, 0.36, 1);
+  /* The product's easing token, so these sections move like the rest of it. */
+  --op-easing: var(--ease-out-expo);
 
   position: relative;
   width: 100%;
@@ -75,7 +76,7 @@
   container-type: inline-size;
 }
 
-.stage::after {
+.section::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -88,6 +89,8 @@
   position: absolute;
   inset: 0;
   z-index: 0;
+  /* Sized against the viewport, not the canvas, so the ruling runs edge to edge
+     with no seam where the container stops. */
   opacity: .12;
   pointer-events: none;
   background-image:
@@ -179,6 +182,13 @@
   height: 100%;
   pointer-events: none;
   overflow: visible;
+  /*
+   * The path is drawn from -20 to 1692 on a 1672 canvas — it is meant to run
+   * off both ends. The canvas is now the container width, so without this the
+   * line would stop dead at the edge of the text column. Fading it instead
+   * reads as the line continuing past the page.
+   */
+  mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent);
 }
 
 .flowBase,

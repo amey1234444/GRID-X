@@ -113,6 +113,10 @@
 
   html {
     color-scheme: dark;
+    /* In-page anchors (the nav links straight into /platform#allocation and its
+       siblings) glide rather than jump. The reduced-motion block below puts
+       this back to `auto`. */
+    scroll-behavior: smooth;
   }
 
   body {

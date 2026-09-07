@@ -359,7 +359,7 @@ export default function PlatformPage(): React.JSX.Element {
 
       <section
         id="modules"
-        className="scroll-mt-16"
+        className="scroll-mt-24"
       >
         <ModulesShowcase modules={showcaseModules} />
       </section>
