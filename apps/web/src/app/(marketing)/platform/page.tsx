@@ -5,6 +5,7 @@ import { ArrowRight } from 'lucide-react';
 import { AmbientLines } from '@/components/marketing/ambient-lines';
 import { ExperienceShowcase } from '@/components/marketing/experience-showcase';
 import { ModuleExplorer, type ProductModule } from '@/components/marketing/module-explorer';
+import { ModulesShowcase, type ShowcaseModule } from '@/components/marketing/modules-showcase';
 import { OperatingPrinciples } from '@/components/marketing/operating-principles';
 import {
   Eyebrow,
@@ -39,6 +40,8 @@ export const metadata: Metadata = {
 const modules = [
   {
     id: 'allocation',
+    timelineLabel: 'Demand',
+    art: '/modules/demand.jpg',
     iconName: 'Layers',
     label: 'Module 01 — 02',
     title: 'Demand, jobs and allocation',
@@ -61,6 +64,8 @@ const modules = [
   },
   {
     id: 'drawings',
+    timelineLabel: 'Drawings',
+    art: '/modules/drawing.jpg',
     iconName: 'FileLock2',
     label: 'Module 03',
     title: 'Drawing and revision control',
@@ -83,6 +88,8 @@ const modules = [
   },
   {
     id: 'material',
+    timelineLabel: 'Materials',
+    art: '/modules/materials.jpg',
     iconName: 'PackageSearch',
     label: 'Module 06',
     title: 'Material issue and reconciliation',
@@ -105,6 +112,8 @@ const modules = [
   },
   {
     id: 'quality',
+    timelineLabel: 'Quality',
+    art: '/modules/quality.jpg',
     iconName: 'ClipboardCheck',
     label: 'Module 08 — 09',
     title: 'Quality, rejection and rework',
@@ -127,6 +136,8 @@ const modules = [
   },
   {
     id: 'payments',
+    timelineLabel: 'Commercials',
+    art: '/modules/invoice.jpg',
     iconName: 'Wallet',
     label: 'Module 11',
     title: 'Commercials and payments',
@@ -149,6 +160,8 @@ const modules = [
   },
   {
     id: 'insight',
+    timelineLabel: 'Reports',
+    art: '/modules/reports.jpg',
     iconName: 'Gauge',
     label: 'Module 12 — 14',
     title: 'Dashboards, scorecards and reports',
@@ -203,6 +216,30 @@ const moduleRows: Record<string, ProductModule['rows']> = {
     { label: 'Items needing action', value: '3', tone: 'warning' },
   ],
 };
+
+/*
+ * The showcase and the explorer are two views of one list. The showcase is the
+ * index — six stages, two live rows each; the explorer below is the detail. The
+ * showcase links into it by anchor, which is also what the primary nav and the
+ * footer link to.
+ */
+const showcaseModules: ShowcaseModule[] = modules.map(
+  ({ id, label, title, rule, timelineLabel, art }, index) => ({
+    id,
+    index: String(index + 1).padStart(2, '0'),
+    label: label.toUpperCase(),
+    timelineLabel: timelineLabel.toUpperCase(),
+    title,
+    description: rule,
+    image: art,
+    // Two rows is what the card has room for; the explorer shows the rest.
+    metrics: (moduleRows[id] ?? []).slice(0, 2).map((row) => ({
+      label: row.label,
+      value: row.value,
+      good: row.tone === 'live',
+    })),
+  }),
+);
 
 const explorerModules: ProductModule[] = modules.map(
   ({ id, label, title, rule, detail, points, iconName }) => ({
@@ -322,15 +359,19 @@ export default function PlatformPage(): React.JSX.Element {
 
       <section
         id="modules"
-        className="section-blueprint scroll-mt-16 border-b border-border-subtle py-24 sm:py-32"
+        className="scroll-mt-16"
       >
+        <ModulesShowcase modules={showcaseModules} />
+      </section>
+
+      <section className="section-blueprint border-b border-border-subtle py-24 sm:py-32">
         <div className="container">
           <Reveal className="grid gap-10 lg:grid-cols-[0.7fr_1.3fr] lg:gap-24">
-            <h2 className="type-hero">The modules</h2>
+            <h2 className="type-hero">Every control, in full</h2>
             <div className="max-w-2xl">
               <p className="text-[clamp(1.125rem,1.8vw,1.5rem)] leading-[1.45] tracking-[-0.025em] text-muted-foreground">
-                Listed in the order the work actually moves — from the decision to outsource through
-                to the payment that closes it.
+                The same six modules, opened up — the rule each one enforces and the mechanics that
+                make it true.
               </p>
               <p className="mt-5 font-mono text-[0.625rem] uppercase tracking-[0.11em] text-subtle">
                 Select a module to inspect its controls and live record

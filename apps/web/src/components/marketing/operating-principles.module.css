@@ -14,6 +14,19 @@
  * descendant would quietly fall back to currentColor.
  */
 .section {
+  /*
+   * --op-k is one "design pixel": the canvas was drawn 1672px wide, so at any
+   * rendered width 1cqi is 1% of the stage and 100cqi/1672 is exactly one unit
+   * of the original composition. Every fixed dimension below is expressed in
+   * it, so the whole thing scales as one piece instead of the type and padding
+   * staying put while the layout shrinks around them.
+   *
+   * Below the desktop breakpoint the canvas is gone and the cards are a plain
+   * vertical stack, so the unit falls back to a real pixel and each value
+   * resolves to the size it was authored at.
+   */
+  --op-k: 1px;
+
   --op-bg: #080909;
   --op-surface: rgba(13, 14, 14, 0.78);
   --op-surface-hover: #f1f1ee;
@@ -23,22 +36,43 @@
   position: relative;
   width: 100%;
   overflow: hidden;
-  background: var(--op-bg);
+  /* The glows live out here so they run the full bleed rather than being cut
+     off at the edge of the stage. */
+  background:
+    radial-gradient(700px 460px at 4% 0%, rgba(255, 255, 255, 0.065), transparent 64%),
+    radial-gradient(680px 420px at 94% 92%, rgba(255, 255, 255, 0.025), transparent 70%),
+    var(--op-bg);
   color: var(--op-text);
   isolation: isolate;
+  border-bottom: 1px solid hsl(var(--border-subtle));
+  padding-block: 6rem;
+}
+
+@media (min-width: 640px) {
+  .section {
+    padding-block: 8rem;
+  }
+}
+
+@media (min-width: 981px) {
+  .section {
+    --op-k: calc(100cqi / 1672);
+  }
 }
 
 .stage {
+  /*
+   * Matches the content box of the site container (max-width 1280px less its
+   * 1.5rem gutters), so this section lines up with every other one on the page
+   * instead of running wider than them. The canvas keeps its ratio, so the
+   * whole composition scales rather than reflowing.
+   */
   position: relative;
-  width: min(100%, 1672px);
+  width: min(100% - 3rem, 1232px);
   aspect-ratio: 1672 / 941;
-  min-height: 760px;
   margin: 0 auto;
   overflow: hidden;
-  background:
-    radial-gradient(700px 460px at 4% 0%, rgba(255,255,255,.065), transparent 64%),
-    radial-gradient(680px 420px at 94% 92%, rgba(255,255,255,.025), transparent 70%),
-    #080909;
+  container-type: inline-size;
 }
 
 .stage::after {
@@ -74,10 +108,10 @@
 .kicker {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: calc(20 * var(--op-k));
   width: fit-content;
   color: rgba(255,255,255,.60);
-  font-size: clamp(9px, .7vw, 12px);
+  font-size: calc(12 * var(--op-k));
   font-weight: 500;
   letter-spacing: .33em;
   line-height: 1;
@@ -85,17 +119,17 @@
 
 .kickerRule {
   display: inline-block;
-  width: 50px;
+  width: calc(50 * var(--op-k));
   height: 1px;
   background: rgba(255,255,255,.34);
 }
 
 .title {
-  margin: 27px 0 12px;
-  max-width: 860px;
+  margin: calc(27 * var(--op-k)) 0 calc(12 * var(--op-k));
+  max-width: calc(860 * var(--op-k));
   color: #efefec;
   font-family: var(--font-display), var(--font-sans), Inter, "Helvetica Neue", Arial, sans-serif;
-  font-size: clamp(36px, 3.56vw, 60px);
+  font-size: calc(60 * var(--op-k));
   font-weight: 400;
   letter-spacing: -.045em;
   line-height: 1.02;
@@ -105,7 +139,7 @@
   margin: 0;
   color: rgba(255,255,255,.60);
   font-family: var(--font-sans), Inter, "Helvetica Neue", Arial, sans-serif;
-  font-size: clamp(14px, 1.24vw, 20px);
+  font-size: calc(20 * var(--op-k));
   font-weight: 400;
   letter-spacing: -.015em;
   line-height: 1.46;
@@ -117,18 +151,18 @@
   top: 11.25%;
   right: 4.35%;
   display: flex;
-  gap: 24px;
+  gap: calc(24 * var(--op-k));
   align-items: stretch;
   color: rgba(255,255,255,.47);
   font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: clamp(8px, .67vw, 11px);
+  font-size: calc(11 * var(--op-k));
   letter-spacing: .29em;
   line-height: 2.3;
 }
 
 .sideNoteRule {
   width: 1px;
-  min-height: 76px;
+  min-height: calc(76 * var(--op-k));
   background: rgba(255,255,255,.34);
 }
 
@@ -208,11 +242,11 @@
   z-index: 6;
   width: 18.35%;
   min-height: 23.7%;
-  padding: 25px 28px 22px;
+  padding: calc(25 * var(--op-k)) calc(28 * var(--op-k)) calc(22 * var(--op-k));
   box-sizing: border-box;
   overflow: hidden;
   border: 1px solid var(--card-border);
-  border-radius: 13px;
+  border-radius: calc(13 * var(--op-k));
   outline: none;
   background: var(--card-bg);
   box-shadow:
@@ -249,11 +283,11 @@
 
 .iconBox {
   display: grid;
-  width: 58px;
-  height: 58px;
+  width: calc(58 * var(--op-k));
+  height: calc(58 * var(--op-k));
   place-items: center;
   border: 1px solid var(--card-border);
-  border-radius: 11px;
+  border-radius: calc(11 * var(--op-k));
   transition:
     border-color .55s var(--op-easing),
     background-color .55s var(--op-easing),
@@ -261,8 +295,8 @@
 }
 
 .icon {
-  width: 30px;
-  height: 30px;
+  width: calc(30 * var(--op-k));
+  height: calc(30 * var(--op-k));
   fill: none;
   stroke: var(--card-text);
   stroke-width: 1.45;
@@ -272,10 +306,10 @@
 }
 
 .cardNumber {
-  padding-top: 4px;
+  padding-top: calc(4 * var(--op-k));
   color: var(--card-meta);
   font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-size: calc(12 * var(--op-k));
   font-weight: 500;
   letter-spacing: .15em;
   transition: color .55s var(--op-easing);
@@ -285,10 +319,10 @@
   position: relative;
   z-index: 1;
   display: block;
-  margin-top: 18px;
+  margin-top: calc(18 * var(--op-k));
   color: var(--card-meta);
   font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: clamp(9px, .7vw, 11px);
+  font-size: calc(11 * var(--op-k));
   font-weight: 500;
   letter-spacing: .27em;
   transition: color .55s var(--op-easing);
@@ -297,10 +331,10 @@
 .card h3 {
   position: relative;
   z-index: 1;
-  margin: 10px 0 8px;
+  margin: calc(10 * var(--op-k)) 0 calc(8 * var(--op-k));
   color: var(--card-text);
   font-family: var(--font-display), var(--font-sans), Inter, "Helvetica Neue", Arial, sans-serif;
-  font-size: clamp(18px, 1.36vw, 24px);
+  font-size: calc(24 * var(--op-k));
   font-weight: 450;
   letter-spacing: -.034em;
   line-height: 1.08;
@@ -310,11 +344,11 @@
 .card p {
   position: relative;
   z-index: 1;
-  max-width: 255px;
+  max-width: calc(255 * var(--op-k));
   margin: 0;
   color: var(--card-body);
   font-family: var(--font-sans), Inter, "Helvetica Neue", Arial, sans-serif;
-  font-size: clamp(13px, 1.02vw, 17px);
+  font-size: calc(17 * var(--op-k));
   line-height: 1.52;
   letter-spacing: -.012em;
   transition: color .55s var(--op-easing);
@@ -322,11 +356,11 @@
 
 .hoverArrow {
   position: absolute;
-  right: 22px;
-  bottom: 18px;
+  right: calc(22 * var(--op-k));
+  bottom: calc(18 * var(--op-k));
   z-index: 1;
   color: #111;
-  font-size: 19px;
+  font-size: calc(19 * var(--op-k));
   opacity: 0;
   transform: translate(-8px, 8px);
   transition:
@@ -398,7 +432,7 @@
   z-index: 5;
   color: rgba(255,255,255,.44);
   font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: clamp(8px, .62vw, 10px);
+  font-size: calc(10 * var(--op-k));
   letter-spacing: .28em;
   line-height: 2.05;
 }
@@ -411,9 +445,9 @@
 }
 
 .smallRule {
-  width: 36px;
+  width: calc(36 * var(--op-k));
   height: 1px;
-  margin-bottom: 12px;
+  margin-bottom: calc(12 * var(--op-k));
   background: rgba(255,255,255,.48);
 }
 
@@ -422,7 +456,7 @@
   bottom: 6.7%;
   display: flex;
   align-items: stretch;
-  gap: 24px;
+  gap: calc(24 * var(--op-k));
 }
 
 .verticalRule {
@@ -463,6 +497,10 @@
   .title {
     margin-top: 22px;
     font-size: clamp(40px, 8.5vw, 64px);
+  }
+
+  .subtitle {
+    font-size: 17px;
   }
 
   .subtitle br {
