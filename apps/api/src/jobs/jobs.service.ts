@@ -1200,6 +1200,39 @@ export class JobsService {
     return cancelled;
   }
 
+  /**
+   * Section 24 — the planning board moves a job by dragging its card into another lane.
+   *
+   * This is the same guarded transition every other module uses, with two additions the board
+   * needs: the caller is scope-checked (a partner user must not drag another partner's job), and
+   * a move into a terminal lane releases the capacity the job was holding, exactly as `cancel`
+   * does. Anything the workflow does not allow is rejected by `assertTransition` with the list of
+   * legal destinations, so the board can tell the user why a drop bounced.
+   */
+  async moveStage(
+    actor: RequestUser,
+    id: string,
+    toStatus: JobStatus,
+    reason?: string,
+  ): Promise<GridJob> {
+    const before = await this.assertJobScope(actor, id);
+    if (before.status === toStatus) return before;
+
+    const moved = await this.transition(actor, id, toStatus, reason);
+    if (RELEASES_CAPACITY.includes(toStatus)) await this.capacity.release(id);
+
+    await this.audit.record(actor, {
+      action: 'JOB_STAGE_MOVED',
+      entityType: 'GridJob',
+      entityId: id,
+      companyId: before.companyId,
+      before: { status: before.status },
+      after: { status: toStatus },
+    });
+
+    return moved;
+  }
+
   /** Single guarded status change used by every module that advances a job. */
   async transition(
     actor: RequestUser | null,
@@ -1235,6 +1268,12 @@ export class JobsService {
  * Accepting the job and confirming material receipt are deliberately not here: a partner has to be
  * able to take a job and receive steel before they have opened the drawing.
  */
+/**
+ * Statuses that end a job's claim on partner capacity. A cancelled or closed job must not keep
+ * counting against the partner's declared hours, or the allocation engine slowly starves.
+ */
+const RELEASES_CAPACITY: JobStatus[] = ['CANCELLED', 'CLOSED'];
+
 const PRODUCTION_MILESTONES: MilestoneType[] = [
   'PRODUCTION_STARTED',
   'FIRST_PIECE_READY',

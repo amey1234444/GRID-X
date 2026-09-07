@@ -1,10 +1,10 @@
-import { AlertTriangle, Check, Minus } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
+import { PROCESS_LABELS, type ProcessType } from '@gridx/shared';
 
+import { CapabilityCoverage } from '@/components/app/capability-coverage';
 import { PageHeader } from '@/components/app/page-header';
 import { StatCard } from '@/components/app/stat-card';
-import { StatusBadge } from '@/components/app/status-badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { humanise } from '@/lib/format';
 import { apiGet } from '@/lib/session';
 import type { CapabilityMatrix } from '@/lib/types';
 
@@ -25,6 +25,14 @@ export default async function CapabilityMatrixPage(): Promise<React.JSX.Element>
     (row) => row.allocatablePartners > 0 && row.allocatablePartners <= THIN_COVER,
   );
 
+  // A capability nobody has signed off is a promise, not capacity. Counting them separately keeps
+  // the "we can do this" number honest.
+  const declaredOnly = matrix.partners.reduce(
+    (sum, partner) =>
+      sum + Object.values(partner.capabilities).filter((capability) => !capability.approved).length,
+    0,
+  );
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -33,17 +41,33 @@ export default async function CapabilityMatrixPage(): Promise<React.JSX.Element>
         description="Which processes the network can actually run, and how many partners stand behind each one."
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Active partners" value={String(matrix.partners.length)} />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Active partners"
+          value={String(matrix.partners.length)}
+          icon="Factory"
+          hint="in the matrix"
+        />
         <StatCard
           label="Processes with no cover"
           value={String(uncovered.length)}
-          hint="Nobody allocatable can run these"
+          tone={uncovered.length > 0 ? 'destructive' : 'default'}
+          icon="AlertTriangle"
+          hint="nobody allocatable can run these"
         />
         <StatCard
           label="Thinly covered"
           value={String(thin.length)}
+          tone={thin.length > 0 ? 'warning' : 'default'}
+          icon="AlertCircle"
           hint={`${THIN_COVER} allocatable partners or fewer`}
+        />
+        <StatCard
+          label="Declared, not approved"
+          value={String(declaredOnly)}
+          tone={declaredOnly > 0 ? 'warning' : 'default'}
+          icon="ClipboardCheck"
+          hint="capabilities awaiting audit"
         />
       </div>
 
@@ -62,86 +86,20 @@ export default async function CapabilityMatrixPage(): Promise<React.JSX.Element>
                 key={row.process}
                 className={
                   row.allocatablePartners === 0
-                    ? 'inline-flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/10 px-2.5 py-1 text-xs text-destructive'
-                    : 'inline-flex items-center gap-1.5 rounded-md border border-warning/40 bg-warning/10 px-2.5 py-1 text-xs'
+                    ? 'inline-flex items-center gap-1.5 rounded-control bg-destructive/10 px-2.5 py-1 text-[0.75rem] text-destructive shadow-[inset_0_0_0_1px_hsl(var(--destructive)/0.28)]'
+                    : 'inline-flex items-center gap-1.5 rounded-control bg-warning/10 px-2.5 py-1 text-[0.75rem] text-warning shadow-[inset_0_0_0_1px_hsl(var(--warning)/0.28)]'
                 }
               >
-                <AlertTriangle className="h-3 w-3" />
-                {humanise(row.process)} · {row.allocatablePartners} allocatable
+                <AlertTriangle className="h-3 w-3" aria-hidden />
+                {PROCESS_LABELS[row.process as ProcessType] ?? row.process} ·{' '}
+                {row.allocatablePartners} allocatable
               </span>
             ))}
           </CardContent>
         </Card>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Partners by process</CardTitle>
-          <CardDescription>
-            A tick is an approved capability. A dash means the partner declared it but it has not
-            been approved, and blank means they do not offer it at all.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[52rem] border-collapse text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-                  <th className="sticky left-0 bg-card px-3 py-2 font-medium">Partner</th>
-                  {matrix.processes.map((process) => (
-                    <th key={process} className="px-2 py-2 text-center font-medium">
-                      <span className="block whitespace-nowrap">{humanise(process)}</span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {matrix.partners.map((partner) => (
-                  <tr key={partner.id} className="border-b last:border-0">
-                    <td className="sticky left-0 bg-card px-3 py-2">
-                      <a
-                        href={`/app/partners/${partner.id}`}
-                        className="block font-medium hover:underline"
-                      >
-                        {partner.businessName}
-                      </a>
-                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        {partner.city}
-                        <StatusBadge status={partner.approvalStatus} className="scale-90" />
-                      </span>
-                    </td>
-                    {matrix.processes.map((process) => {
-                      const capability = partner.capabilities[process];
-                      return (
-                        <td key={process} className="px-2 py-2 text-center">
-                          {!capability ? (
-                            <span className="text-muted-foreground/30">·</span>
-                          ) : capability.approved ? (
-                            <Check
-                              className={
-                                partner.allocatable
-                                  ? 'mx-auto h-4 w-4 text-success'
-                                  : 'mx-auto h-4 w-4 text-muted-foreground'
-                              }
-                            />
-                          ) : (
-                            <Minus className="mx-auto h-4 w-4 text-muted-foreground" />
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {matrix.partners.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              No active partners yet.
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
+      <CapabilityCoverage matrix={matrix} />
     </div>
   );
 }

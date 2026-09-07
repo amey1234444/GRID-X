@@ -53,7 +53,7 @@ export function PartnerInvoicesScreen(): React.JSX.Element {
     return (
       <Screen>
         <View style={screenStyles.list}>
-          <ScreenHeader title="Payments" />
+          <ScreenHeader title="Payments" icon="wallet-outline" />
           <LoadingState />
         </View>
       </Screen>
@@ -82,7 +82,7 @@ export function PartnerInvoicesScreen(): React.JSX.Element {
         refreshControl={<Refresher refreshing={refreshing} onRefresh={refresh} />}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         ListHeaderComponent={
-          <ScreenHeader title="Payments" subtitle={`${formatMoney(outstanding)} outstanding`} />
+          <ScreenHeader title="Payments" subtitle={`${formatMoney(outstanding)} outstanding`} icon="wallet-outline" />
         }
         ListEmptyComponent={
           <EmptyState
@@ -141,7 +141,7 @@ export function PartnerScorecardScreen(): React.JSX.Element {
     return (
       <Screen>
         <View style={screenStyles.list}>
-          <ScreenHeader title="Scorecard" />
+          <ScreenHeader title="Scorecard" icon="stats-chart-outline" />
           <LoadingState />
         </View>
       </Screen>
@@ -164,7 +164,7 @@ export function PartnerScorecardScreen(): React.JSX.Element {
         contentContainerStyle={screenStyles.list}
         refreshControl={<Refresher refreshing={refreshing} onRefresh={refresh} />}
       >
-        <ScreenHeader title="Scorecard" subtitle="Rated monthly on quality, delivery and cost" />
+        <ScreenHeader title="Scorecard" subtitle="Rated monthly on quality, delivery and cost" icon="stats-chart-outline" />
 
         {!latest ? (
           <EmptyState

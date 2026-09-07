@@ -19,7 +19,7 @@ export function PartnerInspectionsScreen(): React.JSX.Element {
     return (
       <Screen>
         <View style={screenStyles.list}>
-          <ScreenHeader title="Inspections" />
+          <ScreenHeader title="Inspections" icon="shield-checkmark-outline" />
           <LoadingState />
         </View>
       </Screen>
@@ -48,6 +48,7 @@ export function PartnerInspectionsScreen(): React.JSX.Element {
         ListHeaderComponent={
           <ScreenHeader
             title="Inspections"
+            icon="shield-checkmark-outline"
             subtitle={open > 0 ? `${open} awaiting a verdict` : 'All closed'}
           />
         }
@@ -99,7 +100,7 @@ export function PartnerReworkScreen(): React.JSX.Element {
     return (
       <Screen>
         <View style={screenStyles.list}>
-          <ScreenHeader title="Rework" />
+          <ScreenHeader title="Rework" icon="repeat-outline" />
           <LoadingState />
         </View>
       </Screen>
@@ -124,7 +125,7 @@ export function PartnerReworkScreen(): React.JSX.Element {
         contentContainerStyle={screenStyles.list}
         refreshControl={<Refresher refreshing={refreshing} onRefresh={refresh} />}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
-        ListHeaderComponent={<ScreenHeader title="Rework" subtitle="Batches sent back for correction" />}
+        ListHeaderComponent={<ScreenHeader title="Rework" subtitle="Batches sent back for correction" icon="repeat-outline" />}
         ListEmptyComponent={
           <EmptyState icon="repeat-outline" title="No rework" description="Nothing has been sent back." />
         }

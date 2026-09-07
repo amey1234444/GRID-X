@@ -173,6 +173,36 @@ replays the Prisma migrations against a throwaway PostgreSQL 16 service to catch
 a `schema.prisma` edited without a matching migration — see
 `.github/workflows/ci.yml`.
 
+## IMS integration
+
+GRID-X connects to the OSWAR IMS **directly over its PostgreSQL database**. Set two
+variables and the boundary is live:
+
+```dotenv
+IMS_ENABLED=true
+IMS_DATABASE_URL="postgresql://gridx_ims:…@ims-db.internal:5432/ims"
+```
+
+Masters (`companies`, `items`, `products`) are pulled incrementally every 30 minutes;
+sales orders, work orders and stock are read live and never copied. Outsourcing facts —
+job status, material issued, rejected quantities, conversion cost, invoices, completion
+dates — are written to `gridx.ims_outbound_fact`, a table GRID-X owns inside the IMS
+database, and replayed with backoff until the IMS accepts them.
+
+GRID-X never writes to a table the IMS owns: reads run inside a `READ ONLY` transaction,
+and the IMS schema is reached through a **mapping** (table and column names per entity)
+rather than hardcoded, so a renamed column is a config edit rather than a release.
+
+```bash
+pnpm ims:introspect          # what is actually in the IMS schema, vs what the mapping expects
+pnpm ims:introspect --write  # generate a candidate mapping file
+pnpm ims:outbox              # create the outbox (only if GRID-X's role may not create schemas)
+```
+
+The REST transport is still there and is one variable away (`IMS_DRIVER=http`). Full
+detail — mapping syntax, least-privilege grants, the outbox contract, bring-up runbook
+and troubleshooting — is in [docs/13-ims-integration.md](docs/13-ims-integration.md).
+
 ## File uploads
 
 Drawings, photographs, partner documents and invoice copies are uploaded through

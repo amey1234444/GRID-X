@@ -119,7 +119,7 @@ export function InspectorTodayScreen({ navigation }: InspectorScreenProps<'Inspe
     return (
       <Screen>
         <View style={screenStyles.list}>
-          <ScreenHeader title="Today" />
+          <ScreenHeader title="Today" icon="today-outline" />
           <LoadingState />
         </View>
       </Screen>
@@ -144,6 +144,7 @@ export function InspectorTodayScreen({ navigation }: InspectorScreenProps<'Inspe
       >
         <ScreenHeader
           title={`Hello, ${user?.name.split(' ')[0] ?? 'Inspector'}`}
+          icon="today-outline"
           subtitle={
             summary.open === 0
               ? 'Your queue is clear'
@@ -279,7 +280,7 @@ export function InspectionQueueScreen({
     return (
       <Screen>
         <View style={screenStyles.list}>
-          <ScreenHeader title="Queue" />
+          <ScreenHeader title="Queue" icon="list-outline" />
           <LoadingState />
         </View>
       </Screen>
@@ -304,7 +305,7 @@ export function InspectionQueueScreen({
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         ListHeaderComponent={
           <View style={styles.queueHeader}>
-            <ScreenHeader title="Queue" subtitle="Inspections assigned to you" />
+            <ScreenHeader title="Queue" subtitle="Inspections assigned to you" icon="list-outline" />
             <ChipRow
               value={filter}
               onChange={setFilter}

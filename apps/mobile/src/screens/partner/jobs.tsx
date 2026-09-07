@@ -100,7 +100,7 @@ export function PartnerJobsScreen({ navigation, route }: PartnerScreenProps<'Par
     return (
       <Screen>
         <View style={screenStyles.list}>
-          <ScreenHeader title="Jobs" />
+          <ScreenHeader title="Jobs" icon="briefcase-outline" />
           <LoadingState />
         </View>
       </Screen>
@@ -125,7 +125,7 @@ export function PartnerJobsScreen({ navigation, route }: PartnerScreenProps<'Par
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         ListHeaderComponent={
           <View style={styles.header}>
-            <ScreenHeader title="Jobs" subtitle="Work allocated to your workshop" />
+            <ScreenHeader title="Jobs" subtitle="Work allocated to your workshop" icon="briefcase-outline" />
             <ChipRow
               value={filter}
               onChange={setFilter}

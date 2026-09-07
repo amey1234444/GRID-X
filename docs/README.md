@@ -27,6 +27,7 @@ maps back to the *GRID-X Software Product Blueprint*.
 | [10 — Operations](10-operations.md) | Local setup, environment variables, testing, CI, seeding and Render deployment |
 | [11 — Application flow and navigation](11-application-flow.md) | Section-by-section walkthrough of the sidebar, the job lifecycle end to end, and a worked example |
 | [12 — Partners and Engineering](12-partners-and-engineering.md) | The two master-data sections field by field: partner onboarding gates, capabilities, scorecards, components, criticality, drawing revision control and watermarking |
+| [13 — IMS integration](13-ims-integration.md) | The direct PostgreSQL connection to the OSWAR IMS: transports, schema mapping, introspection, the outbox, least-privilege grants, bring-up runbook and troubleshooting |
 | [Deployment on Render](deployment-render.md) | The original step-by-step Render runbook |
 
 ## Quick orientation
@@ -40,6 +41,7 @@ maps back to the *GRID-X Software Product Blueprint*.
 | Know what a role is allowed to do | [03 — Security, auth and RBAC](03-security-rbac.md) |
 | Add a field or a table | [02 — Data model](02-data-model.md) |
 | Run the platform locally | [10 — Operations](10-operations.md) |
+| Connect GRID-X to the OSWAR IMS database | [13 — IMS integration](13-ims-integration.md) |
 | Check whether a blueprint requirement is built | [09 — Blueprint coverage](09-blueprint-coverage.md) |
 
 ## Status at a glance
@@ -50,7 +52,7 @@ maps back to the *GRID-X Software Product Blueprint*.
 | Blueprint Modules 1–12 | Complete |
 | Management, operations, quality, finance and partner dashboards | Complete |
 | Section 21 reports (17) | Complete, with CSV export |
-| IMS integration (Section 10) | Complete — inbound pull, outbound push, retry worker |
+| IMS integration (Section 10) | Complete — direct PostgreSQL connection to the IMS (REST kept as a fallback), incremental inbound sync, outbound outbox, retry worker |
 | Notifications (Section 13) | Complete — in-app always, email and WhatsApp when configured |
 | Offline/low-connectivity partner PWA (Section 19) | Complete for milestones, acknowledgements and photographs |
 | Section 20 AI features | Deliberately not built — later phase |

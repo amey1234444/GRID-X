@@ -5,8 +5,9 @@ import { cn } from '@/lib/utils';
 
 export type StatTone = 'default' | 'success' | 'warning' | 'destructive' | 'info';
 
-const TONE_ACCENT: Record<StatTone, string> = {
-  default: 'bg-primary',
+/** Marker beside the label — the only chrome that carries tone, and only when there is one. */
+const TONE_DOT: Record<StatTone, string | null> = {
+  default: null,
   success: 'bg-success',
   warning: 'bg-warning',
   destructive: 'bg-destructive',
@@ -24,8 +25,12 @@ const TONE_TEXT: Record<StatTone, string> = {
 /**
  * A metric tile, not a card of text. The value dominates; the label is a
  * quiet eyebrow above it and the delta is the only coloured element unless
- * the metric itself is an alarm. A 2px accent rail carries the tone so the
- * number stays legible instead of being tinted.
+ * the metric itself is an alarm.
+ *
+ * Tone is carried by the value and a 5px dot beside the label. There is
+ * deliberately no accent rail down the left edge: a stripe on one side of a
+ * tile reads as a border that failed to draw the other three, and a row of
+ * four of them turns a clean grid into a set of tabs.
  */
 export function StatCard({
   label,
@@ -53,14 +58,6 @@ export function StatCard({
         className,
       )}
     >
-      <span
-        className={cn(
-          'absolute inset-y-0 left-0 w-[2px] opacity-60 transition-opacity duration-200 group-hover:opacity-100',
-          TONE_ACCENT[tone],
-        )}
-        aria-hidden
-      />
-
       {icon ? (
         <NavIcon
           name={icon}
@@ -68,7 +65,12 @@ export function StatCard({
         />
       ) : null}
 
-      <p className="type-label">{label}</p>
+      <div className="flex items-center gap-1.5">
+        {TONE_DOT[tone] ? (
+          <span className={cn('h-[5px] w-[5px] shrink-0 rounded-full', TONE_DOT[tone])} aria-hidden />
+        ) : null}
+        <p className="type-label truncate">{label}</p>
+      </div>
 
       <p className={cn('type-metric mt-2.5', TONE_TEXT[tone])} data-numeric>
         {value}

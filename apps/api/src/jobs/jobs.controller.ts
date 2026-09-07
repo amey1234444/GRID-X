@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import {
+  JOB_STATUSES,
   PERMISSIONS,
   allocateJobSchema,
   answerClarificationSchema,
@@ -29,6 +30,12 @@ const jobQuerySchema = paginationSchema.extend({
 });
 
 const cancelSchema = z.object({ reason: z.string().min(5) });
+
+/** Planning-board drag-and-drop. The reason is optional — a drag is its own explanation. */
+const moveStageSchema = z.object({
+  status: z.enum(JOB_STATUSES),
+  reason: z.string().max(500).optional(),
+});
 
 const delayQuerySchema = paginationSchema.extend({
   companyId: z.string().optional(),
@@ -189,6 +196,20 @@ export class JobsController {
     @Body(zodBody(closeJobSchema)) body: z.infer<typeof closeJobSchema>,
   ) {
     return this.jobs.close(user, id, body);
+  }
+
+  /**
+   * Section 24 — move a job to another workflow stage. The planning board calls this when a card
+   * is dropped into a new lane; the service rejects anything the workflow does not permit.
+   */
+  @Post(':id/transition')
+  @RequirePermissions(PERMISSIONS.JOB_UPDATE)
+  moveStage(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body(zodBody(moveStageSchema)) body: z.infer<typeof moveStageSchema>,
+  ) {
+    return this.jobs.moveStage(user, id, body.status, body.reason);
   }
 
   @Post(':id/cancel')

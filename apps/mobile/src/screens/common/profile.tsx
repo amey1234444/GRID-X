@@ -37,7 +37,7 @@ export function ProfileScreen({
   return (
     <Screen>
       <ScrollView contentContainerStyle={screenStyles.list}>
-        <ScreenHeader title="Profile" />
+        <ScreenHeader title="Profile" icon="person-outline" />
 
         <Reveal>
           <Card>

@@ -10,41 +10,67 @@
  *   background → surface → surfaceElevated → surfaceHover → surfaceActive
  */
 export const colors = {
-  background: '#090909',
+  /** --background 0 0% 3.8% */
+  background: '#0a0a0a',
+  /** --surface 0 0% 6% */
   surface: '#0f0f0f',
+  /** --surface-elevated 0 0% 8.5% */
   surfaceElevated: '#161616',
+  /** --surface-hover 0 0% 11% */
   surfaceHover: '#1c1c1c',
+  /** --surface-active 0 0% 14% */
   surfaceActive: '#242424',
+  /** --card 0 0% 6.5% */
+  card: '#111111',
+  /** --popover 0 0% 8% */
   popover: '#141414',
 
+  /** --border 0 0% 15% */
   border: '#262626',
+  /** --border-subtle 0 0% 10.5% */
   borderSubtle: '#1b1b1b',
+  /** --border-strong 0 0% 24% */
   borderStrong: '#3d3d3d',
 
-  foreground: '#f7f7f7',
-  mutedForeground: '#9e9e9e',
-  /** Third text tier — captions, metadata, disabled labels. */
+  /** --foreground 0 0% 96% */
+  foreground: '#f5f5f5',
+  /** --muted-foreground 0 0% 63% */
+  mutedForeground: '#a1a1a1',
+  /** Third text tier — captions, metadata, disabled labels. --subtle-foreground 0 0% 45% */
   subtleForeground: '#737373',
 
   /* Monochrome brand: white is the action colour on a black canvas. */
+  /** --primary 0 0% 97% */
   primary: '#f7f7f7',
+  /** --primary-hover 0 0% 100% */
   primaryHover: '#ffffff',
+  /** --primary-foreground 0 0% 5% */
   primaryForeground: '#0d0d0d',
+  /** --brand 0 0% 92% */
+  brand: '#ebebeb',
 
-  /* Hue is reserved for operational state, never for chrome. */
+  /* Hue is reserved for operational state, never for chrome. `info` is a
+   * neutral grey on purpose — on the web it is 0 0% 68%, not a blue, so an
+   * informational badge cannot be mistaken for a healthy or a failing one. */
+  /** --success 152 38% 45% */
   success: '#479e76',
-  warning: '#dfa239',
-  destructive: '#d34b41',
-  info: '#77a1c5',
+  /** --warning 38 72% 55% */
+  warning: '#dfa23a',
+  /** --destructive 4 62% 54% */
+  destructive: '#d24b41',
+  /** --info 0 0% 68% */
+  info: '#adadad',
 } as const;
 
 /** Machine / site operating states — a different axis to workflow status. */
 export const stateColors = {
   OPERATIONAL: '#479e76',
-  WARNING: '#dfa239',
-  CRITICAL: '#d34b41',
+  WARNING: '#dfa23a',
+  CRITICAL: '#d24b41',
+  /** --state-offline 0 0% 46% */
   OFFLINE: '#757575',
-  MAINTENANCE: '#77a1c5',
+  /** --state-maintenance 0 0% 68% */
+  MAINTENANCE: '#adadad',
 } as const;
 
 export type MachineState = keyof typeof stateColors;
@@ -58,11 +84,19 @@ export const spacing = {
   xxl: 32,
 } as const;
 
-/** Mirrors the web radius hierarchy: control < input < card < modal. */
+/**
+ * Mirrors the web radius hierarchy exactly: control < input < card < modal.
+ * The web is deliberately restrained here — 8px cards, not 16 — and rounder
+ * corners on mobile were the single loudest way the two surfaces diverged.
+ */
 export const radius = {
-  control: 6,
-  input: 8,
-  card: 12,
+  /** --radius-control 0.25rem */
+  control: 4,
+  /** --radius-input 0.375rem */
+  input: 6,
+  /** --radius-card 0.5rem */
+  card: 8,
+  /** --radius-modal 1rem */
   modal: 16,
   full: 999,
 } as const;
@@ -122,61 +156,70 @@ export const elevation = {
 
 export type StatusTone = 'default' | 'success' | 'warning' | 'destructive' | 'info' | 'muted';
 
-const STATUS_TONES: Record<string, StatusTone> = {
-  // Inspections
-  REQUESTED: 'warning',
-  ASSIGNED: 'info',
-  IN_PROGRESS: 'info',
-  COMPLETED: 'success',
-  ACCEPTED: 'success',
-  ACCEPTED_WITH_DEVIATION: 'warning',
-  REWORK_REQUIRED: 'warning',
-  REJECTED: 'destructive',
-  HOLD_FOR_ENGINEERING_REVIEW: 'warning',
-  // Jobs
-  CREATED: 'muted',
-  ALLOCATED: 'info',
-  PARTNER_ACCEPTED: 'info',
-  PARTNER_DECLINED: 'destructive',
-  MATERIAL_ISSUED: 'info',
-  IN_PRODUCTION: 'info',
-  READY_FOR_INSPECTION: 'warning',
-  DISPATCHED: 'info',
-  RECEIVED: 'success',
-  CANCELLED: 'muted',
-  // Rework / non-conformance
-  ISSUED: 'info',
-  READY_FOR_REINSPECTION: 'warning',
-  SCRAPPED: 'destructive',
-  // Material
-  ACKNOWLEDGED: 'success',
-  PARTIALLY_ACKNOWLEDGED: 'warning',
-  RECONCILED: 'success',
-  SHORTAGE: 'destructive',
-  // Drawings
-  SUBMITTED: 'info',
-  RELEASED: 'success',
-  OBSOLETE: 'muted',
-  // Commercials
-  VERIFIED: 'info',
-  SCHEDULED: 'info',
-  HELD: 'destructive',
-  PAID: 'success',
-  APPROVED: 'success',
-  // Generic
-  ON_HOLD: 'warning',
-  OPEN: 'warning',
-  ANSWERED: 'success',
-  CLOSED: 'muted',
-  PENDING: 'warning',
-  OVERDUE: 'destructive',
-  DELAYED: 'destructive',
-  NEW: 'info',
-  DRAFT: 'muted',
-};
+/**
+ * Status tones, mirrored value-for-value from the web's
+ * apps/web/src/components/app/status-badge.tsx.
+ *
+ * These are lists rather than one big map for the same reason the web keeps
+ * them that way: statuses arrive from a dozen modules and most of them are
+ * neutral. Only the ones that mean "good", "waiting" or "bad" get a colour,
+ * and anything unlisted stays neutral instead of being guessed at.
+ */
+const SUCCESS = [
+  'ACCEPTED',
+  'ACTIVE',
+  'APPROVED',
+  'BALANCED',
+  'CERTIFIED',
+  'CLOSED',
+  'COMPLETED',
+  'DELIVERED',
+  'FINANCE_APPROVED',
+  'PAID',
+  'PASSED',
+  'RELEASED',
+  'RESOLVED',
+  'STRATEGIC',
+  'VERIFIED',
+];
 
-export function statusTone(status: string): StatusTone {
-  return STATUS_TONES[status] ?? 'default';
+const WARNING = [
+  'AWAITING_PARTNER_ACCEPTANCE',
+  'DELAYED',
+  'HOLD',
+  'IN_REVIEW',
+  'IN_TRANSIT',
+  'ON_HOLD',
+  'OPEN',
+  'PARTIALLY_PAID',
+  'PENDING',
+  'REWORK',
+  'REWORK_REQUIRED',
+  'SUBMITTED',
+  'TRIAL_APPROVED',
+  'UNDER_REVIEW',
+  'VARIANCE',
+];
+
+const DESTRUCTIVE = [
+  'BLACKLISTED',
+  'CANCELLED',
+  'DECLINED',
+  'FAILED',
+  'OVERDUE',
+  'REJECTED',
+  'SCRAPPED',
+  'SUSPENDED',
+  'TERMINATED',
+];
+
+export function statusTone(status: string | null | undefined): StatusTone {
+  if (!status) return 'muted';
+  const value = status.toUpperCase();
+  if (SUCCESS.includes(value)) return 'success';
+  if (WARNING.includes(value)) return 'warning';
+  if (DESTRUCTIVE.includes(value)) return 'destructive';
+  return 'default';
 }
 
 export function toneColor(tone: StatusTone): string {

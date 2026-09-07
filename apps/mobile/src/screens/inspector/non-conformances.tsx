@@ -19,7 +19,7 @@ export function NonConformancesScreen(): React.JSX.Element {
     return (
       <Screen>
         <View style={screenStyles.list}>
-          <ScreenHeader title="Non-conformances" />
+          <ScreenHeader title="Non-conformances" icon="alert-circle-outline" />
           <LoadingState />
         </View>
       </Screen>
@@ -48,6 +48,7 @@ export function NonConformancesScreen(): React.JSX.Element {
         ListHeaderComponent={
           <ScreenHeader
             title="Non-conformances"
+            icon="alert-circle-outline"
             subtitle={open > 0 ? `${open} still open` : 'Nothing open'}
           />
         }

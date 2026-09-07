@@ -60,7 +60,7 @@ Navigation follows blueprint Section 24 exactly:
 | **Commercial** | Rates · invoices · invoice detail · approvals · payments · incentives and deductions |
 | **Reports** | All 17 reports with filters and CSV export |
 | **Notifications** | Full notification history |
-| **IMS integration** | Status, entity catalogue, pull/push/retry, sync log |
+| **IMS integration** | Transport and connection probe, schema-mapping health, incremental watermarks, entity catalogue, sync/pull/push/retry, sync log |
 | **Administration** | Users · roles · companies · settings · audit log |
 
 ### The job detail screen

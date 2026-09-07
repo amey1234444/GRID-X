@@ -370,6 +370,31 @@ export async function answerClarificationAction(
   ]);
 }
 
+/**
+ * Planning board — a card dragged into another lane. The board has already moved the card
+ * optimistically, so this either confirms the move or hands back the API's reason for refusing
+ * it (usually "cannot move from X to Y"), which the board shows before snapping the card back.
+ */
+export async function moveJobStageAction(
+  jobId: string,
+  status: string,
+): Promise<ActionState> {
+  if (!jobId || !status) return { error: 'Missing job or stage' };
+  const result = await apiFetch<unknown>(`/jobs/${jobId}/transition`, {
+    method: 'POST',
+    body: JSON.stringify({ status }),
+  });
+  if (result.error) return { error: result.error };
+  for (const route of [
+    '/app/production/planning-board',
+    '/app/production/jobs',
+    `/app/production/jobs/${jobId}`,
+  ]) {
+    revalidatePath(route);
+  }
+  return { error: null, success: 'Moved' };
+}
+
 export async function closeJobAction(_state: ActionState, data: FormData): Promise<ActionState> {
   const jobId = text(data, 'jobId');
   if (!jobId) return { error: 'Missing job' };
@@ -1150,10 +1175,20 @@ export async function acknowledgeRevisionAction(
 export async function imsSyncAction(_state: ActionState, data: FormData): Promise<ActionState> {
   const direction = text(data, 'direction');
   const entity = text(data, 'entity');
-  if (!direction || !entity) return { error: 'Select an entity to sync' };
+  if (!direction) return { error: 'Missing sync direction' };
+
+  // Sweeps and retries act on the whole boundary, so they carry no entity.
+  if (direction === 'sync-all') return send('/ims/sync', {}, ['/app/ims']);
+  if (direction === 'retry') return send('/ims/retry', {}, ['/app/ims']);
+
+  if (!entity) return { error: 'Select an entity to sync' };
+  if (direction === 'reset-cursor') return send('/ims/cursors/reset', { entity }, ['/app/ims']);
   if (direction === 'pull') {
-    return send('/ims/pull', { entity }, ['/app/ims']);
+    // Full by default: an operator pulling by hand is usually correcting something the
+    // incremental sweep got wrong, and a watermark would hide exactly the rows they want.
+    return send('/ims/pull', { entity, incremental: false }, ['/app/ims']);
   }
+
   const recordRef = text(data, 'recordRef');
   if (!recordRef) return { error: 'A GRID-X record id is required to push to IMS' };
   return send('/ims/push', { entity, recordRef }, ['/app/ims']);

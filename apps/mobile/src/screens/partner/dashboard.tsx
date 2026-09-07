@@ -34,7 +34,7 @@ export function PartnerHomeScreen({ navigation }: PartnerScreenProps<'PartnerHom
     return (
       <Screen>
         <View style={screenStyles.list}>
-          <ScreenHeader title="Workshop" />
+          <ScreenHeader title="Workshop" icon="home-outline" />
           <LoadingState />
         </View>
       </Screen>
@@ -59,6 +59,7 @@ export function PartnerHomeScreen({ navigation }: PartnerScreenProps<'PartnerHom
       >
         <ScreenHeader
           title={data.businessName}
+          icon="home-outline"
           subtitle={user?.name ? `Signed in as ${user.name}` : undefined}
           right={<StatusPill status={data.category} />}
         />

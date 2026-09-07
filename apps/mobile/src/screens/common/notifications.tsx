@@ -43,7 +43,7 @@ export function NotificationsScreen(): React.JSX.Element {
     return (
       <Screen>
         <View style={screenStyles.list}>
-          <ScreenHeader title="Alerts" />
+          <ScreenHeader title="Alerts" icon="notifications-outline" />
           <LoadingState />
         </View>
       </Screen>
@@ -71,6 +71,7 @@ export function NotificationsScreen(): React.JSX.Element {
         ListHeaderComponent={
           <ScreenHeader
             title="Alerts"
+            icon="notifications-outline"
             subtitle={
               data && data.unreadCount > 0 ? `${data.unreadCount} unread` : 'Everything has been read'
             }
