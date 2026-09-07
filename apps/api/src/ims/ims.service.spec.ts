@@ -23,7 +23,7 @@ function imsConfig(overrides: Partial<AppConfig['ims']> = {}): AppConfig['ims'] 
       applicationName: 'gridx-ims',
     },
     mapping: { profile: 'prisma' },
-    write: { mode: 'outbox', schema: 'gridx', table: 'ims_outbound_fact', autoCreate: true },
+    write: { mode: 'outbox', schema: 'gridx', table: 'ims_outbound_fact', autoCreate: true, postStock: false },
     sync: { inboundEnabled: true, batchSize: 500, entities: ['companies', 'items'] },
     ...overrides,
   };
@@ -114,7 +114,7 @@ describe('ImsService', () => {
     it('lets outbound facts take a different road from inbound reads', async () => {
       const { service, prisma, database, http } = build({
         driver: 'database',
-        write: { mode: 'http', schema: 'gridx', table: 'ims_outbound_fact', autoCreate: true },
+        write: { mode: 'http', schema: 'gridx', table: 'ims_outbound_fact', autoCreate: true, postStock: false },
       });
       prisma.gridJob.findUniqueOrThrow.mockResolvedValue(job());
 
@@ -126,7 +126,7 @@ describe('ImsService', () => {
 
     it('records the fact without delivering it when the write mode is none', async () => {
       const { service, prisma, database, http, disabled } = build({
-        write: { mode: 'none', schema: 'gridx', table: 'ims_outbound_fact', autoCreate: true },
+        write: { mode: 'none', schema: 'gridx', table: 'ims_outbound_fact', autoCreate: true, postStock: false },
       });
       prisma.gridJob.findUniqueOrThrow.mockResolvedValue(job());
 
@@ -152,7 +152,7 @@ describe('ImsService', () => {
       expect(build().service.status().outboxTable).toBe('gridx.ims_outbound_fact');
       expect(
         build({
-          write: { mode: 'http', schema: 'gridx', table: 'ims_outbound_fact', autoCreate: true },
+          write: { mode: 'http', schema: 'gridx', table: 'ims_outbound_fact', autoCreate: true, postStock: false },
         }).service.status().outboxTable,
       ).toBeUndefined();
     });

@@ -37,6 +37,30 @@ export interface ImsEntityMapping {
   /** Schema override for this entity; defaults to `IMS_DATABASE_SCHEMA`. */
   schema?: string;
   /**
+   * Why this IMS has no such entity at all, when it genuinely has none.
+   *
+   * The blueprint's Section 10 list is what GRID-X would *like* from an IMS; a given IMS supplies
+   * some subset of it. Declaring the gap is not the same as a broken mapping: an entity marked
+   * unsupported reads as empty, reports itself as unsupported to `/api/ims/introspect`, and never
+   * builds a query — which is very different from pointing at a table that does not exist and
+   * letting every sync fail with a Postgres error the operator has to decode.
+   */
+  unsupported?: string;
+  /**
+   * A derived base relation to read from instead of a table, for a fact the IMS stores only as a
+   * ledger. `{schema}` is substituted with the quoted default schema. Written once here rather
+   * than asking the IMS DBA for a view, because GRID-X must not need DDL on a database it does
+   * not own.
+   */
+  derivedFrom?: string;
+  /**
+   * The tenant column, when the IMS is multi-tenant. Every read is then scoped to `IMS_ORG_ID`
+   * with a bound parameter, and a read is refused outright if that is unset — pulling another
+   * company's materials into GRID-X is a data-protection incident, not a misconfiguration to
+   * shrug at.
+   */
+  orgColumn?: string;
+  /**
    * Canonical field to IMS column. A bare name (`code`) is a column on the base table; a
    * qualified name (`c.code`) refers to a join alias; a value starting with `=` is a raw SQL
    * expression (`=coalesce(t."name", t."title")`).
@@ -412,7 +436,179 @@ const SNAKE_PROFILE: ImsMapping = {
   },
 };
 
+/**
+ * The real OSWAR IMS, read off its `schema.prisma` rather than guessed.
+ *
+ * Two things about that schema decide most of what follows. It is multi-tenant — every business
+ * table carries `org_id` — so every read here is org-scoped and refuses to run unscoped. And it is
+ * an *inventory* system, not an ERP: its production module was removed (migration
+ * `20260602100000_remove_production_module`), so it has no products, no sales orders, no work
+ * orders and no purchase orders. Those four are declared unsupported rather than pointed at
+ * hopeful table names, because a planner deserves "IMS does not publish work orders" over an empty
+ * dropdown with no explanation.
+ *
+ * Stock is the other consequence: there is no balance table. On-hand quantity exists only as the
+ * signed sum of `stock_transactions`, so `stock` reads from a derived aggregate mirroring the
+ * IMS's own `STOCK_IN_TYPES` set. If the IMS adds an inbound transaction type, this list is the
+ * one place that has to learn about it.
+ */
+const OSWAR_PROFILE: ImsMapping = {
+  // The IMS's tenant *is* its company record. `slug` is its unique human key, so it becomes the
+  // GRID-X company code; an IMS organisation carries no GST, PAN or address columns.
+  companies: {
+    table: 'organizations',
+    columns: {
+      code: 'slug',
+      name: 'name',
+    },
+    where: 't."deleted_at" IS NULL',
+    searchColumns: ['slug', 'name'],
+    changeColumn: 'updated_at',
+    orgColumn: 'id',
+  },
+  items: {
+    table: 'materials',
+    joins: [{ table: 'categories', alias: 'c', on: 'c."id" = t."category_id"', type: 'LEFT' }],
+    columns: {
+      code: 'code',
+      name: 'name',
+      uom: 'unit_of_measure',
+      // The IMS has no material-grade column. Its nearest honest equivalent is the category the
+      // material is filed under, which is how a stores user reads it anyway.
+      materialGrade: 'c.name',
+      standardRate: 'unit_price',
+      imsRef: 'id',
+    },
+    where: 't."deleted_at" IS NULL',
+    searchColumns: ['code', 'name'],
+    changeColumn: 'updated_at',
+    orgColumn: 'org_id',
+  },
+  products: {
+    table: 'materials',
+    columns: { companyCode: 'org_id', code: 'code', name: 'name' },
+    unsupported:
+      'The OSWAR IMS has no product master — its production module was removed. Products are ' +
+      'maintained in GRID-X until an ERP that owns them is connected.',
+  },
+  'sales-orders': {
+    table: 'materials',
+    columns: { reference: 'code' },
+    unsupported:
+      'The OSWAR IMS holds no sales orders. Raise GRID-X jobs from an internal or manual ' +
+      'requirement until a system of record for customer orders is connected.',
+  },
+  'work-orders': {
+    table: 'materials',
+    columns: { reference: 'code' },
+    unsupported:
+      'The OSWAR IMS holds no work orders — its production module was removed. GRID-X jobs are ' +
+      'raised from an internal or manual requirement instead (Module 4).',
+  },
+  'purchase-orders': {
+    table: 'goods_receipts',
+    columns: { reference: 'po_reference' },
+    unsupported:
+      'The OSWAR IMS has no purchase-order master; it records only a free-text `po_reference` on ' +
+      'each goods receipt, which is a receipt rather than an order and must not be read as one.',
+  },
+  suppliers: {
+    table: 'suppliers',
+    columns: {
+      code: 'code',
+      name: 'name',
+      gstNumber: 'gst_number',
+      phone: 'phone',
+      email: 'email',
+    },
+    where: 't."deleted_at" IS NULL',
+    searchColumns: ['code', 'name'],
+    changeColumn: 'updated_at',
+    orgColumn: 'org_id',
+  },
+  // No balance table exists, so this is the IMS's own ledger arithmetic expressed once. Rows with
+  // no warehouse are excluded: a balance belonging to no location cannot be issued from one.
+  stock: {
+    table: 'stock_transactions',
+    derivedFrom:
+      '(SELECT s."org_id" AS org_id, s."material_id" AS material_id, ' +
+      's."warehouse_id" AS warehouse_id, MAX(s."created_at") AS updated_at, ' +
+      'SUM(CASE WHEN s."type" IN (' +
+      "'OPENING', 'PURCHASE', 'RETURN_IN', 'ADJUSTMENT_IN', 'TRANSFER_IN'" +
+      ') THEN s."quantity" ELSE -s."quantity" END) AS quantity ' +
+      'FROM {schema}."stock_transactions" s ' +
+      'WHERE s."warehouse_id" IS NOT NULL ' +
+      'GROUP BY s."org_id", s."material_id", s."warehouse_id")',
+    joins: [
+      { table: 'materials', alias: 'm', on: 'm."id" = t."material_id"', type: 'INNER' },
+      { table: 'warehouses', alias: 'w', on: 'w."id" = t."warehouse_id"', type: 'INNER' },
+    ],
+    columns: {
+      itemCode: 'm.code',
+      itemName: 'm.name',
+      warehouseCode: 'w.code',
+      warehouseName: 'w.name',
+      quantity: 'quantity',
+      uom: 'm.unit_of_measure',
+      updatedAt: 'updated_at',
+    },
+    where: 'm."deleted_at" IS NULL AND w."deleted_at" IS NULL',
+    searchColumns: ['m.code', 'm.name', 'w.code'],
+    changeColumn: 'updated_at',
+    orgColumn: 'org_id',
+  },
+  warehouses: {
+    table: 'warehouses',
+    joins: [{ table: 'organizations', alias: 'o', on: 'o."id" = t."org_id"', type: 'LEFT' }],
+    columns: {
+      code: 'code',
+      name: 'name',
+      companyCode: 'o.slug',
+    },
+    where: 't."deleted_at" IS NULL',
+    searchColumns: ['code', 'name'],
+    changeColumn: 'updated_at',
+    orgColumn: 'org_id',
+  },
+  'material-transactions': {
+    table: 'stock_transactions',
+    joins: [
+      { table: 'materials', alias: 'm', on: 'm."id" = t."material_id"', type: 'LEFT' },
+      { table: 'warehouses', alias: 'w', on: 'w."id" = t."warehouse_id"', type: 'LEFT' },
+    ],
+    columns: {
+      reference: 'id',
+      itemCode: 'm.code',
+      warehouseCode: 'w.code',
+      transactionType: 'type',
+      quantity: 'quantity',
+      uom: 'm.unit_of_measure',
+      occurredAt: 'created_at',
+    },
+    searchColumns: ['m.code'],
+    // Ledger rows are append-only in the IMS, so creation time is also the change time.
+    changeColumn: 'created_at',
+    orgColumn: 'org_id',
+  },
+  users: {
+    table: 'users',
+    columns: {
+      reference: 'id',
+      name: 'name',
+      email: 'email',
+      phone: 'phone',
+      role: 'role',
+      isActive: 'is_active',
+    },
+    where: 't."deleted_at" IS NULL',
+    searchColumns: ['name', 'email'],
+    changeColumn: 'updated_at',
+    orgColumn: 'org_id',
+  },
+};
+
 export const IMS_MAPPING_PROFILES: Record<ImsMappingProfileName, ImsMapping> = {
+  oswar: OSWAR_PROFILE,
   prisma: PRISMA_PROFILE,
   snake: SNAKE_PROFILE,
 };
@@ -432,6 +628,9 @@ const joinSchema = z.object({
 const entitySchema = z.object({
   table: z.string().trim().min(1),
   schema: z.string().trim().min(1).optional(),
+  unsupported: z.string().trim().min(1).optional(),
+  derivedFrom: z.string().trim().min(1).optional(),
+  orgColumn: z.string().trim().min(1).optional(),
   columns: z.record(z.string().trim().min(1)),
   joins: z.array(joinSchema).optional(),
   where: z.string().trim().min(1).optional(),
@@ -514,6 +713,14 @@ function parseMappingJson(json: string | undefined, warnings: string[]): unknown
   }
 }
 
+/**
+ * Whether this IMS publishes the entity at all. An unsupported entity is a fact about the IMS,
+ * not a fault in GRID-X: callers report it and carry on rather than retrying or alarming.
+ */
+export function unsupportedReason(mapping: ImsEntityMapping | undefined): string | null {
+  return mapping?.unsupported?.trim() || null;
+}
+
 // ---------------------------------------------------------------------------
 // SQL construction
 // ---------------------------------------------------------------------------
@@ -551,6 +758,9 @@ export function columnExpression(value: string, context: string): string {
   throw new Error(`IMS mapping ${context} column "${value}" has too many qualifiers`);
 }
 
+/** Alias the change column is always selected under, so watermark reading needs no mapping. */
+export const WATERMARK_ALIAS = '__ims_changed_at';
+
 export interface BuiltQuery {
   text: string;
   values: unknown[];
@@ -568,8 +778,13 @@ export function buildSelect(
   entity: ImsInboundEntity,
   mapping: ImsEntityMapping,
   defaultSchema: string,
-  options: { search?: string; limit?: number; since?: Date } = {},
+  options: { search?: string; limit?: number; since?: Date; orgId?: string } = {},
 ): BuiltQuery {
+  const unsupported = unsupportedReason(mapping);
+  if (unsupported) {
+    throw new Error(`IMS does not publish ${entity}: ${unsupported}`);
+  }
+
   const schema = quoteIdentifier(mapping.schema ?? defaultSchema);
   const table = quoteIdentifier(mapping.table);
   const values: unknown[] = [];
@@ -585,6 +800,23 @@ export function buildSelect(
     throw new Error(`IMS mapping for ${entity} selects no columns`);
   }
 
+  // Selected as well as, not instead of, any mapped field: the driver reads the watermark from
+  // this alias, so it no longer has to guess which returned key holds the change time.
+  if (mapping.changeColumn) {
+    selects.push(
+      `${columnExpression(mapping.changeColumn, `${entity}.changeColumn`)} AS ${quoteIdentifier(WATERMARK_ALIAS)}`,
+    );
+  }
+
+  // `{schema}` in a derived relation is substituted rather than concatenated by the caller, so
+  // one mapping works whether the IMS lives in `public` or a namespaced schema.
+  const relation = mapping.derivedFrom
+    ? assertSafeFragment(
+        mapping.derivedFrom.replaceAll('{schema}', schema),
+        `${entity}.derivedFrom`,
+      )
+    : `${schema}.${table}`;
+
   const joins = (mapping.joins ?? []).map((join) => {
     const joinSchemaName = quoteIdentifier(join.schema ?? mapping.schema ?? defaultSchema);
     const joinTable = quoteIdentifier(join.table);
@@ -596,6 +828,19 @@ export function buildSelect(
   const conditions: string[] = [];
   if (mapping.where) {
     conditions.push(`(${assertSafeFragment(mapping.where, `${entity}.where`)})`);
+  }
+
+  if (mapping.orgColumn) {
+    if (!options.orgId) {
+      throw new Error(
+        `IMS ${entity} is tenant-scoped by "${mapping.orgColumn}" but IMS_ORG_ID is not set; ` +
+          'refusing to read across every organisation in the IMS',
+      );
+    }
+    values.push(options.orgId);
+    conditions.push(
+      `${columnExpression(mapping.orgColumn, `${entity}.orgColumn`)} = $${values.length}`,
+    );
   }
 
   const search = options.search?.trim();
@@ -627,7 +872,7 @@ export function buildSelect(
 
   const text = [
     `SELECT ${selects.join(', ')}`,
-    `FROM ${schema}.${table} AS t`,
+    `FROM ${relation} AS t`,
     ...joins,
     conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '',
     order,
@@ -664,6 +909,12 @@ export function validateMapping(mapping: ImsMapping): MappingIssue[] {
       continue;
     }
 
+    const unsupported = unsupportedReason(entityMapping);
+    if (unsupported) {
+      issues.push({ entity, severity: 'warning', message: `Not published by this IMS: ${unsupported}` });
+      continue;
+    }
+
     for (const field of IMS_REQUIRED_FIELDS[entity]) {
       if (!entityMapping.columns[field]) {
         issues.push({
@@ -696,7 +947,12 @@ export function validateMapping(mapping: ImsMapping): MappingIssue[] {
     }
 
     try {
-      buildSelect(entity, entityMapping, 'public', { limit: 1 });
+      buildSelect(entity, entityMapping, 'public', {
+        limit: 1,
+        // A structural check, not a read: the value is never sent anywhere, it only satisfies the
+        // tenant-scoping guard so the rest of the statement can be built and checked.
+        orgId: entityMapping.orgColumn ? '00000000-0000-0000-0000-000000000000' : undefined,
+      });
     } catch (error) {
       issues.push({ entity, severity: 'error', message: String(error) });
     }

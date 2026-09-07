@@ -136,16 +136,26 @@ services:
       - key: WHATSAPP_API_TOKEN
         sync: false
       # IMS boundary — GRID-X consumes masters from IMS and pushes back status.
-      # The direct driver connects to the IMS PostgreSQL database; set
-      # IMS_DATABASE_URL in the Render dashboard and leave IMS_DRIVER on auto.
+      #
+      # Everything non-secret is set here. Only IMS_DATABASE_URL and IMS_ORG_ID
+      # (both sync: false) need filling in the Render dashboard; until they are,
+      # the driver reports "not configured" and does nothing — it cannot half-work.
       - key: IMS_ENABLED
-        value: "false"
+        value: "true"
+      # Explicit rather than "auto": reads go over the database link because the
+      # IMS REST API has no "since" filter and no paging.
       - key: IMS_DRIVER
-        value: auto
+        value: database
       - key: IMS_DATABASE_URL
         sync: false
+      # The IMS is multi-tenant. Without this the database driver refuses to read,
+      # rather than pulling every organisation's materials into GRID-X.
+      - key: IMS_ORG_ID
+        sync: false
+      # The OSWAR IMS lives in the "ims" schema, not public — that belongs to the
+      # CRM on the same Supabase database.
       - key: IMS_DATABASE_SCHEMA
-        value: public
+        value: ims
       - key: IMS_DB_POOL_MAX
         value: "5"
       - key: IMS_DB_STATEMENT_TIMEOUT_MS
@@ -154,12 +164,17 @@ services:
       - key: IMS_DB_SSL
         value: no-verify
       - key: IMS_MAPPING_PROFILE
-        value: prisma
+        value: oswar
       # Per-entity overrides as inline JSON — a mounted file is awkward on Render.
       - key: IMS_MAPPING_JSON
         sync: false
+      # "none" until the outbox exists: it lives in the IMS database and its
+      # creation needs CREATE on that database, which the least-privilege
+      # read-only role in docs/13 deliberately does not have. Facts are still
+      # recorded in the GRID-X sync log meanwhile. Switch to "outbox" once a DBA
+      # has run packages/db/prisma/ims/001_gridx_outbox.sql (pnpm ims:outbox).
       - key: IMS_WRITE_MODE
-        value: outbox
+        value: none
       - key: IMS_OUTBOX_SCHEMA
         value: gridx
       - key: IMS_OUTBOX_TABLE
@@ -168,16 +183,29 @@ services:
         value: "true"
       - key: IMS_SYNC_INBOUND_ENABLED
         value: "true"
+      # The OSWAR IMS publishes no product master, so there is nothing to sweep.
       - key: IMS_SYNC_ENTITIES
-        value: companies,items,products
+        value: companies,items
       - key: IMS_SYNC_BATCH_SIZE
         value: "500"
+      # REST transport. The IMS issues no API keys — a dedicated ADMIN login is the
+      # only way in. Used for writes when IMS_WRITE_MODE=http.
       - key: IMS_BASE_URL
+        sync: false
+      - key: IMS_AUTH_EMAIL
+        sync: false
+      - key: IMS_AUTH_PASSWORD
         sync: false
       - key: IMS_API_KEY
         sync: false
       - key: IMS_TIMEOUT_MS
         value: "15000"
+      # Off by default: the IMS accepts no idempotency key on a stock post, so a
+      # retry after a lost response would issue the same material twice.
+      - key: IMS_HTTP_POST_STOCK
+        value: "false"
+      - key: IMS_ISSUE_WAREHOUSE_ID
+        sync: false
       - key: SENTRY_DSN
         sync: false
 

@@ -13,7 +13,7 @@ export function PartnerMoreScreen({ navigation }: PartnerScreenProps<'PartnerMor
   return (
     <Screen>
       <ScrollView contentContainerStyle={screenStyles.list}>
-        <ScreenHeader title="More" />
+        <ScreenHeader title="More" icon="ellipsis-horizontal-outline" />
 
         <Card>
           <NavRow

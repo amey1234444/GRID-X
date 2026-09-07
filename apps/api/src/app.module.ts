@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -35,7 +36,16 @@ import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, load: [configuration] }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [configuration],
+      // `pnpm dev` runs each package with its own directory as the cwd, so Nest's default lookup
+      // of `.env` resolves to apps/api — where no such file lives. The repo keeps one `.env` at the
+      // root (README, and every packages/db script reads it with `-e ../../.env`), so without this
+      // a variable added there reaches Prisma and not the API, and the misconfiguration is silent:
+      // every setting simply falls back to its default. A per-app file still wins if one is added.
+      envFilePath: ['.env', join(__dirname, '..', '..', '..', '.env')],
+    }),
     ScheduleModule.forRoot(),
     JwtModule.register({}),
     PrismaModule,

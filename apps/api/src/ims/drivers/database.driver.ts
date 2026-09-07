@@ -13,8 +13,10 @@ import {
   type ImsOutboundEntity,
 } from '../ims.contract';
 import {
+  WATERMARK_ALIAS,
   buildSelect,
   loadMapping,
+  unsupportedReason,
   validateMapping,
   type ImsMapping,
   type MappingIssue,
@@ -29,7 +31,9 @@ export interface EntityIntrospection {
   missingColumns: string[];
   /** Columns the table has that the mapping does not use — useful when a name has drifted. */
   unmappedColumns: string[];
-  status: 'ok' | 'degraded' | 'broken';
+  /** Set when this IMS does not publish the entity at all, with the reason to show an operator. */
+  unsupported?: string;
+  status: 'ok' | 'degraded' | 'broken' | 'unsupported';
 }
 
 export interface ImsIntrospection {
@@ -110,10 +114,25 @@ export class DatabaseImsDriver implements ImsGateway {
       throw new Error(`No IMS mapping is declared for ${entity}`);
     }
 
+    // An entity this IMS does not have is an empty read with a reason attached, not an error.
+    // Callers that ask for work orders from an IMS with no work orders should get a sentence they
+    // can show a planner, and nothing should retry.
+    const unsupported = unsupportedReason(entityMapping);
+    if (unsupported) {
+      return {
+        records: [],
+        unsupported,
+        watermark: null,
+        fullScan: false,
+        source: `${entity} is not published by this IMS`,
+      };
+    }
+
     const query = buildSelect(entity, entityMapping, this.settings.database.schema, {
       search: options.search,
       limit: options.limit ?? this.settings.sync.batchSize,
       since: options.since,
+      orgId: this.settings.orgId,
     });
 
     const rows = await this.db.read<Record<string, unknown>>(query.text, query.values);
@@ -125,7 +144,7 @@ export class DatabaseImsDriver implements ImsGateway {
 
     for (const row of rows) {
       if (entityMapping.changeColumn) {
-        const changed = toDate(row[entityMapping.changeColumn] ?? row.updatedAt);
+        const changed = toDate(row[WATERMARK_ALIAS]);
         if (changed && (!watermark || changed > watermark)) watermark = changed;
       }
       const parsed = schema.safeParse(normaliseRow(row));
@@ -197,6 +216,19 @@ export class DatabaseImsDriver implements ImsGateway {
 
     const entities: EntityIntrospection[] = IMS_INBOUND_ENTITIES.map((entity) => {
       const entityMapping = mapping[entity];
+      const unsupported = unsupportedReason(entityMapping);
+      if (unsupported) {
+        return {
+          entity,
+          table: '—',
+          tableExists: false,
+          missingColumns: [],
+          unmappedColumns: [],
+          unsupported,
+          status: 'unsupported' as const,
+        };
+      }
+
       const columns = live.get(entityMapping.table);
       const tableExists = Boolean(columns);
 
@@ -242,6 +274,7 @@ export class DatabaseImsDriver implements ImsGateway {
 function normaliseRow(row: Record<string, unknown>): Record<string, unknown> {
   const output: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(row)) {
+    if (key === WATERMARK_ALIAS) continue;
     if (value === null || value === undefined) continue;
     if (value instanceof Date) output[key] = value.toISOString();
     else if (Buffer.isBuffer(value)) output[key] = value.toString('utf8');

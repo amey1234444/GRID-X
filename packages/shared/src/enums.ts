@@ -178,6 +178,57 @@ export const PROCESS_LABELS: Record<ProcessType, string> = {
   TRANSPORT: 'Transport',
 };
 
+export const PROCESS_FAMILIES = [
+  'METALWORK',
+  'PRECISION',
+  'FINISHING',
+  'ELECTRICAL',
+  'LOGISTICS',
+] as const;
+export type ProcessFamily = (typeof PROCESS_FAMILIES)[number];
+
+export const PROCESS_FAMILY_LABELS: Record<ProcessFamily, string> = {
+  METALWORK: 'Metalwork',
+  PRECISION: 'Precision',
+  FINISHING: 'Finishing',
+  ELECTRICAL: 'Electrical',
+  LOGISTICS: 'Logistics',
+};
+
+/**
+ * Which family each process belongs to. The capability matrix groups its columns
+ * by family so a reader can see at a glance that a partner covers all of
+ * metalwork but none of precision — twelve ungrouped columns cannot show that.
+ *
+ * The order of PROCESS_TYPES already runs family by family; keep it that way so
+ * grouped columns stay contiguous without re-sorting.
+ */
+export const PROCESS_FAMILY: Record<ProcessType, ProcessFamily> = {
+  CUTTING: 'METALWORK',
+  BENDING: 'METALWORK',
+  WELDING: 'METALWORK',
+  FABRICATION: 'METALWORK',
+  MACHINING: 'PRECISION',
+  DRILLING: 'PRECISION',
+  GRINDING: 'PRECISION',
+  PAINTING: 'FINISHING',
+  ASSEMBLY: 'FINISHING',
+  PACKING: 'FINISHING',
+  ELECTRICAL_WIRING: 'ELECTRICAL',
+  TRANSPORT: 'LOGISTICS',
+};
+
+/** Processes of each family, in PROCESS_TYPES order. */
+export function processesByFamily(
+  processes: readonly ProcessType[] = PROCESS_TYPES,
+): { family: ProcessFamily; label: string; processes: ProcessType[] }[] {
+  return PROCESS_FAMILIES.map((family) => ({
+    family,
+    label: PROCESS_FAMILY_LABELS[family],
+    processes: processes.filter((process) => PROCESS_FAMILY[process] === family),
+  })).filter((group) => group.processes.length > 0);
+}
+
 export const MACHINE_CONDITIONS = ['EXCELLENT', 'GOOD', 'FAIR', 'POOR', 'UNDER_REPAIR'] as const;
 export type MachineCondition = (typeof MACHINE_CONDITIONS)[number];
 

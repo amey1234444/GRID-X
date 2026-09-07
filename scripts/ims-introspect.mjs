@@ -37,7 +37,7 @@ const flag = (name, fallback) => {
 
 const url = process.env.IMS_DATABASE_URL;
 const schema = flag('schema', process.env.IMS_DATABASE_SCHEMA || 'public');
-const profileName = flag('profile', process.env.IMS_MAPPING_PROFILE || 'prisma');
+const profileName = flag('profile', process.env.IMS_MAPPING_PROFILE || 'oswar');
 const shouldWrite = args.includes('--write');
 const sslMode = process.env.IMS_DB_SSL || 'require';
 
@@ -62,6 +62,18 @@ const ENTITY_FIELDS = {
   'material-transactions': ['reference', 'itemCode', 'warehouseCode', 'transactionType', 'quantity'],
   users: ['reference', 'name', 'email', 'phone', 'role', 'isActive'],
   'purchase-orders': ['reference', 'supplierCode', 'itemCode', 'quantity', 'status'],
+};
+
+/**
+ * Entities the OSWAR IMS does not publish at all — its production module was removed, so it has no
+ * products, sales orders, work orders or purchase orders. Reported as such rather than counted
+ * against the mapping, so the summary line means something.
+ */
+const UNSUPPORTED = {
+  products: 'no product master (production module removed)',
+  'sales-orders': 'no sales orders',
+  'work-orders': 'no work orders (production module removed)',
+  'purchase-orders': 'only a free-text po_reference on goods_receipts, which is a receipt',
 };
 
 /** Table-name candidates per entity, best guess first. */
@@ -151,8 +163,16 @@ try {
   const generated = {};
   let broken = 0;
   let degraded = 0;
+  let unsupported = 0;
+  const unscoped = [];
 
   for (const [entity, fields] of Object.entries(ENTITY_FIELDS)) {
+    if (profileName === 'oswar' && UNSUPPORTED[entity]) {
+      unsupported += 1;
+      console.log(`· ${entity.padEnd(24)} not published by this IMS — ${UNSUPPORTED[entity]}`);
+      continue;
+    }
+
     const table = pickTable(entity, tables);
     if (!table) {
       broken += 1;
@@ -170,10 +190,18 @@ try {
       else missing.push(field);
     }
 
+    // Multi-tenancy is the one thing worth failing loudly over: an unscoped read on a shared IMS
+    // pulls other companies' data into GRID-X, and it looks like a working sync while it does it.
+    const orgColumn = ['org_id', 'orgId', 'organization_id', 'organizationId', 'company_id'].find(
+      (candidate) => columns.includes(candidate),
+    );
+    if (orgColumn && !process.env.IMS_ORG_ID) unscoped.push(entity);
+
     const changeColumn = pickColumn('updatedAt', columns) ?? pickColumn('createdAt', columns);
     generated[entity] = {
       table,
       columns: mapped,
+      ...(orgColumn ? { orgColumn } : {}),
       ...(changeColumn ? { changeColumn } : {}),
       ...(mapped.code || mapped.name
         ? { searchColumns: [mapped.code, mapped.name].filter(Boolean) }
@@ -189,8 +217,18 @@ try {
   }
 
   console.log(
-    `\n${Object.keys(ENTITY_FIELDS).length - broken - degraded} clean, ${degraded} partial, ${broken} unmatched.`,
+    `\n${Object.keys(ENTITY_FIELDS).length - broken - degraded - unsupported} clean, ` +
+      `${degraded} partial, ${broken} unmatched, ${unsupported} not published by this IMS.`,
   );
+
+  if (unscoped.length > 0) {
+    console.log(
+      `\n! ${unscoped.length} entit${unscoped.length === 1 ? 'y is' : 'ies are'} tenant-scoped ` +
+        'but IMS_ORG_ID is not set. GRID-X will refuse to read them rather than pull every\n' +
+        '  organisation in the IMS. Find the id with:\n' +
+        `    select id, slug, name from ${schema}.organizations;\n`,
+    );
+  }
   console.log(
     'Fields left unmatched are usually joins (a code that lives on a parent table) or genuinely\n' +
       'absent. Fill those in by hand: a joined column is written "alias.column" with a matching\n' +

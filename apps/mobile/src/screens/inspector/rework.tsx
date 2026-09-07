@@ -73,7 +73,7 @@ export function ReworkListScreen({ navigation }: InspectorScreenProps<'ReworkLis
     return (
       <Screen>
         <View style={screenStyles.list}>
-          <ScreenHeader title="Rework" />
+          <ScreenHeader title="Rework" icon="repeat-outline" />
           <LoadingState />
         </View>
       </Screen>
@@ -98,7 +98,7 @@ export function ReworkListScreen({ navigation }: InspectorScreenProps<'ReworkLis
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         ListHeaderComponent={
           <View style={styles.header}>
-            <ScreenHeader title="Rework" subtitle="Work sent back for correction" />
+            <ScreenHeader title="Rework" subtitle="Work sent back for correction" icon="repeat-outline" />
             <ChipRow
               value={filter}
               onChange={setFilter}

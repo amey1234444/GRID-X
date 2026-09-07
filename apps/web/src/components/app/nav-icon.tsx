@@ -1,11 +1,14 @@
 'use client';
 
 import {
+  AlertCircle,
+  AlertTriangle,
   BarChart3,
   Bell,
   Boxes,
   ClipboardCheck,
   ClipboardList,
+  Clock,
   Cog,
   Factory,
   FileText,
@@ -26,11 +29,14 @@ import {
 } from 'lucide-react';
 
 const ICONS: Record<string, LucideIcon> = {
+  AlertCircle,
+  AlertTriangle,
   BarChart3,
   Bell,
   Boxes,
   ClipboardCheck,
   ClipboardList,
+  Clock,
   Cog,
   Factory,
   FileText,

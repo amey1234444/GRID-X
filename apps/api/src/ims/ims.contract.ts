@@ -199,6 +199,15 @@ export interface ImsFetchOptions {
 
 export interface ImsFetchResult<T = unknown> {
   records: T[];
+  /**
+   * Set when this IMS does not publish the entity at all, carrying the reason to show a user.
+   *
+   * The blueprint's Section 10 list is what GRID-X would like from an IMS; a given IMS supplies
+   * some subset. An entity outside that subset reads as empty — but an empty dropdown with no
+   * explanation is how a planner concludes the software is broken, so the reason travels with the
+   * result rather than being logged and forgotten.
+   */
+  unsupported?: string;
   /** Highest change timestamp seen, to be stored as the next watermark. Null when not incremental. */
   watermark: Date | null;
   /** True when the entity has no mapped change column, so `since` could not be honoured. */

@@ -1,9 +1,11 @@
 import {
   IMS_MAPPING_PROFILES,
+  WATERMARK_ALIAS,
   buildSelect,
   columnExpression,
   loadMapping,
   quoteIdentifier,
+  unsupportedReason,
   validateMapping,
   type ImsEntityMapping,
 } from './ims.mapping';
@@ -115,17 +117,117 @@ describe('IMS mapping', () => {
   });
 
   describe('built-in profiles', () => {
-    it.each(['prisma', 'snake'] as const)('%s declares every boundary entity', (profile) => {
+    it.each(['oswar', 'prisma', 'snake'] as const)('%s declares every boundary entity', (profile) => {
       expect(Object.keys(IMS_MAPPING_PROFILES[profile]).sort()).toEqual(
         [...IMS_INBOUND_ENTITIES].sort(),
       );
     });
 
-    it.each(['prisma', 'snake'] as const)('%s has no structural errors', (profile) => {
+    it.each(['oswar', 'prisma', 'snake'] as const)('%s has no structural errors', (profile) => {
       const errors = validateMapping(IMS_MAPPING_PROFILES[profile]).filter(
         (issue) => issue.severity === 'error',
       );
       expect(errors).toEqual([]);
+    });
+  });
+
+  describe('the oswar profile', () => {
+    const oswar = IMS_MAPPING_PROFILES.oswar;
+
+    it('reads masters from the tables the IMS actually has', () => {
+      expect(oswar.items.table).toBe('materials');
+      expect(oswar.companies.table).toBe('organizations');
+      expect(oswar.warehouses.table).toBe('warehouses');
+      expect(oswar.suppliers.table).toBe('suppliers');
+      expect(oswar['material-transactions'].table).toBe('stock_transactions');
+    });
+
+    it('declares the four entities this IMS does not publish, with a reason', () => {
+      for (const entity of ['products', 'sales-orders', 'work-orders', 'purchase-orders'] as const) {
+        expect(unsupportedReason(oswar[entity])).toEqual(expect.stringContaining('IMS'));
+      }
+    });
+
+    it('scopes every business entity to a tenant', () => {
+      for (const entity of [
+        'items',
+        'suppliers',
+        'warehouses',
+        'stock',
+        'material-transactions',
+        'users',
+      ] as const) {
+        expect(oswar[entity].orgColumn).toBe('org_id');
+      }
+      // The IMS organisation *is* the company, so its own primary key is the tenant key.
+      expect(oswar.companies.orgColumn).toBe('id');
+    });
+
+    it('derives stock from the ledger, because the IMS keeps no balance table', () => {
+      const query = buildSelect(
+        'stock',
+        oswar.stock,
+        'public',
+        { orgId: 'org-1' },
+      );
+      expect(query.text).toContain('SUM(CASE WHEN');
+      // The inbound set has to match the IMS's own STOCK_IN_TYPES, or every balance is wrong.
+      expect(query.text).toContain("'OPENING', 'PURCHASE', 'RETURN_IN', 'ADJUSTMENT_IN', 'TRANSFER_IN'");
+      expect(query.text).toContain('"public"."stock_transactions" s');
+      expect(query.values).toContain('org-1');
+    });
+  });
+
+  describe('tenant scoping', () => {
+    const scoped: ImsEntityMapping = {
+      table: 'materials',
+      columns: { code: 'code' },
+      orgColumn: 'org_id',
+    };
+
+    it('binds the tenant as a parameter rather than interpolating it', () => {
+      const query = buildSelect('items', scoped, 'public', { orgId: 'org-7' });
+      expect(query.text).toContain('t."org_id" = $1');
+      expect(query.values[0]).toBe('org-7');
+    });
+
+    it('refuses to read a tenant-scoped entity with no tenant', () => {
+      // Reading every organisation in a shared IMS is a data-protection incident, so this fails
+      // loudly rather than returning a superset.
+      expect(() => buildSelect('items', scoped, 'public', {})).toThrow(/IMS_ORG_ID is not set/);
+    });
+  });
+
+  describe('unsupported entities', () => {
+    const missing: ImsEntityMapping = {
+      table: 'nothing',
+      columns: { reference: 'id' },
+      unsupported: 'This IMS has no work orders.',
+    };
+
+    it('never builds a query for one', () => {
+      expect(() => buildSelect('work-orders', missing, 'public')).toThrow(/does not publish/);
+    });
+
+    it('is a warning, not an error, so the rest of the mapping still validates', () => {
+      const issues = validateMapping({
+        ...IMS_MAPPING_PROFILES.oswar,
+        'work-orders': missing,
+      }).filter((issue) => issue.entity === 'work-orders');
+      expect(issues.every((issue) => issue.severity === 'warning')).toBe(true);
+    });
+  });
+
+  describe('watermarks', () => {
+    it('selects the change column under a fixed alias the driver can read', () => {
+      const query = buildSelect(
+        'items',
+        { table: 'materials', columns: { code: 'code' }, changeColumn: 'updated_at' },
+        'public',
+      );
+      // Without this the driver looked the watermark up by the IMS's column name, which the row
+      // never carries — every read aliases its columns to canonical field names.
+      expect(query.text).toContain(`t."updated_at" AS "${WATERMARK_ALIAS}"`);
     });
   });
 

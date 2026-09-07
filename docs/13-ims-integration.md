@@ -33,9 +33,10 @@ Section 10 of the blueprint sets the rule this whole document serves:
                                                      │
                                         ┌────────────▼────────────┐
                                         │   OSWAR IMS PostgreSQL  │
-                                        │   Company · Item ·      │
-                                        │   Product · Warehouse · │
-                                        │   StockBalance · …      │
+                                        │   organizations ·       │
+                                        │   materials · suppliers │
+                                        │   warehouses · users ·  │
+                                        │   stock_transactions    │
                                         │                         │
                                         │   gridx.ims_outbound_   │
                                         │        fact  (ours)     │
@@ -60,44 +61,113 @@ outbox keeps the blast radius at zero, gives the IMS a queue it can drain in its
 transaction with its own validation, and gives both sides a durable record of exactly
 what was claimed and when.
 
-### Why a direct connection rather than the REST API
+### Which transport, and why the answer differs by direction
 
-It removes a moving part (an API that must be deployed, versioned and kept up), removes a
-round trip, and gives incremental reads that are actually incremental — a `WHERE
-"updatedAt" >= $1` against an indexed column, rather than hoping the IMS honours a `since`
-query parameter. It costs coupling: if the IMS renames a column, GRID-X notices. Section 5
-is how that is made survivable.
+Both transports are implemented, and the recommended production shape uses **both**:
 
-Both transports are kept. `IMS_DRIVER=http` is a one-variable rollback.
+```dotenv
+IMS_DRIVER=database     # reads
+IMS_WRITE_MODE=http     # writes
+```
+
+**Read over the database link.** Not for elegance — for three concrete properties the IMS
+REST API does not have:
+
+* *Incrementality.* No IMS list endpoint accepts a `since` parameter. Over HTTP every
+  sweep is a full read of every table, and the scheduler can never advance a watermark
+  honestly. Over SQL it is `WHERE "updated_at" >= $1` against an indexed column.
+* *Cost.* `GET /materials` recomputes on-hand stock per material by summing that
+  material's ledger — one query per row, on every call. `GET /transactions` returns the
+  entire ledger with no paging at all.
+* *Credentials.* The IMS issues no API keys and has no client-credentials flow. The only
+  way in is `POST /auth/login` with a user's email and password, returning a token that
+  expires in a day. A read-only Postgres role is a better long-lived machine credential
+  than a password belonging to a user account that can be deactivated or rotated by
+  someone who does not know GRID-X depends on it.
+
+**Write over the REST API.** The direction reverses, because on the way in the IMS's
+business logic is exactly what you want:
+
+* `POST /transactions/bulk` refuses an outbound movement that would drive stock negative,
+  and maintains weighted-average valuation. A direct `INSERT` into `stock_transactions`
+  bypasses both, silently, and the damage shows up later as a valuation nobody can explain.
+* GRID-X does not know the IMS's invariants — which columns are computed, which triggers
+  fire, which statuses are legal. Writing through the API means never having to.
+
+`OUTSOURCE` already exists in the IMS's own `TransactionType` enum, so GRID-X issuing
+material to a partner is a movement the IMS was designed to record, not a concept forced
+into it. It is the **only** outbound fact posted to the ledger. The other six have no home
+in this IMS and stay in the outbox: five of them describe outsourcing, which the IMS does
+not model at all, and `finished-components-received` is a genuine open question — a
+finished component is not an IMS material, and this IMS has no unambiguous inbound type
+for job-work output (`RETURN_IN` means returned goods, `PURCHASE` means bought, and
+`MANUFACTURING` is an *outbound* consumption type here). Which one OSWAR wants is an
+accounting decision to settle before it can be automated.
+
+**The one caveat, and why stock posting is opt-in.** `POST /transactions/bulk` accepts no
+idempotency key, and nothing in the IMS makes a repeated post a no-op. If GRID-X posts a
+movement and the response is lost, a retry issues the same material twice. So
+`IMS_HTTP_POST_STOCK` defaults to **off**: GRID-X will not move another system's stock on
+a guess. With it off — or for the five outbound facts the IMS has no model for at all —
+the fact lands in the outbox and the sync log instead, for the IMS team to drain.
+
+If the two systems cannot share a network, `IMS_DRIVER=http` reads everything over REST
+instead. It works; it is just a full scan every time.
 
 ---
 
 ## 2. What crosses the boundary
 
-### Inbound — eleven entities
+### Inbound — eleven entities, of which this IMS publishes seven
 
-| Entity | Treatment | Where it lands |
-| --- | --- | --- |
-| `companies` | **Persisted** | `Company`, upserted on `code` |
-| `items` | **Persisted** | `Item`, upserted on `code` |
-| `products` | **Persisted** | `Product`, upserted on `(companyId, code)` |
-| `sales-orders` | Read-through | `GET /api/ims/orders`, job creation |
-| `work-orders` | Read-through | `GET /api/ims/orders`, job creation |
-| `stock` | Read-through | `GET /api/ims/stock`, material issue |
-| `warehouses` | Read-through | — |
-| `suppliers` | Read-through | — |
-| `material-transactions` | Read-through | — |
-| `users` | Read-through | — |
-| `purchase-orders` | Read-through | — |
+The blueprint's Section 10 list is what GRID-X would like from an IMS. The OSWAR IMS
+supplies a subset of it, and the gap is a fact about the IMS rather than a fault in the
+mapping — so the four missing entities are **declared unsupported**, with a reason that
+reaches the operator, instead of being pointed at table names that do not exist.
 
-Only three are copied, because only three are genuinely needed locally: a job references
-a component that references an item, and none of that can be resolved per-request against
-a foreign database. Everything else is read live and logged with *"Read-through entity:
-IMS remains the system of record"*.
+| Entity | Treatment | IMS source | Where it lands |
+| --- | --- | --- | --- |
+| `companies` | **Persisted** | `organizations` (`slug` → code) | `Company`, upserted on `code` |
+| `items` | **Persisted** | `materials` | `Item`, upserted on `code` |
+| `stock` | Read-through | derived from `stock_transactions` | `GET /api/ims/stock`, material issue |
+| `warehouses` | Read-through | `warehouses` | — |
+| `suppliers` | Read-through | `suppliers` | — |
+| `material-transactions` | Read-through | `stock_transactions` | — |
+| `users` | Read-through | `users` | — |
+| `products` | **Unsupported** | — | Maintained in GRID-X |
+| `sales-orders` | **Unsupported** | — | Jobs raised from an internal requirement |
+| `work-orders` | **Unsupported** | — | Jobs raised from an internal requirement |
+| `purchase-orders` | **Unsupported** | — | — |
 
-A product whose company has not been pulled yet is **skipped, not invented** — creating a
-placeholder company would put a record into GRID-X that IMS never sent. Pull `companies`
-first; the default `IMS_SYNC_ENTITIES` order does exactly that.
+The IMS's production module was removed (migration
+`20260602100000_remove_production_module`), which is why it has no product master, no
+sales orders and no work orders. Its only trace of a purchase order is a free-text
+`po_reference` on a goods receipt — a receipt, not an order, and not read as one.
+
+Module 4 already allows for this: a GRID-X job may be raised from *"an internal production
+requirement"* or *"a manual requirement"*, which is the path a planner takes here. Asking
+for an unsupported entity returns the reason rather than an unexplained empty list.
+
+**Stock has no balance table.** On-hand quantity exists in the IMS only as the signed sum
+of the ledger, so GRID-X reads it from a derived aggregate that mirrors the IMS's own
+`STOCK_IN_TYPES` set (`OPENING`, `PURCHASE`, `RETURN_IN`, `ADJUSTMENT_IN`, `TRANSFER_IN`
+add; everything else subtracts). If the IMS adds an inbound type, `stock.derivedFrom` in
+the `oswar` profile is the one place that has to learn about it.
+
+**Two entities are copied**, because only they are needed to resolve a job locally: a job
+references a component that references an item, and that cannot be looked up per-request
+against a foreign database. Everything else is read live and logged with *"Read-through
+entity: IMS remains the system of record"*.
+
+### The IMS is multi-tenant, and that is load-bearing
+
+Every business table in the IMS carries `org_id`. An unscoped read does not fail — it
+succeeds and returns every organisation's materials, which is a data-protection incident
+that looks exactly like a working sync. So `IMS_ORG_ID` is **required** for the database
+driver, and a tenant-scoped read with no tenant configured is refused outright rather than
+returning a superset. The REST driver gets this for free (the IMS derives the tenant from
+the token) but still checks the token's org against `IMS_ORG_ID` when one is set, so a
+credential pointing at the wrong workspace fails on the first call.
 
 ### Outbound — seven facts
 
@@ -125,12 +195,42 @@ sync, it does not block closing a job or approving an invoice.
 
 ```dotenv
 IMS_ENABLED=true
-IMS_DATABASE_URL="postgresql://gridx_ims:••••@ims-db.internal:5432/ims?sslmode=require"
+IMS_DATABASE_URL="postgresql://gridx_ims:••••@aws-0-ap-northeast-1.pooler.supabase.com:5432/postgres"
+IMS_DATABASE_SCHEMA=ims
+IMS_DB_SSL=no-verify
+IMS_ORG_ID="<the OSWAR organisation's uuid>"
 ```
 
-That is enough. `IMS_DRIVER` defaults to `auto`, which sees a database URL and picks the
-direct driver; `IMS_WRITE_MODE` defaults to `outbox`; the scheduled inbound sync turns
-itself on.
+All four are required, and two of them are the usual reason a first attempt reads
+nothing:
+
+* **`IMS_DATABASE_SCHEMA=ims`, not `public`.** The IMS shares a Supabase database with
+  the CRM, which owns `public`; every IMS table lives in `ims`. Its own `DATABASE_URL`
+  carries `?schema=ims`. A wrong schema here reads as "no tables found".
+* **`IMS_DB_SSL=no-verify`.** Supabase serves a certificate Node will not verify against
+  its bundled root store. The connection is still encrypted; only the chain is unchecked. `IMS_DRIVER` defaults to `auto`, which sees a database URL and picks
+the direct driver; `IMS_MAPPING_PROFILE` defaults to `oswar`; `IMS_WRITE_MODE` defaults
+to `outbox`; the scheduled inbound sync turns itself on.
+
+Find the organisation id with:
+
+```sql
+SELECT id, slug, name FROM organizations WHERE deleted_at IS NULL;
+```
+
+To post real stock movements back over REST as well, add:
+
+```dotenv
+IMS_WRITE_MODE=http
+IMS_BASE_URL="https://ims.oswar.example/api/v1"
+IMS_AUTH_EMAIL="gridx@oswar.example"      # a dedicated IMS user, ADMIN role
+IMS_AUTH_PASSWORD="••••"
+IMS_HTTP_POST_STOCK=true                  # read the caveat in section 1 first
+IMS_ISSUE_WAREHOUSE_ID="<warehouse uuid>"
+```
+
+The IMS user needs **ADMIN**: it redacts unit prices and refuses the members list to
+lower roles, so a `STORE_MANAGER` credential syncs items with no rate and no users.
 
 ### Everything else
 
@@ -146,7 +246,8 @@ itself on.
 | `IMS_DB_IDLE_TIMEOUT_MS` | `30000` | Close an idle pooled connection |
 | `IMS_DB_SSL` | `require` | `require` verifies the certificate, `no-verify` accepts self-signed, `disable` turns TLS off |
 | `IMS_DB_APPLICATION_NAME` | `gridx-ims` | Shows in the IMS `pg_stat_activity` |
-| `IMS_MAPPING_PROFILE` | `prisma` | `prisma` (PascalCase/camelCase) or `snake` |
+| `IMS_ORG_ID` | — | The IMS organisation GRID-X speaks for. **Required** for the database driver |
+| `IMS_MAPPING_PROFILE` | `oswar` | `oswar` (the real IMS), or `prisma` / `snake` for a different one |
 | `IMS_MAPPING_FILE` | — | JSON file of per-entity overrides |
 | `IMS_MAPPING_JSON` | — | The same as inline JSON, for Render/Vercel |
 | `IMS_WRITE_MODE` | `outbox` | `outbox`, `http`, or `none` |
@@ -154,9 +255,14 @@ itself on.
 | `IMS_OUTBOX_TABLE` | `ims_outbound_fact` | Table for GRID-X's outbox |
 | `IMS_OUTBOX_AUTO_CREATE` | `true` | Create the outbox on first push |
 | `IMS_SYNC_INBOUND_ENABLED` | on when a database URL is set | Scheduled inbound sweep |
-| `IMS_SYNC_ENTITIES` | `companies,items,products` | Entities the sweep pulls, in order |
+| `IMS_SYNC_ENTITIES` | `companies,items` | Entities the sweep pulls, in order |
 | `IMS_SYNC_BATCH_SIZE` | `500` | Rows per entity per sweep |
-| `IMS_BASE_URL` / `IMS_API_KEY` / `IMS_TIMEOUT_MS` | — / — / `15000` | The REST transport |
+| `IMS_BASE_URL` | — | REST base URL, including the IMS prefix (`…/api/v1`) |
+| `IMS_AUTH_EMAIL` / `IMS_AUTH_PASSWORD` | — | The IMS login GRID-X uses. Needs the ADMIN role |
+| `IMS_API_KEY` | — | A pre-issued bearer token, for an IMS deployment that hands one out |
+| `IMS_TIMEOUT_MS` | `15000` | REST request timeout |
+| `IMS_HTTP_POST_STOCK` | `false` | Whether GRID-X may post real movements into the IMS ledger |
+| `IMS_ISSUE_WAREHOUSE_ID` | — | The IMS warehouse material is issued from. Required when posting stock |
 
 Managed Postgres providers (Neon, Render, Supabase, RDS) hand out certificates Node will
 not verify against its bundled root store. Set `IMS_DB_SSL=no-verify` there — the
@@ -175,9 +281,9 @@ GRANT USAGE   ON SCHEMA public TO gridx_ims;
 
 -- Narrow is better: grant only the tables the mapping actually names, so an accidental
 -- mapping override cannot read payroll.
-GRANT SELECT ON "Company", "Item", "Product", "Warehouse", "StockBalance",
-                "SalesOrder", "WorkOrder", "Supplier", "StockMovement",
-                "PurchaseOrder", "User"
+-- The tables the `oswar` profile actually names, and no others.
+GRANT SELECT ON organizations, materials, categories, warehouses, suppliers,
+                stock_transactions, users
   TO gridx_ims;
 
 -- The outbox. Either let GRID-X create it (needs CREATE on the database) …
@@ -250,16 +356,25 @@ and a typo that becomes a second statement is not a typo any more. So:
 
 ### Profiles and overrides
 
-Two built-in profiles cover the plausible shapes:
+* **`oswar`** (default) — the real OSWAR IMS, transcribed from its `schema.prisma`. Not a
+  guess: the table and column names, the soft-delete filters, the `org_id` scoping and the
+  four unsupported entities all come from the schema itself.
+* **`prisma`** — PascalCase tables, camelCase columns. What Prisma generates without
+  `@@map`. An informed guess, for a different IMS.
+* **`snake`** — plural snake_case tables and columns. Likewise a guess.
 
-* **`prisma`** (default) — PascalCase tables, camelCase columns. What Prisma generates
-  without `@@map`, which is how the sibling Autix products are built.
-* **`snake`** — plural snake_case tables and columns.
+Beyond the column forms above, an entity may also declare:
 
-Both are *informed guesses*. Override what they got wrong with `IMS_MAPPING_FILE` (a JSON
-file) or `IMS_MAPPING_JSON` (inline). Overrides merge per entity and per column, so
-correcting one awkward table does not mean restating the other ten. A malformed override
-is warned about and ignored — a bad override must not stop the API booting.
+| Key | Meaning |
+| --- | --- |
+| `orgColumn` | The tenant column. Every read is scoped to `IMS_ORG_ID`, and refused without one |
+| `derivedFrom` | A derived base relation instead of a table, for a fact stored only as a ledger. `{schema}` is substituted |
+| `unsupported` | This IMS has no such entity. Reads return empty with this reason; no query is built |
+
+Override anything a profile gets wrong with `IMS_MAPPING_FILE` (a JSON file) or
+`IMS_MAPPING_JSON` (inline). Overrides merge per entity and per column, so correcting one
+awkward table does not mean restating the other ten. A malformed override is warned about
+and ignored — a bad override must not stop the API booting.
 
 ---
 
@@ -287,7 +402,7 @@ Then, in Control at `/app/ims`, or over the API:
 | Check | Endpoint | What good looks like |
 | --- | --- | --- |
 | Can we connect? | `GET /api/ims/health` | `reachable: true`, a latency, a server version |
-| Does the mapping fit? | `GET /api/ims/introspect` | every entity `ok`; `degraded` reads but is missing columns; `broken` cannot read at all |
+| Does the mapping fit? | `GET /api/ims/introspect` | every entity `ok` or `unsupported`; `degraded` reads but is missing columns; `broken` cannot read at all |
 | Do the rows look right? | `GET /api/ims/preview?entity=items` | ten real rows, nothing persisted |
 | Pull for real | `POST /api/ims/sync` | created/updated counts per entity |
 

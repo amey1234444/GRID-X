@@ -536,7 +536,9 @@ export interface ImsEntityIntrospection {
   tableExists: boolean;
   missingColumns: string[];
   unmappedColumns: string[];
-  status: 'ok' | 'degraded' | 'broken';
+  /** Why this IMS does not publish the entity at all — a fact about the IMS, not a fault. */
+  unsupported?: string;
+  status: 'ok' | 'degraded' | 'broken' | 'unsupported';
 }
 
 export interface ImsIntrospection {

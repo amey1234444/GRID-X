@@ -1,7 +1,8 @@
 import { RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
-import { colors, spacing, typography } from '@/theme';
+import { colors, radius, spacing, typography } from '@/theme';
 
 export function formatDate(value: string | null | undefined): string {
   if (!value) return '—';
@@ -51,20 +52,42 @@ export function isSameDay(value: string | null | undefined, reference = new Date
   );
 }
 
+/**
+ * The screen's identity block, matching the web's PageHeader: a typed glyph in
+ * a bordered tile, the screen name, and any actions that belong to it, closed
+ * by a hairline. The subtitle is deliberately quiet — the title and the data
+ * below it carry the screen.
+ */
 export function ScreenHeader({
   title,
   subtitle,
+  icon,
+  meta,
   right,
 }: {
   title: string;
   subtitle?: string;
+  /** Ionicons name, matching the tab this screen belongs to. */
+  icon?: keyof typeof Ionicons.glyphMap;
+  /** Inline status or count pills that sit beside the title. */
+  meta?: React.ReactNode;
   right?: React.ReactNode;
 }): React.JSX.Element {
   return (
     <View style={styles.header}>
       <View style={styles.headerText}>
-        <Text style={typography.title}>{title}</Text>
-        {subtitle ? <Text style={typography.caption}>{subtitle}</Text> : null}
+        <View style={styles.headerTitleRow}>
+          {icon ? (
+            <View style={styles.headerIcon}>
+              <Ionicons name={icon} size={17} color={colors.brand} />
+            </View>
+          ) : null}
+          <Text style={[typography.title, styles.headerTitle]} numberOfLines={1}>
+            {title}
+          </Text>
+          {meta}
+        </View>
+        {subtitle ? <Text style={[typography.caption, styles.headerSubtitle]}>{subtitle}</Text> : null}
       </View>
       {right}
     </View>
@@ -130,6 +153,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.md,
     marginBottom: spacing.lg,
+    paddingBottom: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSubtle,
   },
-  headerText: { flex: 1, gap: 4 },
+  headerText: { flex: 1, gap: 6 },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.input,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: { flexShrink: 1 },
+  /* Aligned under the title, clear of the glyph tile — as on the web. */
+  headerSubtitle: { paddingLeft: 42 },
 });

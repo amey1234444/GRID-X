@@ -370,6 +370,31 @@ export async function answerClarificationAction(
   ]);
 }
 
+/**
+ * Planning board — a card dragged into another lane. The board has already moved the card
+ * optimistically, so this either confirms the move or hands back the API's reason for refusing
+ * it (usually "cannot move from X to Y"), which the board shows before snapping the card back.
+ */
+export async function moveJobStageAction(
+  jobId: string,
+  status: string,
+): Promise<ActionState> {
+  if (!jobId || !status) return { error: 'Missing job or stage' };
+  const result = await apiFetch<unknown>(`/jobs/${jobId}/transition`, {
+    method: 'POST',
+    body: JSON.stringify({ status }),
+  });
+  if (result.error) return { error: result.error };
+  for (const route of [
+    '/app/production/planning-board',
+    '/app/production/jobs',
+    `/app/production/jobs/${jobId}`,
+  ]) {
+    revalidatePath(route);
+  }
+  return { error: null, success: 'Moved' };
+}
+
 export async function closeJobAction(_state: ActionState, data: FormData): Promise<ActionState> {
   const jobId = text(data, 'jobId');
   if (!jobId) return { error: 'Missing job' };

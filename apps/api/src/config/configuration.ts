@@ -1,7 +1,7 @@
 export type ImsDriverName = 'database' | 'http' | 'disabled';
 export type ImsSslMode = 'disable' | 'require' | 'no-verify';
 export type ImsWriteMode = 'outbox' | 'http' | 'none';
-export type ImsMappingProfileName = 'prisma' | 'snake';
+export type ImsMappingProfileName = 'oswar' | 'prisma' | 'snake';
 
 export interface AppConfig {
   port: number;
@@ -63,6 +63,23 @@ export interface AppConfig {
     driver: ImsDriverName;
     baseUrl?: string;
     apiKey?: string;
+    /**
+     * The IMS organisation GRID-X speaks for.
+     *
+     * The OSWAR IMS is multi-tenant: every material, warehouse, supplier and ledger row carries an
+     * `org_id`. The direct driver scopes every read to this id and refuses to read without it. The
+     * HTTP driver does not need it — the IMS derives the tenant from the access token — but it is
+     * still checked against the token's org, so a credential pointing at the wrong workspace is
+     * caught on the first call rather than after a week of importing someone else's catalogue.
+     */
+    orgId?: string;
+    /**
+     * Credentials for the REST transport. The OSWAR IMS issues no API keys and has no
+     * client-credentials flow — `POST /auth/login` with a user's email and password is the only
+     * way in — so this is a dedicated, least-privilege IMS user, not a person's own login.
+     */
+    email?: string;
+    password?: string;
     timeoutMs: number;
     database: {
       /** PostgreSQL connection string for the IMS database — the whole point of the direct driver. */
@@ -83,9 +100,9 @@ export interface AppConfig {
     };
     mapping: {
       /**
-       * Which naming convention the IMS database uses. `prisma` is PascalCase tables with
-       * camelCase columns (what Prisma generates without `@@map`, which is how the sibling
-       * Autix products are built); `snake` is plural snake_case.
+       * Which IMS the mapping describes. `oswar` is the real OSWAR IMS, transcribed from its
+       * `schema.prisma` and the default. `prisma` (PascalCase tables, camelCase columns) and
+       * `snake` (plural snake_case) are generic conventions kept for a different IMS.
        */
       profile: ImsMappingProfileName;
       /** Path to a JSON file overriding part or all of the profile. */
@@ -107,6 +124,17 @@ export interface AppConfig {
       table: string;
       /** Create the outbox schema and table on boot when they are missing. */
       autoCreate: boolean;
+      /**
+       * Whether GRID-X may post real stock movements into the IMS ledger over REST.
+       *
+       * Off by default, and deliberately. `POST /transactions/bulk` accepts no idempotency key, so
+       * a retry after a lost response issues the same material to the same partner twice. Turning
+       * this on is a decision that the IMS ledger may occasionally need a manual correction —
+       * worth it for a live integration, not something to inherit from a default.
+       */
+      postStock: boolean;
+      /** The IMS warehouse outsourced material is issued from and returned to. */
+      warehouseId?: string;
     };
     sync: {
       /** Whether the scheduler pulls masters on its own, or only an operator does. */
@@ -220,6 +248,9 @@ export default function configuration(): AppConfig {
       driver: resolveImsDriver(imsEnabled, imsDatabaseUrl, imsBaseUrl),
       baseUrl: imsBaseUrl,
       apiKey: process.env.IMS_API_KEY || undefined,
+      orgId: process.env.IMS_ORG_ID?.trim() || undefined,
+      email: process.env.IMS_AUTH_EMAIL?.trim() || undefined,
+      password: process.env.IMS_AUTH_PASSWORD || undefined,
       timeoutMs: num(process.env.IMS_TIMEOUT_MS, 15000),
       database: {
         url: imsDatabaseUrl,
@@ -238,8 +269,10 @@ export default function configuration(): AppConfig {
       mapping: {
         profile: oneOf<ImsMappingProfileName>(
           process.env.IMS_MAPPING_PROFILE,
-          ['prisma', 'snake'],
-          'prisma',
+          ['oswar', 'prisma', 'snake'],
+          // The OSWAR IMS is the IMS this integration is for, and its profile is checked against
+          // the real schema. The other two are conventions to fall back on for a different IMS.
+          'oswar',
         ),
         file: process.env.IMS_MAPPING_FILE || undefined,
         json: process.env.IMS_MAPPING_JSON || undefined,
@@ -253,11 +286,15 @@ export default function configuration(): AppConfig {
         schema: process.env.IMS_OUTBOX_SCHEMA?.trim() || 'gridx',
         table: process.env.IMS_OUTBOX_TABLE?.trim() || 'ims_outbound_fact',
         autoCreate: bool(process.env.IMS_OUTBOX_AUTO_CREATE, true),
+        postStock: bool(process.env.IMS_HTTP_POST_STOCK, false),
+        warehouseId: process.env.IMS_ISSUE_WAREHOUSE_ID?.trim() || undefined,
       },
       sync: {
         inboundEnabled: bool(process.env.IMS_SYNC_INBOUND_ENABLED, Boolean(imsDatabaseUrl)),
         batchSize: num(process.env.IMS_SYNC_BATCH_SIZE, 500),
-        entities: list(process.env.IMS_SYNC_ENTITIES, ['companies', 'items', 'products']),
+        // Only entities GRID-X persists are worth a scheduled sweep, and only the ones this IMS
+        // actually publishes. It has no product master, so `products` is not in the default.
+        entities: list(process.env.IMS_SYNC_ENTITIES, ['companies', 'items']),
       },
     },
     sentryDsn: process.env.SENTRY_DSN || undefined,

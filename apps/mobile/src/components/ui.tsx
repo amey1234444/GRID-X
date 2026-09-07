@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -123,9 +123,15 @@ export function StatTile({
   const valueColor = tone === 'default' ? colors.foreground : accent;
   const content = (
     <>
-      {/* Accent rail carries the tone so the number itself stays legible. */}
-      <View style={[styles.statRail, { backgroundColor: accent }]} />
-      <Text style={typography.label}>{label}</Text>
+      {/* Tone travels in the value and a 5px dot beside the label. There is deliberately no
+          accent rail down the left edge: a stripe on one side reads as a border that failed to
+          draw the other three, and a grid of them stops looking like one surface. */}
+      <View style={styles.statLabelRow}>
+        {tone === 'default' ? null : <View style={[styles.statDot, { backgroundColor: accent }]} />}
+        <Text style={typography.label} numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
       <Text style={[styles.statValue, { color: valueColor }]}>{value}</Text>
       {hint ? <Text style={styles.statHint}>{hint}</Text> : null}
     </>
@@ -174,12 +180,15 @@ export function Button({
             ? colors.surfaceElevated
             : 'transparent';
 
+  // Matches the web: --destructive-foreground is white, --success-foreground is near-black.
   const textColor =
     variant === 'primary'
       ? colors.primaryForeground
-      : variant === 'destructive' || variant === 'success'
+      : variant === 'destructive'
         ? '#ffffff'
-        : colors.foreground;
+        : variant === 'success'
+          ? colors.primaryForeground
+          : colors.foreground;
 
   return (
     <Pressable
@@ -239,25 +248,55 @@ export function Field({
   );
 }
 
+/**
+ * Focus on the web tints the field's own hairline with --primary rather than
+ * drawing an offset halo. React Native has no :focus-visible, so the state is
+ * tracked here and the same treatment applied.
+ */
+function useFocusRing(props: TextInputProps): {
+  focused: boolean;
+  onFocus: TextInputProps['onFocus'];
+  onBlur: TextInputProps['onBlur'];
+} {
+  const [focused, setFocused] = useState(false);
+  return {
+    focused,
+    onFocus: (event) => {
+      setFocused(true);
+      props.onFocus?.(event);
+    },
+    onBlur: (event) => {
+      setFocused(false);
+      props.onBlur?.(event);
+    },
+  };
+}
+
 export function Input({ style, ...props }: TextInputProps): React.JSX.Element {
+  const { focused, onFocus, onBlur } = useFocusRing(props);
   return (
     <TextInput
       placeholderTextColor={colors.subtleForeground}
-      style={[styles.input, style]}
+      style={[styles.input, focused && styles.inputFocused, style]}
       autoCapitalize="none"
       {...props}
+      onFocus={onFocus}
+      onBlur={onBlur}
     />
   );
 }
 
 export function Textarea({ style, ...props }: TextInputProps): React.JSX.Element {
+  const { focused, onFocus, onBlur } = useFocusRing(props);
   return (
     <TextInput
       placeholderTextColor={colors.subtleForeground}
       multiline
       textAlignVertical="top"
-      style={[styles.input, styles.textarea, style]}
+      style={[styles.input, styles.textarea, focused && styles.inputFocused, style]}
       {...props}
+      onFocus={onFocus}
+      onBlur={onBlur}
     />
   );
 }
@@ -564,7 +603,7 @@ export function Banner({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.card,
     borderRadius: radius.card,
     ...elevation.hairline,
   },
@@ -586,12 +625,13 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: '45%',
     overflow: 'hidden',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.card,
     borderRadius: radius.card,
     ...elevation.hairline,
     padding: spacing.lg,
   },
-  statRail: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 2, opacity: 0.7 },
+  statLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statDot: { width: 5, height: 5, borderRadius: 2.5 },
   statValue: {
     fontSize: 26,
     fontWeight: '600',
@@ -624,6 +664,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     fontSize: 15,
   },
+  inputFocused: { borderColor: colors.primary },
   textarea: { minHeight: 96, paddingTop: spacing.md },
   segmented: {
     flexDirection: 'row',
@@ -683,7 +724,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.sm,

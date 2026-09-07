@@ -134,15 +134,19 @@ drains at its own pace.
 
 ### Inbound
 
-Eleven entities are recognised:
+Eleven entities are recognised, of which the OSWAR IMS publishes seven:
 
 ```
-companies · products · items · sales-orders · work-orders · suppliers
-stock · warehouses · material-transactions · users · purchase-orders
+companies · items · suppliers · stock · warehouses · material-transactions · users
 ```
 
-Only three are **persisted**, because only three are genuinely needed locally:
-`companies`, `items` and `products` — each validated with a zod schema, upserted on its
+`products`, `sales-orders`, `work-orders` and `purchase-orders` are declared
+**unsupported**: the IMS's production module was removed, so it holds none of them. Asking
+for one returns the reason rather than an unexplained empty list. See
+[13 — IMS integration](13-ims-integration.md).
+
+Two are **persisted**, because only two are genuinely needed locally:
+`companies` and `items` — each validated with a zod schema, upserted on its
 natural key, and counted as created/updated/skipped. Everything else is logged as a
 **read-through**, with the message *"Read-through entity: IMS remains the system of
 record"*, so GRID-X never becomes a second source of truth.

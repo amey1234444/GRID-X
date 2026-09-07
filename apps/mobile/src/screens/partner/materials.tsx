@@ -57,7 +57,7 @@ export function PartnerMaterialsScreen({
     return (
       <Screen>
         <View style={screenStyles.list}>
-          <ScreenHeader title="Material" />
+          <ScreenHeader title="Material" icon="cube-outline" />
           <LoadingState />
         </View>
       </Screen>
@@ -86,6 +86,7 @@ export function PartnerMaterialsScreen({
         ListHeaderComponent={
           <ScreenHeader
             title="Material"
+            icon="cube-outline"
             subtitle={pending > 0 ? `${pending} challan to acknowledge` : 'All challans acknowledged'}
           />
         }

@@ -109,10 +109,12 @@ for the whole repository.
 | `IMS_DATABASE_SCHEMA` | `public` | Schema the IMS tables live in |
 | `IMS_DB_POOL_MAX` / `IMS_DB_CONNECTION_TIMEOUT_MS` / `IMS_DB_STATEMENT_TIMEOUT_MS` / `IMS_DB_IDLE_TIMEOUT_MS` | 5 / 10000 / 15000 / 30000 | Connection and statement ceilings, so GRID-X cannot exhaust or pin the IMS |
 | `IMS_DB_SSL` | `require` | `require`, `no-verify` (managed providers) or `disable` |
-| `IMS_MAPPING_PROFILE` / `IMS_MAPPING_FILE` / `IMS_MAPPING_JSON` | `prisma` / — / — | Which IMS naming convention, plus per-entity overrides |
+| `IMS_ORG_ID` | — | The IMS organisation GRID-X speaks for. Required for the database driver — the IMS is multi-tenant |
+| `IMS_MAPPING_PROFILE` / `IMS_MAPPING_FILE` / `IMS_MAPPING_JSON` | `oswar` / — / — | Which IMS the mapping describes, plus per-entity overrides |
 | `IMS_WRITE_MODE` + `IMS_OUTBOX_SCHEMA` / `IMS_OUTBOX_TABLE` / `IMS_OUTBOX_AUTO_CREATE` | `outbox` / `gridx` / `ims_outbound_fact` / true | Where outbound facts go |
-| `IMS_SYNC_INBOUND_ENABLED` / `IMS_SYNC_ENTITIES` / `IMS_SYNC_BATCH_SIZE` | on with a database URL / `companies,items,products` / 500 | The scheduled inbound sweep |
-| `IMS_BASE_URL` / `IMS_API_KEY` / `IMS_TIMEOUT_MS` | — / — / 15000 | The REST transport |
+| `IMS_SYNC_INBOUND_ENABLED` / `IMS_SYNC_ENTITIES` / `IMS_SYNC_BATCH_SIZE` | on with a database URL / `companies,items` / 500 | The scheduled inbound sweep |
+| `IMS_BASE_URL` / `IMS_AUTH_EMAIL` / `IMS_AUTH_PASSWORD` / `IMS_TIMEOUT_MS` | — / — / — / 15000 | The REST transport. The IMS issues no API keys; the login needs the ADMIN role |
+| `IMS_HTTP_POST_STOCK` / `IMS_ISSUE_WAREHOUSE_ID` | false / — | Whether GRID-X posts real stock movements into the IMS ledger, and from which warehouse |
 | `SENTRY_DSN` | — | Error monitoring; blank disables it |
 | `SEED_PASSWORD` | `ChangeMe123!` | Password given to every seeded account |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:4000/api` | Browser-facing API base |

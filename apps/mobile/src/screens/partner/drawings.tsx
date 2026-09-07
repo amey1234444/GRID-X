@@ -48,7 +48,7 @@ export function PartnerDrawingsScreen(): React.JSX.Element {
     return (
       <Screen>
         <View style={screenStyles.list}>
-          <ScreenHeader title="Drawings" />
+          <ScreenHeader title="Drawings" icon="document-text-outline" />
           <LoadingState />
         </View>
       </Screen>
@@ -74,7 +74,7 @@ export function PartnerDrawingsScreen(): React.JSX.Element {
         refreshControl={<Refresher refreshing={refreshing} onRefresh={refresh} />}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         ListHeaderComponent={
-          <ScreenHeader title="Drawings" subtitle="Only released revisions shared with you" />
+          <ScreenHeader title="Drawings" subtitle="Only released revisions shared with you" icon="document-text-outline" />
         }
         ListEmptyComponent={
           <EmptyState

@@ -67,7 +67,7 @@ export function InsightBanner({
   aside?: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <section className="relative flex h-full min-h-[238px] overflow-hidden rounded-card border-l-2 border-brand/70 bg-card p-5 shadow-hairline surface-sheen sm:p-6">
+    <section className="relative flex h-full min-h-[238px] overflow-hidden rounded-card bg-card p-5 shadow-hairline surface-sheen sm:p-6">
       <div
         className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/70 to-transparent"
         aria-hidden

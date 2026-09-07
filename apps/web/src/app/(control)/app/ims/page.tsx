@@ -105,7 +105,15 @@ export default async function ImsPage(): Promise<React.JSX.Element> {
       header: 'Mapping',
       render: (row) => (
         <StatusBadge
-          status={row.status === 'ok' ? 'ACCEPTED' : row.status === 'degraded' ? 'PENDING' : 'FAILED'}
+          status={
+            row.status === 'ok'
+              ? 'ACCEPTED'
+              : row.status === 'degraded'
+                ? 'PENDING'
+                : row.status === 'unsupported'
+                  ? 'NOT_PUBLISHED'
+                  : 'FAILED'
+          }
         />
       ),
     },
@@ -113,7 +121,9 @@ export default async function ImsPage(): Promise<React.JSX.Element> {
       key: 'missing',
       header: 'Unresolved columns',
       render: (row) =>
-        row.missingColumns.length > 0 ? (
+        row.unsupported ? (
+          <span className="text-xs text-muted-foreground">{row.unsupported}</span>
+        ) : row.missingColumns.length > 0 ? (
           <span className="font-mono text-xs">{row.missingColumns.join(', ')}</span>
         ) : (
           '—'

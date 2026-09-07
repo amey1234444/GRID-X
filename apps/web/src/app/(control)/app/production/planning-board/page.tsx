@@ -1,124 +1,145 @@
 import Link from 'next/link';
+import { JOB_STATUS_LABELS, type JobStatus } from '@gridx/shared';
 
+import { EmptyState } from '@/components/app/empty-state';
 import { PageHeader } from '@/components/app/page-header';
+import { PlanningBoard } from '@/components/app/planning-board';
 import { StatCard } from '@/components/app/stat-card';
 import { StatusBadge } from '@/components/app/status-badge';
-import { EmptyState } from '@/components/app/empty-state';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDate, formatNumber, humanise } from '@/lib/format';
 import { apiGet } from '@/lib/session';
 import { emptyPage, type JobRow, type Paginated } from '@/lib/types';
 
 export const metadata = { title: 'Planning board · GRID-X' };
 
-const LANES: { status: string; label: string }[] = [
-  { status: 'DRAFT', label: 'Draft' },
-  { status: 'PLANNED', label: 'Planned' },
-  { status: 'AWAITING_PARTNER_ACCEPTANCE', label: 'Awaiting acceptance' },
-  { status: 'ACCEPTED', label: 'Accepted' },
-  { status: 'MATERIAL_ISSUED', label: 'Material issued' },
-  { status: 'IN_PRODUCTION', label: 'In production' },
-  { status: 'READY_FOR_INSPECTION', label: 'Ready for inspection' },
-  { status: 'QUALITY_ACCEPTED', label: 'Quality accepted' },
-  { status: 'DISPATCHED', label: 'Dispatched' },
+/** Stages that mean the job is out of the plant's hands and waiting on someone else. */
+const WAITING_ON_OTHERS: JobStatus[] = [
+  'AWAITING_PARTNER_ACCEPTANCE',
+  'INSPECTION_REQUESTED',
+  'MATERIAL_PENDING',
 ];
 
 export default async function PlanningBoardPage(): Promise<React.JSX.Element> {
   const jobs = await apiGet<Paginated<JobRow>>('/jobs?pageSize=200', emptyPage<JobRow>());
+
+  const open = jobs.data.filter(
+    (job) => !['CLOSED', 'CANCELLED'].includes(job.status),
+  );
+  const waiting = open.filter((job) => WAITING_ON_OTHERS.includes(job.status as JobStatus));
+  const inProduction = open.filter((job) => job.status === 'IN_PRODUCTION');
+  const overdue = open.filter((job) => job.isOverdue);
+  const unallocated = open.filter((job) => job.partnerId === null);
+  const rework = open.filter((job) => job.status === 'REWORK');
+
+  const attention = [...unallocated, ...rework]
+    .filter((job, index, all) => all.findIndex((other) => other.id === job.id) === index)
+    .sort((a, b) => {
+      if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+      return a.dueDate.localeCompare(b.dueDate);
+    });
 
   return (
     <div className="space-y-6">
       <PageHeader
         icon="Cog"
         title="Planning board"
-        description="Live view of every open job by workflow stage — spot bottlenecks and unallocated work at a glance."
+        description="Every open job by workflow stage. Drag a card into another lane to advance it — only the moves the workflow allows will accept a drop."
+        meta={
+          <Badge variant="secondary" dot>
+            {formatNumber(open.length)} open
+          </Badge>
+        }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Open jobs" value={formatNumber(jobs.data.length)} />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Open jobs" value={formatNumber(open.length)} icon="Cog" hint="on the board" />
         <StatCard
-          label="Awaiting acceptance"
-          value={formatNumber(jobs.data.filter((job) => job.status === 'AWAITING_PARTNER_ACCEPTANCE').length)}
+          label="Waiting on someone"
+          value={formatNumber(waiting.length)}
           tone="warning"
+          icon="Clock"
+          hint="acceptance, material or inspection"
         />
         <StatCard
           label="In production"
-          value={formatNumber(jobs.data.filter((job) => job.status === 'IN_PRODUCTION').length)}
+          value={formatNumber(inProduction.length)}
+          icon="Factory"
+          hint="on the floor now"
         />
         <StatCard
           label="Overdue"
-          value={formatNumber(jobs.data.filter((job) => job.isOverdue).length)}
-          tone="destructive"
+          value={formatNumber(overdue.length)}
+          tone={overdue.length > 0 ? 'destructive' : 'default'}
+          icon="AlertTriangle"
+          hint="past the promised date"
         />
       </div>
 
-      {jobs.data.length === 0 ? (
-        <EmptyState title="No jobs to plan" description="Create jobs to populate the planning board." />
+      {open.length === 0 ? (
+        <EmptyState
+          title="No jobs to plan"
+          description="Create and allocate jobs to populate the planning board."
+        />
       ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {LANES.map((lane) => {
-            const laneJobs = jobs.data.filter((job) => job.status === lane.status);
-            return (
-              <Card key={lane.status} className="min-w-[280px] flex-1">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center justify-between text-sm">
-                    {lane.label}
-                    <Badge variant="secondary">{laneJobs.length}</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {laneJobs.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Nothing here.</p>
-                  ) : (
-                    laneJobs.map((job) => (
-                      <Link
-                        key={job.id}
-                        href={`/app/production/jobs/${job.id}`}
-                        className="block rounded-lg border p-3 transition hover:border-primary/50 hover:bg-secondary/50"
-                      >
-                        <p className="text-sm font-medium">{job.jobNumber}</p>
-                        <p className="text-xs text-muted-foreground">{job.componentCode}</p>
-                        <p className="mt-1 text-xs">
-                          {job.partnerName ?? 'Unallocated'} · {formatNumber(job.quantity)} pcs
-                        </p>
-                        <p
-                          className={`text-xs ${job.isOverdue ? 'font-medium text-destructive' : 'text-muted-foreground'}`}
-                        >
-                          Due {formatDate(job.dueDate)}
-                        </p>
-                      </Link>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+        <PlanningBoard jobs={open} />
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Blocked &amp; unallocated</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {jobs.data
-            .filter((job) => job.partnerId === null || job.status === 'ON_HOLD')
-            .slice(0, 20)
-            .map((job) => (
+      {attention.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Needs a decision</CardTitle>
+            <CardDescription>
+              Jobs with no partner behind them, and jobs sent back for rework. Neither moves on its
+              own.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-1.5">
+            {attention.slice(0, 20).map((job) => (
               <Link
                 key={job.id}
                 href={`/app/production/jobs/${job.id}`}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm hover:bg-secondary/50"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-input p-2.5 text-sm shadow-[inset_0_0_0_1px_hsl(var(--border-subtle))] transition-colors duration-200 hover:bg-surface-hover"
               >
-                <span className="font-medium">{job.jobNumber}</span>
-                <span className="text-muted-foreground">{job.componentName}</span>
+                <span className="font-medium tabular-nums">{job.jobNumber}</span>
+                <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                  {job.componentName}
+                </span>
+                {job.partnerId === null ? (
+                  <Badge variant="warning" size="sm">
+                    Unallocated
+                  </Badge>
+                ) : null}
                 <StatusBadge status={job.status} />
-                <span className="text-xs text-muted-foreground">{humanise(job.priority)}</span>
+                <span className="text-[0.6875rem] text-subtle">{humanise(job.priority)}</span>
+                <span
+                  className={`text-[0.6875rem] tabular-nums ${
+                    job.isOverdue ? 'font-medium text-destructive' : 'text-subtle'
+                  }`}
+                >
+                  {formatDate(job.dueDate)}
+                </span>
               </Link>
             ))}
-        </CardContent>
-      </Card>
+            {attention.length > 20 ? (
+              <p className="pt-1 text-[0.75rem] text-subtle">
+                +{formatNumber(attention.length - 20)} more — see{' '}
+                <Link href="/app/production/jobs" className="underline hover:text-foreground">
+                  all jobs
+                </Link>
+                .
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <p className="text-[0.75rem] text-subtle">
+        Lanes follow the job workflow: {JOB_STATUS_LABELS.DRAFT} → {JOB_STATUS_LABELS.ACCEPTED} →{' '}
+        {JOB_STATUS_LABELS.IN_PRODUCTION} → {JOB_STATUS_LABELS.QUALITY_ACCEPTED} →{' '}
+        {JOB_STATUS_LABELS.RECEIVED}. Closed and cancelled jobs leave the board.
+      </p>
     </div>
   );
 }

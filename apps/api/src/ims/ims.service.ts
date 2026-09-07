@@ -516,6 +516,10 @@ export class ImsService {
       );
     }
     const result = await gateway.fetch(entity, { search, limit: 50 });
+    if (result.unsupported) {
+      // Better a planner reads why there are no orders to pick than concludes the lookup is broken.
+      throw new BadRequestException(result.unsupported);
+    }
     return result.records
       .map((record) => imsOrderSchema.safeParse(record))
       .filter((parsed): parsed is { success: true; data: ImsOrderOption } => parsed.success)
@@ -532,6 +536,7 @@ export class ImsService {
       throw new BadRequestException('IMS integration is not configured, so stock cannot be read.');
     }
     const result = await gateway.fetch('stock', { search, limit });
+    if (result.unsupported) throw new BadRequestException(result.unsupported);
     return result.records
       .map((record) => imsStockSchema.safeParse(record))
       .filter((parsed): parsed is { success: true; data: ImsStockRecord } => parsed.success)
@@ -548,6 +553,7 @@ export class ImsService {
       throw new BadRequestException('IMS integration is not configured.');
     }
     const result = await gateway.fetch(entity, { limit });
+    if (result.unsupported) throw new BadRequestException(result.unsupported);
     return { source: result.source, rows: result.records };
   }
 
@@ -711,7 +717,9 @@ export class ImsService {
         component: { select: { componentCode: true, name: true } },
         partner: { select: { partnerCode: true, businessName: true } },
         materialIssues: {
-          include: { items: { include: { item: { select: { code: true } } } } },
+          // `imsRef` is the IMS's own material id. It rides along on every issued line so the REST
+          // transport can post a real stock movement without a second lookup per item.
+          include: { items: { include: { item: { select: { code: true, imsRef: true } } } } },
         },
       },
     });
@@ -743,6 +751,7 @@ export class ImsService {
             issueDate: issue.issueDate ? issue.issueDate.toISOString() : null,
             items: issue.items.map((item) => ({
               itemCode: item.item.code,
+              itemImsRef: item.item.imsRef,
               quantity: item.quantity,
               uom: item.uom,
               weightKg: item.issueWeightKg,
