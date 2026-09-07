@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "GRID-X",
+    "slug": "gridx-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#090909",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#090909"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "in.oswar.gridx"
+    },
+    "android": {
+      "package": "in.oswar.gridx",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#090909"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "apiBaseUrl": "https://gridx-api.onrender.com/api",
+      "eas": {
+        "projectId": "e93f216f-d9f0-4b35-b753-073cde1d883f"
+      }
+    }
+  }
+}

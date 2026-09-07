@@ -29,6 +29,13 @@ export const CONTROL_NAVIGATION: NavSection[] = [
     permission: PERMISSIONS.PARTNER_READ,
     items: [
       { label: 'All partners', href: '/app/partners', permission: PERMISSIONS.PARTNER_READ },
+      {
+        label: 'Capabilities',
+        href: '/app/partners/capabilities',
+        permission: PERMISSIONS.PARTNER_READ,
+      },
+      { label: 'Machines', href: '/app/partners/machines', permission: PERMISSIONS.PARTNER_READ },
+      { label: 'Audits', href: '/app/partners/audits', permission: PERMISSIONS.PARTNER_READ },
       { label: 'Scorecards', href: '/app/partners/scorecards', permission: PERMISSIONS.SCORECARD_READ },
     ],
   },
@@ -55,6 +62,12 @@ export const CONTROL_NAVIGATION: NavSection[] = [
       { label: 'Jobs', href: '/app/production/jobs', permission: PERMISSIONS.JOB_READ },
       { label: 'Planning board', href: '/app/production/planning-board', permission: PERMISSIONS.JOB_READ },
       { label: 'Capacity', href: '/app/production/capacity', permission: PERMISSIONS.CAPACITY_READ },
+      { label: 'Delays', href: '/app/production/delays', permission: PERMISSIONS.JOB_READ },
+      {
+        label: 'Clarifications',
+        href: '/app/production/clarifications',
+        permission: PERMISSIONS.JOB_READ,
+      },
     ],
   },
   {
@@ -63,6 +76,12 @@ export const CONTROL_NAVIGATION: NavSection[] = [
     permission: PERMISSIONS.MATERIAL_READ,
     items: [
       { label: 'Material issues', href: '/app/materials/issues', permission: PERMISSIONS.MATERIAL_READ },
+      {
+        label: 'Partner stock',
+        href: '/app/materials/partner-stock',
+        permission: PERMISSIONS.MATERIAL_READ,
+      },
+      { label: 'Scrap', href: '/app/materials/scrap', permission: PERMISSIONS.MATERIAL_READ },
       { label: 'Reconciliation', href: '/app/materials/reconciliation', permission: PERMISSIONS.MATERIAL_READ },
     ],
   },
@@ -78,6 +97,11 @@ export const CONTROL_NAVIGATION: NavSection[] = [
         permission: PERMISSIONS.INSPECTION_READ,
       },
       { label: 'Rework', href: '/app/quality/rework', permission: PERMISSIONS.INSPECTION_READ },
+      {
+        label: 'Corrective actions',
+        href: '/app/quality/corrective-actions',
+        permission: PERMISSIONS.INSPECTION_READ,
+      },
     ],
   },
   {
@@ -85,7 +109,13 @@ export const CONTROL_NAVIGATION: NavSection[] = [
     icon: 'Truck',
     permission: PERMISSIONS.SHIPMENT_READ,
     items: [
+      { label: 'Pickups', href: '/app/logistics/pickups', permission: PERMISSIONS.SHIPMENT_READ },
       { label: 'Shipments', href: '/app/logistics/shipments', permission: PERMISSIONS.SHIPMENT_READ },
+      {
+        label: 'Deliveries',
+        href: '/app/logistics/deliveries',
+        permission: PERMISSIONS.SHIPMENT_READ,
+      },
       { label: 'Vehicles', href: '/app/logistics/vehicles', permission: PERMISSIONS.SHIPMENT_READ },
     ],
   },
@@ -102,6 +132,17 @@ export const CONTROL_NAVIGATION: NavSection[] = [
     items: [
       { label: 'Rates', href: '/app/commercial/rates', permission: PERMISSIONS.RATE_READ },
       { label: 'Invoices', href: '/app/commercial/invoices', permission: PERMISSIONS.INVOICE_READ },
+      {
+        label: 'Approvals',
+        href: '/app/commercial/approvals',
+        permission: PERMISSIONS.INVOICE_READ,
+      },
+      { label: 'Payments', href: '/app/commercial/payments', permission: PERMISSIONS.INVOICE_READ },
+      {
+        label: 'Incentives & deductions',
+        href: '/app/commercial/incentives',
+        permission: PERMISSIONS.RATE_MANAGE,
+      },
     ],
   },
   {
@@ -109,6 +150,11 @@ export const CONTROL_NAVIGATION: NavSection[] = [
     href: '/app/reports',
     icon: 'BarChart3',
     permission: PERMISSIONS.REPORT_READ,
+  },
+  {
+    label: 'Notifications',
+    href: '/app/notifications',
+    icon: 'Bell',
   },
   {
     label: 'IMS integration',
@@ -137,6 +183,7 @@ export const PARTNER_NAVIGATION: NavItem[] = [
   { label: 'Drawings', href: '/partner/drawings', icon: 'FileText' },
   { label: 'Material', href: '/partner/material', icon: 'Boxes' },
   { label: 'Inspections', href: '/partner/inspections', icon: 'ShieldCheck' },
+  { label: 'Rework', href: '/partner/rework', icon: 'Hammer' },
   { label: 'Invoices', href: '/partner/invoices', icon: 'Wallet' },
   { label: 'Scorecard', href: '/partner/scorecard', icon: 'Gauge' },
   { label: 'Support', href: '/partner/support', icon: 'LifeBuoy' },

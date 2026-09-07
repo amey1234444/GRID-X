@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import {
+  JOB_STATUSES,
   PERMISSIONS,
   allocateJobSchema,
   answerClarificationSchema,
@@ -30,6 +31,26 @@ const jobQuerySchema = paginationSchema.extend({
 
 const cancelSchema = z.object({ reason: z.string().min(5) });
 
+/** Planning-board drag-and-drop. The reason is optional — a drag is its own explanation. */
+const moveStageSchema = z.object({
+  status: z.enum(JOB_STATUSES),
+  reason: z.string().max(500).optional(),
+});
+
+const delayQuerySchema = paginationSchema.extend({
+  companyId: z.string().optional(),
+  partnerId: z.string().optional(),
+  reason: z.string().optional(),
+  responsibility: z.string().optional(),
+  openOnly: z.coerce.boolean().optional(),
+});
+
+const clarificationQuerySchema = paginationSchema.extend({
+  companyId: z.string().optional(),
+  partnerId: z.string().optional(),
+  status: z.string().optional(),
+});
+
 @ApiTags('Jobs')
 @Controller('jobs')
 export class JobsController {
@@ -42,6 +63,38 @@ export class JobsController {
     @Query(zodBody(jobQuerySchema)) query: z.infer<typeof jobQuerySchema>,
   ) {
     return this.jobs.list(user, { ...query, status: query.status as never });
+  }
+
+  /**
+   * Section 12's \"get delayed jobs\". Declared before :id so the router does not read \"delays\"
+   * as a job identifier.
+   */
+  @Get('delays')
+  @RequirePermissions(PERMISSIONS.JOB_READ)
+  listDelays(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(delayQuerySchema)) query: z.infer<typeof delayQuerySchema>,
+  ) {
+    return this.jobs.listDelays(user, {
+      ...query,
+      reason: query.reason as never,
+      responsibility: query.responsibility as never,
+    });
+  }
+
+  @Post('delays/:delayId/resolve')
+  @RequirePermissions(PERMISSIONS.JOB_UPDATE)
+  resolveDelay(@CurrentUser() user: RequestUser, @Param('delayId') delayId: string) {
+    return this.jobs.resolveDelay(user, delayId);
+  }
+
+  @Get('clarifications')
+  @RequirePermissions(PERMISSIONS.JOB_READ)
+  listClarifications(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(clarificationQuerySchema)) query: z.infer<typeof clarificationQuerySchema>,
+  ) {
+    return this.jobs.listClarifications(user, { ...query, status: query.status as never });
   }
 
   @Get(':id')
@@ -71,8 +124,8 @@ export class JobsController {
 
   @Get(':id/recommendations')
   @RequirePermissions(PERMISSIONS.JOB_ALLOCATE)
-  recommendations(@Param('id') id: string) {
-    return this.jobs.recommendations(id);
+  recommendations(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.jobs.recommendations(id, user);
   }
 
   @Post(':id/allocate')
@@ -143,6 +196,20 @@ export class JobsController {
     @Body(zodBody(closeJobSchema)) body: z.infer<typeof closeJobSchema>,
   ) {
     return this.jobs.close(user, id, body);
+  }
+
+  /**
+   * Section 24 — move a job to another workflow stage. The planning board calls this when a card
+   * is dropped into a new lane; the service rejects anything the workflow does not permit.
+   */
+  @Post(':id/transition')
+  @RequirePermissions(PERMISSIONS.JOB_UPDATE)
+  moveStage(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body(zodBody(moveStageSchema)) body: z.infer<typeof moveStageSchema>,
+  ) {
+    return this.jobs.moveStage(user, id, body.status, body.reason);
   }
 
   @Post(':id/cancel')

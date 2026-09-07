@@ -1,6 +1,7 @@
 import { createItemAction, createProductAction } from '@/app/actions/control';
 import { ActionDialog } from '@/components/app/action-dialog';
 import { DataTable } from '@/components/app/data-table';
+import { ImportPanel } from '@/components/app/import-panel';
 import { PageHeader } from '@/components/app/page-header';
 import { StatusBadge } from '@/components/app/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,8 +23,32 @@ export default async function MastersPage(): Promise<React.JSX.Element> {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Ruler"
         title="Engineering masters"
         description="Raw material items, finished products and the process catalogue with standard hourly rates."
+      />
+
+      <ImportPanel
+        targets={[
+          {
+            entity: 'components',
+            title: 'Components',
+            description:
+              'Component code, name, primary process, criticality and standard rates. Existing codes are updated.',
+          },
+          {
+            entity: 'partner-rates',
+            title: 'Partner rates',
+            description:
+              'Conversion rate per partner and component. The current rate is closed off and kept as history.',
+          },
+          {
+            entity: 'approved-partners',
+            title: 'Approved partner list',
+            description:
+              'Which partners may be allocated which components. A partner without the matching approved capability is rejected.',
+          },
+        ]}
       />
 
       <Card>

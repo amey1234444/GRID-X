@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NotificationChannel, NotificationEvent, RoleCode } from '@gridx/db';
+import { channelsForEvent, deliverableChannels } from '@gridx/shared';
 import { createTransport, Transporter } from 'nodemailer';
 import { AppConfig } from '../config/configuration';
 import { PrismaService } from '../prisma/prisma.service';
@@ -27,6 +28,8 @@ export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
   private readonly settings: AppConfig['notifications'];
   private readonly mailer: Transporter | null;
+  /** Notification links are app-relative; an email has to carry somewhere clickable. */
+  private readonly webAppUrl: string;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -35,6 +38,10 @@ export class NotificationsService {
     const notifications = this.config.get<AppConfig['notifications']>('notifications');
     if (!notifications) throw new Error('Notification configuration missing');
     this.settings = notifications;
+    this.webAppUrl = (this.config.get<string>('webAppUrl') ?? 'http://localhost:3000').replace(
+      /\/$/,
+      '',
+    );
     this.mailer =
       notifications.emailEnabled && notifications.smtp.host
         ? createTransport({
@@ -49,12 +56,23 @@ export class NotificationsService {
         : null;
   }
 
+  /**
+   * Section 13 — raises a notification on every channel the event warrants.
+   *
+   * The channel choice is a policy, not a per-call-site decision: it used to be, and the result was
+   * that forty call sites each passed `['IN_APP']` or `['IN_APP','WHATSAPP']` and email — fully
+   * implemented, configured in `.env` — was never once requested. `channelsForEvent` now decides,
+   * and a caller overrides only where it genuinely differs.
+   */
   async notify(input: NotifyInput): Promise<void> {
     const recipients = await this.resolveRecipients(input);
     if (recipients.length === 0) return;
 
-    const channels = input.channels ?? ['IN_APP'];
+    const requested = input.channels ?? channelsForEvent(input.event);
     for (const recipient of recipients) {
+      // A partner worker with a phone and no email should not accumulate failed email rows: that
+      // is not a misconfiguration, it is simply how that person is reachable.
+      const channels = deliverableChannels(requested, recipient);
       for (const channel of channels) {
         const notification = await this.prisma.notification.create({
           data: {
@@ -78,6 +96,49 @@ export class NotificationsService {
         }
       }
     }
+  }
+
+  /**
+   * Sends a message straight to a phone without recording a notification — used
+   * for login OTPs, which are credentials rather than something to sit in an inbox.
+   * Returns false when the channel is not configured so callers can fall back.
+   */
+  async sendDirectMessage(phone: string, text: string): Promise<boolean> {
+    const { apiUrl, apiToken } = this.settings.whatsapp;
+    if (!this.settings.whatsappEnabled || !apiUrl || !apiToken) return false;
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${apiToken}` },
+        body: JSON.stringify({ to: phone, text }),
+      });
+      if (!response.ok) throw new Error(`WhatsApp API responded ${response.status}`);
+      return true;
+    } catch (error) {
+      this.logger.warn(`Direct message delivery failed: ${String(error)}`);
+      return false;
+    }
+  }
+
+  /**
+   * Sends an email without recording a notification — used for password reset links, which are
+   * credentials rather than something to sit in an inbox and be read twice. Returns false when the
+   * channel is not configured so the caller can fall back.
+   */
+  async sendDirectEmail(to: string, subject: string, text: string): Promise<boolean> {
+    if (!this.mailer) return false;
+    try {
+      await this.mailer.sendMail({ from: this.settings.smtp.from, to, subject, text });
+      return true;
+    } catch (error) {
+      this.logger.warn(`Direct email delivery failed: ${String(error)}`);
+      return false;
+    }
+  }
+
+  /** Whether email can actually be delivered, so a caller can tell a user what to expect. */
+  get emailConfigured(): boolean {
+    return this.mailer !== null;
   }
 
   async markRead(userId: string, notificationId: string): Promise<void> {
@@ -130,7 +191,7 @@ export class NotificationsService {
         from: this.settings.smtp.from,
         to: email,
         subject: input.title,
-        text: input.body,
+        text: this.emailBody(input),
       });
       await this.prisma.notification.update({
         where: { id: notificationId },
@@ -143,6 +204,17 @@ export class NotificationsService {
         data: { status: 'FAILED', error: String(error) },
       });
     }
+  }
+
+  /** The notification, plus an absolute link back into GRID-X where there is one. */
+  private emailBody(input: NotifyInput): string {
+    if (!input.link) return input.body;
+    const url = input.link.startsWith('http')
+      ? input.link
+      : `${this.webAppUrl}${input.link.startsWith('/') ? '' : '/'}${input.link}`;
+    return `${input.body}
+
+Open in GRID-X: ${url}`;
   }
 
   private async deliverWhatsapp(

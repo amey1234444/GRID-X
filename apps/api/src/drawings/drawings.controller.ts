@@ -43,8 +43,11 @@ export class DrawingsController {
 
   @Get('engineering-changes')
   @RequirePermissions(PERMISSIONS.DRAWING_READ)
-  listChanges(@Query(zodBody(paginationSchema)) query: z.infer<typeof paginationSchema>) {
-    return this.drawings.listEngineeringChanges(query);
+  listChanges(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(paginationSchema)) query: z.infer<typeof paginationSchema>,
+  ) {
+    return this.drawings.listEngineeringChanges(user, query);
   }
 
   @Post('engineering-changes')
@@ -166,7 +169,7 @@ export class DrawingsController {
 
   @Get('revisions/:revisionId/access-log')
   @RequirePermissions(PERMISSIONS.DRAWING_AUDIT_READ)
-  accessLog(@Param('revisionId') revisionId: string) {
-    return this.drawings.accessLog(revisionId);
+  accessLog(@CurrentUser() user: RequestUser, @Param('revisionId') revisionId: string) {
+    return this.drawings.accessLog(user, revisionId);
   }
 }

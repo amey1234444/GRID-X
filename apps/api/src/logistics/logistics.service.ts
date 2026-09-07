@@ -15,12 +15,23 @@ import { SequenceService } from '../audit/sequence.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
+import {
+  assertCanWriteToCompany,
+  assertCompanyScope,
+  companyWhere,
+} from '../common/company-scope';
 import { JobsService } from '../jobs/jobs.service';
 
 export interface ShipmentFilters extends PaginationInput {
   status?: string;
+  /** Several statuses at once, comma separated — the pickup and delivery boards are status groups. */
+  statuses?: string;
   direction?: string;
   partnerId?: string;
+  /** Planned pickup has passed and the vehicle has not collected. */
+  pickupOverdue?: boolean;
+  /** Expected delivery has passed and nothing has been signed for. */
+  deliveryOverdue?: boolean;
 }
 
 /** Module 10 — pickups, deliveries and proof of delivery across the partner network. */
@@ -41,8 +52,22 @@ export class LogisticsService {
         ? { OR: [{ fromPartnerId: filters.partnerId }, { toPartnerId: filters.partnerId }] }
         : {};
     const where: Prisma.ShipmentWhereInput = {
+      ...companyWhere(actor),
       ...partnerScope,
       ...(filters.status ? { status: filters.status as Prisma.EnumShipmentStatusFilter } : {}),
+      ...(filters.statuses
+        ? {
+            status: {
+              in: filters.statuses.split(',').filter(Boolean) as Prisma.EnumShipmentStatusFilter['in'],
+            },
+          }
+        : {}),
+      ...(filters.pickupOverdue
+        ? { plannedPickupAt: { lt: new Date() }, actualPickupAt: null }
+        : {}),
+      ...(filters.deliveryOverdue
+        ? { expectedDeliveryAt: { lt: new Date() }, actualDeliveryAt: null }
+        : {}),
       ...(filters.direction
         ? { direction: filters.direction as Prisma.EnumShipmentDirectionFilter }
         : {}),
@@ -86,10 +111,12 @@ export class LogisticsService {
     ) {
       throw new ForbiddenException('This shipment belongs to another partner');
     }
+    assertCompanyScope(actor, shipment.companyId, 'shipment');
     return shipment;
   }
 
   async create(actor: RequestUser, input: z.infer<typeof createShipmentSchema>) {
+    assertCanWriteToCompany(actor, input.companyId);
     const shipmentNumber = await this.sequence.next('SHIPMENT');
     const shipment = await this.prisma.shipment.create({
       data: {
@@ -130,6 +157,7 @@ export class LogisticsService {
     id: string,
     input: z.infer<typeof updateShipmentStatusSchema>,
   ) {
+    await this.findOne(actor, id);
     const shipment = await this.prisma.shipment.update({
       where: { id },
       data: {
@@ -183,6 +211,7 @@ export class LogisticsService {
     id: string,
     input: z.infer<typeof proofOfDeliverySchema>,
   ) {
+    await this.findOne(actor, id);
     const pod = await this.prisma.proofOfDelivery.upsert({
       where: { shipmentId: id },
       create: {

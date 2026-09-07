@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push to the same branch makes an in-flight run redundant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, typecheck and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.18.1
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The API and web both import these, and Prisma's client is generated
+      # rather than checked in, so they have to be built before anything else.
+      # The :ci scripts skip dotenv, which has no .env to read in CI.
+      - name: Build shared package
+        run: pnpm --filter @gridx/shared build
+
+      - name: Build database package
+        run: pnpm --filter @gridx/db build:ci
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      - name: Lint
+        run: pnpm -r lint
+
+      - name: Test
+        run: pnpm -r test
+
+  # apps/mobile has its own npm tree (Metro and pnpm symlinks do not mix), so
+  # `pnpm -r` above never reaches it.
+  mobile:
+    name: Mobile lint and typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.18.1
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+  migrations:
+    name: Migrations apply cleanly
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: gridx
+          POSTGRES_PASSWORD: gridx
+          POSTGRES_DB: gridx_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gridx"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://gridx:gridx@localhost:5432/gridx_ci?schema=public
+      SEED_PASSWORD: ci-only-password
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.18.1
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared package
+        run: pnpm --filter @gridx/shared build
+
+      - name: Build database package
+        run: pnpm --filter @gridx/db build:ci
+
+      # The drift check replays migrations into a throwaway database, so it needs
+      # one of its own rather than the database the following steps use.
+      - name: Create shadow database
+        run: PGPASSWORD=gridx psql -h localhost -U gridx -d gridx_ci -c 'CREATE DATABASE gridx_shadow;'
+
+      # Catches schema.prisma edited without a matching migration — one of the two
+      # ways the Render deploy breaks. --exit-code makes a non-empty diff fail.
+      - name: Check schema and migrations agree
+        run: >-
+          pnpm --filter @gridx/db exec prisma migrate diff
+          --from-migrations ./prisma/migrations
+          --to-schema-datamodel ./prisma/schema.prisma
+          --shadow-database-url postgresql://gridx:gridx@localhost:5432/gridx_shadow?schema=public
+          --exit-code
+
+      # And the other: a migration that fails against a clean database.
+      - name: Apply migrations
+        run: pnpm --filter @gridx/db deploy:ci
+
+      - name: Seed
+        run: pnpm --filter @gridx/db seed:ci

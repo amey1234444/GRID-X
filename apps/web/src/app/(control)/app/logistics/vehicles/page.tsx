@@ -34,6 +34,7 @@ export default async function VehiclesPage(): Promise<React.JSX.Element> {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Truck"
         title="Vehicles"
         description="Transport fleet and hired vehicles used for partner pickups and deliveries."
         actions={

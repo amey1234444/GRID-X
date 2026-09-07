@@ -16,6 +16,7 @@ export const PERMISSIONS = {
   PARTNER_CAPABILITY_MANAGE: 'partner_capability:manage',
   PARTNER_DOCUMENT_MANAGE: 'partner_document:manage',
   PARTNER_MACHINE_MANAGE: 'partner_machine:manage',
+  PARTNER_LOCATION_MANAGE: 'partner_location:manage',
 
   // Components / engineering
   COMPONENT_READ: 'component:read',
@@ -55,6 +56,7 @@ export const PERMISSIONS = {
   MATERIAL_ACKNOWLEDGE: 'material:acknowledge',
   MATERIAL_CONSUMPTION_UPDATE: 'material_consumption:update',
   MATERIAL_RECONCILE: 'material:reconcile',
+  MATERIAL_TRANSACTION_RECORD: 'material_transaction:record',
 
   // Quality
   INSPECTION_READ: 'inspection:read',
@@ -146,6 +148,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     P.PARTNER_CAPABILITY_MANAGE,
     P.PARTNER_DOCUMENT_MANAGE,
     P.PARTNER_MACHINE_MANAGE,
+    P.PARTNER_LOCATION_MANAGE,
     P.COMPONENT_READ,
     P.COMPONENT_MANAGE,
     P.ITEM_READ,
@@ -230,6 +233,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     P.PARTNER_CREATE,
     P.PARTNER_UPDATE,
     P.PARTNER_DOCUMENT_MANAGE,
+    P.PARTNER_LOCATION_MANAGE,
     P.COMPONENT_READ,
     P.ITEM_READ,
     P.ITEM_MANAGE,
@@ -267,6 +271,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, PermissionCode[]> = {
     P.MATERIAL_ISSUE,
     P.MATERIAL_CONSUMPTION_UPDATE,
     P.MATERIAL_RECONCILE,
+    P.MATERIAL_TRANSACTION_RECORD,
     P.TOOL_READ,
     P.TOOL_MANAGE,
     P.SHIPMENT_READ,

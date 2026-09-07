@@ -9,6 +9,7 @@ import {
   partnerCapabilitySchema,
   partnerDocumentSchema,
   partnerEmployeeSchema,
+  partnerLocationSchema,
   partnerMachineSchema,
   suspendPartnerSchema,
   updatePartnerSchema,
@@ -27,6 +28,16 @@ const listQuerySchema = paginationSchema.extend({
   companyId: z.string().optional(),
 });
 
+const machineQuerySchema = paginationSchema.extend({
+  partnerId: z.string().optional(),
+  search: z.string().optional(),
+});
+
+const auditQuerySchema = paginationSchema.extend({
+  partnerId: z.string().optional(),
+  result: z.string().optional(),
+});
+
 @ApiTags('Partners')
 @Controller('partners')
 export class PartnersController {
@@ -42,6 +53,34 @@ export class PartnersController {
       ...query,
       approvalStatus: query.approvalStatus as never,
     });
+  }
+
+  /** Section 7 screen 5 — declared before :id so \"capability-matrix\" is not read as a partner id. */
+  @Get('capability-matrix')
+  @RequirePermissions(PERMISSIONS.PARTNER_READ)
+  capabilityMatrix(
+    @CurrentUser() user: RequestUser,
+    @Query('companyId') companyId?: string,
+  ) {
+    return this.partners.capabilityMatrix(user, companyId);
+  }
+
+  @Get('machines')
+  @RequirePermissions(PERMISSIONS.PARTNER_READ)
+  listMachines(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(machineQuerySchema)) query: z.infer<typeof machineQuerySchema>,
+  ) {
+    return this.partners.listMachines(user, query);
+  }
+
+  @Get('audits')
+  @RequirePermissions(PERMISSIONS.PARTNER_READ)
+  listAudits(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(auditQuerySchema)) query: z.infer<typeof auditQuerySchema>,
+  ) {
+    return this.partners.listAudits(user, query);
   }
 
   @Get(':id')
@@ -139,6 +178,29 @@ export class PartnersController {
   @RequirePermissions(PERMISSIONS.PARTNER_DOCUMENT_MANAGE)
   verifyDocument(@CurrentUser() user: RequestUser, @Param('documentId') documentId: string) {
     return this.partners.verifyDocument(user, documentId);
+  }
+
+  /** Module 1 — additional units for a partner working out of more than one address. */
+  @Get(':id/locations')
+  @RequirePermissions(PERMISSIONS.PARTNER_READ)
+  listLocations(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.partners.listLocations(user, id);
+  }
+
+  @Post(':id/locations')
+  @RequirePermissions(PERMISSIONS.PARTNER_LOCATION_MANAGE)
+  addLocation(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body(zodBody(partnerLocationSchema)) body: z.infer<typeof partnerLocationSchema>,
+  ) {
+    return this.partners.addLocation(user, id, body);
+  }
+
+  @Delete('locations/:locationId')
+  @RequirePermissions(PERMISSIONS.PARTNER_LOCATION_MANAGE)
+  removeLocation(@CurrentUser() user: RequestUser, @Param('locationId') locationId: string) {
+    return this.partners.removeLocation(user, locationId);
   }
 
   @Post(':id/employees')

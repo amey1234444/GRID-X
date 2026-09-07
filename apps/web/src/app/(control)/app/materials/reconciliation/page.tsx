@@ -35,6 +35,7 @@ export default async function ReconciliationPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Boxes"
         title="Material reconciliation"
         description="Issued versus consumed, scrap returned and unused material — the gate before payment approval."
         actions={
@@ -60,8 +61,9 @@ export default async function ReconciliationPage({
                 hidden={{ jobId }}
                 fields={[
                   { name: 'itemId', label: 'Item', type: 'select', required: true, options: items, span: 2 },
-                  { name: 'returnedWeightKg', label: 'Returned weight (kg)', type: 'number', step: '0.001', required: true },
-                  { name: 'scrapType', label: 'Scrap type' },
+                  { name: 'scrapWeightKg', label: 'Scrap weight (kg)', type: 'number', step: '0.001', required: true },
+                  { name: 'returnedWeightKg', label: 'Returned weight (kg)', type: 'number', step: '0.001' },
+                  { name: 'challanNumber', label: 'Return challan number' },
                   { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
                 ]}
               />
@@ -74,8 +76,13 @@ export default async function ReconciliationPage({
                 hidden={{ jobId }}
                 fields={[
                   { name: 'itemId', label: 'Item', type: 'select', required: true, options: items, span: 2 },
-                  { name: 'unusedReturnedKg', label: 'Unused returned (kg)', type: 'number', step: '0.001' },
-                  { name: 'deductionAmount', label: 'Deduction amount', type: 'number', step: '0.01' },
+                  {
+                    name: 'unusedReturnedKg',
+                    label: 'Unused returned (kg)',
+                    type: 'number',
+                    step: '0.001',
+                    help: 'Any shortage deduction is calculated from the item rate automatically.',
+                  },
                   { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
                 ]}
               />

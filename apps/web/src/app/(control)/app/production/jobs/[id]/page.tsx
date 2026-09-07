@@ -1,6 +1,15 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { DELAY_REASONS, MILESTONE_TYPES, RESPONSIBLE_PARTIES } from '@gridx/shared';
+import {
+  DELAY_REASONS,
+  JOB_PRIORITIES,
+  MANUAL_TRANSACTION_TYPES,
+  MATERIAL_RESPONSIBILITIES,
+  MILESTONE_TYPES,
+  PERMISSIONS,
+  RESPONSIBLE_PARTIES,
+  TRANSACTION_TYPE_LABELS,
+} from '@gridx/shared';
 
 import {
   allocateJobAction,
@@ -9,9 +18,12 @@ import {
   closeJobAction,
   createMaterialIssueAction,
   jobMilestoneAction,
+  recordMaterialTransactionAction,
   reportDelayAction,
   requestInspectionAction,
+  updateJobAction,
 } from '@/app/actions/control';
+import { ActivityTrail } from '@/components/app/activity-trail';
 import { ActionDialog } from '@/components/app/action-dialog';
 import { DataTable } from '@/components/app/data-table';
 import { DetailList } from '@/components/app/detail-list';
@@ -21,29 +33,39 @@ import { StatCard } from '@/components/app/stat-card';
 import { StatusBadge } from '@/components/app/status-badge';
 import { Timeline } from '@/components/app/timeline';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { formatCurrency, formatDate, formatDateTime, formatNumber, humanise } from '@/lib/format';
 import { optionsFrom } from '@/lib/options';
 import { inspectorOptions, itemOptions, partnerOptions } from '@/lib/reference';
-import { apiFetch } from '@/lib/session';
+import { apiFetch, apiGet, currentUser } from '@/lib/session';
 import type { PartnerRecommendation } from '@gridx/shared';
 
-import type { JobDetail } from '@/lib/types';
+import type { JobDetail, MaterialRequirement, MaterialTransactionRow } from '@/lib/types';
 
 export default async function JobDetailPage({
   params,
 }: {
   params: { id: string };
 }): Promise<React.JSX.Element> {
-  const [result, partners, items, inspectors] = await Promise.all([
+  const [result, partners, items, inspectors, user, requirement, ledger] = await Promise.all([
     apiFetch<JobDetail>(`/jobs/${params.id}`),
     partnerOptions(),
     itemOptions(),
     inspectorOptions(),
+    currentUser(),
+    // Module 6 step 2 - what the bill of material says stores should issue, and the ledger of
+    // everything that has actually moved. Both are read-only here; neither blocks the page.
+    apiGet<MaterialRequirement | null>(`/materials/jobs/${params.id}/requirement`, null),
+    apiGet<MaterialTransactionRow[]>(`/materials/transactions?jobId=${params.id}`, []),
   ]);
   const job = result.data;
   if (!job) notFound();
+
+  // Module 2: Class A work may only be outsourced on senior management authorisation, so the
+  // reason field is offered only when it applies and only to someone who can actually give it.
+  const isClassA = job.component.criticality === 'CLASS_A';
+  const mayAuthoriseClassA = user?.permissions.includes(PERMISSIONS.JOB_CLASS_A_OVERRIDE) ?? false;
 
   const recommendations =
     job.partner === null
@@ -57,23 +79,104 @@ export default async function JobDetailPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Cog"
         title={job.jobNumber}
         description={`${job.component.componentCode} · ${job.component.name} · ${formatNumber(job.quantity)} pcs due ${formatDate(job.dueDate)}`}
         actions={
           <>
+            <ActionDialog
+              title="Edit job"
+              description="Only the fields you fill in are changed."
+              triggerLabel="Edit"
+              triggerVariant="outline"
+              action={updateJobAction}
+              hidden={{ jobId: job.id }}
+              fields={[
+                { name: 'quantity', label: 'Quantity', type: 'number', defaultValue: String(job.quantity) },
+                {
+                  name: 'rate',
+                  label: 'Conversion rate',
+                  type: 'number',
+                  step: '0.01',
+                  defaultValue: String(job.rate),
+                },
+                { name: 'dueDate', label: 'Due date', type: 'date', defaultValue: job.dueDate.slice(0, 10) },
+                {
+                  name: 'plannedStartDate',
+                  label: 'Planned start',
+                  type: 'date',
+                  defaultValue: job.plannedStartDate ? job.plannedStartDate.slice(0, 10) : undefined,
+                },
+                {
+                  name: 'priority',
+                  label: 'Priority',
+                  type: 'select',
+                  options: optionsFrom(JOB_PRIORITIES),
+                  defaultValue: job.priority,
+                },
+                {
+                  name: 'materialResponsibility',
+                  label: 'Material responsibility',
+                  type: 'select',
+                  options: optionsFrom(MATERIAL_RESPONSIBILITIES),
+                  defaultValue: job.materialResponsibility,
+                },
+                {
+                  name: 'deliveryLocation',
+                  label: 'Delivery location',
+                  defaultValue: job.deliveryLocation ?? undefined,
+                  span: 2,
+                },
+                {
+                  name: 'customerProject',
+                  label: 'Customer / project',
+                  defaultValue: job.customerProject ?? undefined,
+                },
+                { name: 'sourceRef', label: 'Source reference', defaultValue: job.sourceRef ?? undefined },
+                { name: 'notes', label: 'Notes', type: 'textarea', defaultValue: job.notes ?? undefined, span: 2 },
+              ]}
+            />
             {job.partner === null ? (
               <ActionDialog
                 title="Allocate job"
-                description="Allocation validates partner approval, component approval, capability, capacity and Class A authorisation."
+                description={
+                  isClassA && !mayAuthoriseClassA
+                    ? 'This is a Class A component. Only the GRID-X Head or a Group Admin can authorise outsourcing it.'
+                    : 'Allocation validates partner approval, component approval, capability, capacity and Class A authorisation, and reserves the partner’s declared hours.'
+                }
                 triggerLabel="Allocate"
                 action={allocateJobAction}
                 hidden={{ jobId: job.id }}
                 fields={[
                   { name: 'partnerId', label: 'Partner', type: 'select', required: true, options: partners, span: 2 },
-                  { name: 'rate', label: 'Conversion rate', type: 'number', step: '0.01' },
-                  { name: 'dueDate', label: 'Revised due date', type: 'date' },
-                  { name: 'classAOverrideReason', label: 'Class A authorisation reason', type: 'textarea', span: 2 },
-                  { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
+                  {
+                    name: 'rate',
+                    label: 'Conversion rate',
+                    type: 'number',
+                    step: '0.01',
+                    help: 'Leave blank to keep the job rate. Dates are changed with Edit job.',
+                  },
+                  {
+                    name: 'grantDrawingAccess',
+                    label: 'Drawing access',
+                    type: 'checkbox',
+                    defaultValue: 'on',
+                    placeholder: 'Grant access to the released revision',
+                  },
+                  ...(isClassA && mayAuthoriseClassA
+                    ? [
+                        {
+                          name: 'classAOverrideReason',
+                          label: 'Class A authorisation reason',
+                          type: 'textarea' as const,
+                          required: !job.classAOverrideReason,
+                          help: job.classAOverrideReason
+                            ? 'This job already carries an authorisation. Leave blank to keep it.'
+                            : 'Class A components stay in-house unless senior management authorises otherwise.',
+                          span: 2 as const,
+                        },
+                      ]
+                    : []),
                 ]}
               />
             ) : (
@@ -114,6 +217,14 @@ export default async function JobDetailPage({
                 { name: 'offeredQuantity', label: 'Offered quantity', type: 'number', required: true },
                 { name: 'inspectorId', label: 'Inspector', type: 'select', options: inspectors },
                 { name: 'dueAt', label: 'Due at', type: 'date' },
+                {
+                  name: 'photographFileIds',
+                  label: 'Photographs',
+                  type: 'files',
+                  category: 'PHOTOGRAPH',
+                  accept: 'image/*',
+                  span: 2,
+                },
                 { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
               ]}
             />
@@ -427,15 +538,33 @@ export default async function JobDetailPage({
               triggerLabel="Issue material"
               triggerSize="sm"
               action={createMaterialIssueAction}
-              hidden={{ jobId: job.id, partnerId: job.partner?.id }}
+              hidden={{ jobId: job.id }}
               fields={[
-                { name: 'itemId', label: 'Item', type: 'select', required: true, options: items, span: 2 },
-                { name: 'quantity', label: 'Quantity', type: 'number', required: true },
-                { name: 'uom', label: 'UOM', defaultValue: 'KG' },
-                { name: 'issueWeightKg', label: 'Issue weight (kg)', type: 'number', step: '0.001' },
-                { name: 'issueDate', label: 'Issue date', type: 'date' },
-                { name: 'transportMode', label: 'Transport mode' },
+                {
+                  name: 'items',
+                  label: 'Material lines',
+                  type: 'rows',
+                  addLabel: 'Add material line',
+                  span: 2,
+                  columns: [
+                    { name: 'itemId', label: 'Item', type: 'select', options: items, required: true },
+                    { name: 'quantity', label: 'Quantity', type: 'number', required: true },
+                    { name: 'uom', label: 'UOM', defaultValue: 'KG' },
+                    { name: 'issueWeightKg', label: 'Issue weight (kg)', type: 'number', step: '0.001', required: true },
+                    { name: 'batchNumber', label: 'Batch number' },
+                    { name: 'heatNumber', label: 'Heat number' },
+                  ],
+                },
+                { name: 'expectedReturnDate', label: 'Expected return', type: 'date' },
                 { name: 'vehicleNumber', label: 'Vehicle number' },
+                { name: 'driverName', label: 'Driver name' },
+                {
+                  name: 'photographFileIds',
+                  label: 'Loading photographs',
+                  type: 'files',
+                  category: 'PHOTOGRAPH',
+                  accept: 'image/*',
+                },
                 { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
               ]}
             />
@@ -466,6 +595,80 @@ export default async function JobDetailPage({
             rowHref={(row) => `/app/materials/issues/${row.id}`}
             empty={{ title: 'No material issued', description: 'Issue material once the partner accepts the job.' }}
           />
+          {requirement && requirement.hasBillOfMaterial ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Material requirement</CardTitle>
+                <CardDescription>
+                  From the bill of material for {requirement.componentCode}:{' '}
+                  {formatNumber(requirement.quantity)} off, plus a{' '}
+                  {formatNumber(requirement.scrapAllowancePercent, 1)}% scrap allowance. Issue the
+                  outstanding column.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DataTable
+                  columns={[
+                    {
+                      key: 'item',
+                      header: 'Item',
+                      render: (row: MaterialRequirement['lines'][number]) =>
+                        [row.itemCode, row.itemName].filter(Boolean).join(' — '),
+                    },
+                    {
+                      key: 'perUnit',
+                      header: 'Per unit',
+                      align: 'right',
+                      render: (row: MaterialRequirement['lines'][number]) =>
+                        `${formatNumber(row.quantityPerUnit, 3)} ${row.uom}`,
+                    },
+                    {
+                      key: 'net',
+                      header: 'Net',
+                      align: 'right',
+                      render: (row: MaterialRequirement['lines'][number]) =>
+                        formatNumber(row.netQuantity, 3),
+                    },
+                    {
+                      key: 'allowance',
+                      header: 'Scrap allowance',
+                      align: 'right',
+                      render: (row: MaterialRequirement['lines'][number]) =>
+                        formatNumber(row.scrapAllowanceQuantity, 3),
+                    },
+                    {
+                      key: 'gross',
+                      header: 'Required',
+                      align: 'right',
+                      render: (row: MaterialRequirement['lines'][number]) => (
+                        <span className="font-medium">{formatNumber(row.grossQuantity, 3)}</span>
+                      ),
+                    },
+                    {
+                      key: 'issued',
+                      header: 'Issued',
+                      align: 'right',
+                      render: (row: MaterialRequirement['lines'][number]) =>
+                        formatNumber(row.alreadyIssued, 3),
+                    },
+                    {
+                      key: 'outstanding',
+                      header: 'Outstanding',
+                      align: 'right',
+                      render: (row: MaterialRequirement['lines'][number]) => (
+                        <span className={row.outstanding > 0 ? 'font-medium text-warning' : undefined}>
+                          {formatNumber(row.outstanding, 3)}
+                        </span>
+                      ),
+                    },
+                  ]}
+                  rows={requirement.lines}
+                  empty={{ title: 'No bill of material' }}
+                />
+              </CardContent>
+            </Card>
+          ) : null}
+
           <Card>
             <CardHeader>
               <CardTitle>Reconciliation</CardTitle>
@@ -498,6 +701,128 @@ export default async function JobDetailPage({
                 ]}
                 rows={job.reconciliations}
                 empty={{ title: 'Not reconciled', description: 'Reconcile material before payment approval.' }}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Material ledger</CardTitle>
+              <CardDescription>
+                Every movement of OSWAR material for this job. Issues, consumption and scrap are
+                written here automatically; returns and replacements are recorded by hand.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex justify-end">
+                <ActionDialog
+                  title="Record a material movement"
+                  description="For material the documented flows do not cover: a rejected batch going back, a replacement going out, unused stock returned, or a shortage or excess found at the partner."
+                  triggerLabel="Record movement"
+                  triggerSize="sm"
+                  triggerVariant="outline"
+                  action={recordMaterialTransactionAction}
+                  hidden={{ jobId: job.id }}
+                  fields={[
+                    { name: 'itemId', label: 'Item', type: 'select', options: items, required: true },
+                    {
+                      name: 'type',
+                      label: 'Movement',
+                      type: 'select',
+                      required: true,
+                      options: MANUAL_TRANSACTION_TYPES.map((value) => ({
+                        value,
+                        label: TRANSACTION_TYPE_LABELS[value],
+                      })),
+                    },
+                    {
+                      name: 'quantityKg',
+                      label: 'Weight (kg)',
+                      type: 'number',
+                      step: '0.001',
+                      required: true,
+                    },
+                    { name: 'reference', label: 'Challan or reference' },
+                    { name: 'batchNumber', label: 'Batch number' },
+                    { name: 'heatNumber', label: 'Heat number' },
+                    {
+                      name: 'replacesTransactionId',
+                      label: 'Replaces which rejection?',
+                      type: 'select',
+                      options: ledger
+                        .filter((row) => row.type === 'REJECTED_MATERIAL')
+                        .map((row) => ({
+                          value: row.id,
+                          label: `${row.item.code} · ${formatNumber(row.quantityKg, 3)} kg · ${formatDate(row.occurredAt)}`,
+                        })),
+                      help: 'Required when recording replacement material, so the two can be traced together.',
+                      span: 2,
+                    },
+                    { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
+                    {
+                      name: 'photographFileIds',
+                      label: 'Photographs',
+                      type: 'files',
+                      category: 'PHOTOGRAPH',
+                      accept: 'image/*',
+                      span: 2,
+                    },
+                  ]}
+                />
+              </div>
+
+              <DataTable
+                columns={[
+                  {
+                    key: 'occurredAt',
+                    header: 'When',
+                    render: (row: MaterialTransactionRow) => formatDate(row.occurredAt),
+                  },
+                  {
+                    key: 'type',
+                    header: 'Movement',
+                    render: (row: MaterialTransactionRow) => humanise(row.type),
+                  },
+                  {
+                    key: 'item',
+                    header: 'Item',
+                    render: (row: MaterialTransactionRow) => `${row.item.code} — ${row.item.name}`,
+                  },
+                  {
+                    key: 'quantity',
+                    header: 'Weight (kg)',
+                    align: 'right',
+                    render: (row: MaterialTransactionRow) => formatNumber(row.quantityKg, 3),
+                  },
+                  {
+                    key: 'direction',
+                    header: 'Custody',
+                    render: (row: MaterialTransactionRow) =>
+                      row.directionKg > 0 ? (
+                        <span className="text-warning">to partner</span>
+                      ) : row.directionKg < 0 ? (
+                        <span className="text-success">back to OSWAR</span>
+                      ) : (
+                        <span className="text-muted-foreground">at partner</span>
+                      ),
+                  },
+                  {
+                    key: 'reference',
+                    header: 'Reference',
+                    render: (row: MaterialTransactionRow) => row.reference ?? '—',
+                  },
+                  {
+                    key: 'by',
+                    header: 'Recorded by',
+                    render: (row: MaterialTransactionRow) => row.recordedBy?.name ?? 'System',
+                  },
+                ]}
+                rows={ledger}
+                empty={{
+                  title: 'Nothing has moved yet',
+                  description:
+                    'Movements appear here as material is issued, consumed, scrapped or returned.',
+                }}
               />
             </CardContent>
           </Card>
@@ -559,6 +884,8 @@ export default async function JobDetailPage({
           />
         </TabsContent>
       </Tabs>
+
+      <ActivityTrail entityType="GridJob" entityId={job.id} />
     </div>
   );
 }

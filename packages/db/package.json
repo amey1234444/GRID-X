@@ -20,9 +20,11 @@
     "seed:ci": "tsx prisma/seed.ts",
     "reset": "dotenv -e ../../.env -- prisma migrate reset --force",
     "seed": "dotenv -e ../../.env -- tsx prisma/seed.ts",
+    "reset-admin": "dotenv -e ../../.env -- tsx prisma/reset-admin.ts",
+    "reset-admin:ci": "tsx prisma/reset-admin.ts",
     "studio": "dotenv -e ../../.env -- prisma studio",
     "build": "dotenv -e ../../.env -- prisma generate && tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.seed.json",
     "lint": "echo \"@gridx/db: no lint\""
   },
   "prisma": {
@@ -33,6 +35,7 @@
   },
   "devDependencies": {
     "@gridx/shared": "workspace:*",
+    "@types/node": "20.17.10",
     "argon2": "0.41.1",
     "dotenv": "16.4.5",
     "dotenv-cli": "7.4.4",

@@ -76,6 +76,7 @@ export default async function PaymentsPage(): Promise<React.JSX.Element> {
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Wallet"
         title="Payments"
         description="Finance-approved invoices waiting to be scheduled and paid, with the payment register."
       />

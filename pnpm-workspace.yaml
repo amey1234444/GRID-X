@@ -1,3 +1,6 @@
 packages:
   - "apps/*"
   - "packages/*"
+  # The Expo app manages its own dependency tree with npm — React Native's
+  # Metro bundler does not tolerate pnpm's symlinked node_modules.
+  - "!apps/mobile"

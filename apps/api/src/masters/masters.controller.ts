@@ -31,14 +31,17 @@ export class MastersController {
 
   @Get('components')
   @RequirePermissions(PERMISSIONS.COMPONENT_READ)
-  listComponents(@Query(zodBody(componentQuerySchema)) query: z.infer<typeof componentQuerySchema>) {
-    return this.masters.listComponents(query);
+  listComponents(
+    @CurrentUser() user: RequestUser,
+    @Query(zodBody(componentQuerySchema)) query: z.infer<typeof componentQuerySchema>,
+  ) {
+    return this.masters.listComponents(user, query);
   }
 
   @Get('components/:id')
   @RequirePermissions(PERMISSIONS.COMPONENT_READ)
-  getComponent(@Param('id') id: string) {
-    return this.masters.getComponent(id);
+  getComponent(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.masters.getComponent(user, id);
   }
 
   @Post('components')
@@ -126,8 +129,8 @@ export class MastersController {
 
   @Get('products')
   @RequirePermissions(PERMISSIONS.COMPONENT_READ)
-  listProducts(@Query('companyId') companyId?: string) {
-    return this.masters.listProducts(companyId);
+  listProducts(@CurrentUser() user: RequestUser, @Query('companyId') companyId?: string) {
+    return this.masters.listProducts(user, companyId);
   }
 
   @Post('products')

@@ -4,7 +4,7 @@
  * Creates the permission catalogue, roles, OSWAR companies, internal users, a small partner
  * network and one complete job flow so every screen has meaningful data on first run.
  */
-import { PrismaClient, Prisma, ProcessType, RoleCode } from '@prisma/client';
+import { PrismaClient, Prisma, JobStatus, ProcessType, RoleCode } from '@prisma/client';
 import { PERMISSIONS, ROLE_PERMISSIONS, ROLE_DESCRIPTIONS, ROLE_LABELS } from '@gridx/shared';
 import * as argon2 from 'argon2';
 
@@ -321,6 +321,212 @@ async function main(): Promise<void> {
       materialGrade: 'IS2062 E250BR',
       itemQuantity: 6.8,
     },
+    // Phase 3 asks for 15–25 pilot components across the process mix, so the allocation engine,
+    // the capacity board and the concentration report all have something real to chew on.
+    {
+      componentCode: 'CMP-SHF-032',
+      name: 'Main drive shaft',
+      primaryProcess: 'MACHINING' as ProcessType,
+      criticality: 'CLASS_A' as const,
+      inspectionLevel: 'LEVEL_3_FULL_DIMENSIONAL' as const,
+      theoreticalWeightKg: 44.2,
+      standardCycleTimeMinutes: 165,
+      standardConversionRate: 3150,
+      materialGrade: 'EN8D',
+      itemQuantity: 48,
+    },
+    {
+      componentCode: 'CMP-GRD-118',
+      name: 'Safety guard panel',
+      primaryProcess: 'BENDING' as ProcessType,
+      criticality: 'CLASS_C' as const,
+      inspectionLevel: 'LEVEL_2_SAMPLING' as const,
+      theoreticalWeightKg: 11.8,
+      standardCycleTimeMinutes: 38,
+      standardConversionRate: 420,
+      materialGrade: 'IS513 CR4',
+      itemQuantity: 12.6,
+    },
+    {
+      componentCode: 'CMP-HUB-044',
+      name: 'Rotor hub machined',
+      primaryProcess: 'MACHINING' as ProcessType,
+      criticality: 'CLASS_B' as const,
+      inspectionLevel: 'LEVEL_3_FULL_DIMENSIONAL' as const,
+      theoreticalWeightKg: 28.6,
+      standardCycleTimeMinutes: 128,
+      standardConversionRate: 2240,
+      materialGrade: 'EN19',
+      itemQuantity: 31,
+    },
+    {
+      componentCode: 'CMP-DUC-076',
+      name: 'Hot air duct assembly',
+      primaryProcess: 'FABRICATION' as ProcessType,
+      criticality: 'CLASS_B' as const,
+      inspectionLevel: 'LEVEL_2_SAMPLING' as const,
+      theoreticalWeightKg: 37.4,
+      standardCycleTimeMinutes: 146,
+      standardConversionRate: 1780,
+      materialGrade: 'SS304',
+      itemQuantity: 40,
+    },
+    {
+      componentCode: 'CMP-PLT-201',
+      name: 'Mounting plate laser cut',
+      primaryProcess: 'CUTTING' as ProcessType,
+      criticality: 'CLASS_D' as const,
+      inspectionLevel: 'LEVEL_1_VISUAL' as const,
+      theoreticalWeightKg: 3.9,
+      standardCycleTimeMinutes: 12,
+      standardConversionRate: 96,
+      materialGrade: 'IS2062 E250BR',
+      itemQuantity: 4.2,
+    },
+    {
+      componentCode: 'CMP-FRM-021',
+      name: 'Control panel enclosure',
+      primaryProcess: 'FABRICATION' as ProcessType,
+      criticality: 'CLASS_C' as const,
+      inspectionLevel: 'LEVEL_2_SAMPLING' as const,
+      theoreticalWeightKg: 22.1,
+      standardCycleTimeMinutes: 94,
+      standardConversionRate: 1180,
+      materialGrade: 'IS513 CR4',
+      itemQuantity: 24,
+    },
+    {
+      componentCode: 'CMP-ARM-009',
+      name: 'Secondary oven arm',
+      primaryProcess: 'WELDING' as ProcessType,
+      criticality: 'CLASS_B' as const,
+      inspectionLevel: 'LEVEL_3_FULL_DIMENSIONAL' as const,
+      theoreticalWeightKg: 61.3,
+      standardCycleTimeMinutes: 178,
+      standardConversionRate: 2050,
+      materialGrade: 'IS2062 E250BR',
+      itemQuantity: 65,
+    },
+    {
+      componentCode: 'CMP-PIN-155',
+      name: 'Locking pin set',
+      primaryProcess: 'MACHINING' as ProcessType,
+      criticality: 'CLASS_D' as const,
+      inspectionLevel: 'LEVEL_2_SAMPLING' as const,
+      theoreticalWeightKg: 1.4,
+      standardCycleTimeMinutes: 9,
+      standardConversionRate: 74,
+      materialGrade: 'EN8D',
+      itemQuantity: 1.6,
+    },
+    {
+      componentCode: 'CMP-TNK-088',
+      name: 'Coolant tank welded',
+      primaryProcess: 'WELDING' as ProcessType,
+      criticality: 'CLASS_C' as const,
+      inspectionLevel: 'LEVEL_2_SAMPLING' as const,
+      theoreticalWeightKg: 26.7,
+      standardCycleTimeMinutes: 102,
+      standardConversionRate: 1320,
+      materialGrade: 'SS304',
+      itemQuantity: 29,
+    },
+    {
+      componentCode: 'CMP-CVR-133',
+      name: 'Inspection cover',
+      primaryProcess: 'BENDING' as ProcessType,
+      criticality: 'CLASS_D' as const,
+      inspectionLevel: 'LEVEL_1_VISUAL' as const,
+      theoreticalWeightKg: 5.2,
+      standardCycleTimeMinutes: 16,
+      standardConversionRate: 148,
+      materialGrade: 'IS513 CR4',
+      itemQuantity: 5.6,
+    },
+    {
+      componentCode: 'CMP-BSE-052',
+      name: 'Gearbox mounting base',
+      primaryProcess: 'MACHINING' as ProcessType,
+      criticality: 'CLASS_B' as const,
+      inspectionLevel: 'LEVEL_3_FULL_DIMENSIONAL' as const,
+      theoreticalWeightKg: 54.8,
+      standardCycleTimeMinutes: 196,
+      standardConversionRate: 3480,
+      materialGrade: 'IS2062 E250BR',
+      itemQuantity: 58,
+    },
+    {
+      componentCode: 'CMP-RLR-097',
+      name: 'Idler roller assembly',
+      primaryProcess: 'ASSEMBLY' as ProcessType,
+      criticality: 'CLASS_C' as const,
+      inspectionLevel: 'LEVEL_2_SAMPLING' as const,
+      theoreticalWeightKg: 14.6,
+      standardCycleTimeMinutes: 52,
+      standardConversionRate: 680,
+      materialGrade: 'EN8D',
+      itemQuantity: 15.8,
+    },
+    {
+      componentCode: 'CMP-STD-176',
+      name: 'Floor stand fabricated',
+      primaryProcess: 'FABRICATION' as ProcessType,
+      criticality: 'CLASS_D' as const,
+      inspectionLevel: 'LEVEL_1_VISUAL' as const,
+      theoreticalWeightKg: 19.3,
+      standardCycleTimeMinutes: 64,
+      standardConversionRate: 540,
+      materialGrade: 'IS1239',
+      itemQuantity: 21,
+    },
+    {
+      componentCode: 'CMP-CHT-064',
+      name: 'Discharge chute',
+      primaryProcess: 'FABRICATION' as ProcessType,
+      criticality: 'CLASS_C' as const,
+      inspectionLevel: 'LEVEL_2_SAMPLING' as const,
+      theoreticalWeightKg: 31.5,
+      standardCycleTimeMinutes: 118,
+      standardConversionRate: 1460,
+      materialGrade: 'SS304',
+      itemQuantity: 34,
+    },
+    {
+      componentCode: 'CMP-CLP-188',
+      name: 'Pipe clamp set',
+      primaryProcess: 'CUTTING' as ProcessType,
+      criticality: 'CLASS_D' as const,
+      inspectionLevel: 'LEVEL_1_VISUAL' as const,
+      theoreticalWeightKg: 2.1,
+      standardCycleTimeMinutes: 7,
+      standardConversionRate: 62,
+      materialGrade: 'IS2062 E250BR',
+      itemQuantity: 2.3,
+    },
+    {
+      componentCode: 'CMP-FLG-119',
+      name: 'Blower flange machined',
+      primaryProcess: 'MACHINING' as ProcessType,
+      criticality: 'CLASS_C' as const,
+      inspectionLevel: 'LEVEL_3_FULL_DIMENSIONAL' as const,
+      theoreticalWeightKg: 9.7,
+      standardCycleTimeMinutes: 41,
+      standardConversionRate: 720,
+      materialGrade: 'EN19',
+      itemQuantity: 10.4,
+    },
+    {
+      componentCode: 'CMP-LDR-142',
+      name: 'Access ladder welded',
+      primaryProcess: 'WELDING' as ProcessType,
+      criticality: 'CLASS_D' as const,
+      inspectionLevel: 'LEVEL_1_VISUAL' as const,
+      theoreticalWeightKg: 16.8,
+      standardCycleTimeMinutes: 58,
+      standardConversionRate: 480,
+      materialGrade: 'IS1239',
+      itemQuantity: 18.2,
+    },
   ];
 
   const components = [];
@@ -427,6 +633,40 @@ async function main(): Promise<void> {
       maxCapacityHours: 420,
       capabilities: ['CUTTING', 'PAINTING', 'PACKING'] as ProcessType[],
     },
+    // Phase 3 runs the pilot with five partners. Four and five deliberately widen the spread:
+    // one strategic partner with the heavy machining the network otherwise lacks, and one micro
+    // unit still in capability audit, so the approval workflow and the allocation guards both
+    // have something to refuse.
+    {
+      partnerCode: 'PTR-00004',
+      businessName: 'Kalmeshwar Heavy Fabricators',
+      ownerName: 'Anil Rathod',
+      phone: '9811100004',
+      email: 'owner@kalmeshwarheavy.example',
+      city: 'Kalmeshwar',
+      distanceKm: 27,
+      category: 'A' as const,
+      level: 'L4_STRATEGIC' as const,
+      approvalStatus: 'STRATEGIC' as const,
+      auditStatus: 'PASSED' as const,
+      maxCapacityHours: 2400,
+      capabilities: ['MACHINING', 'FABRICATION', 'WELDING', 'ASSEMBLY'] as ProcessType[],
+    },
+    {
+      partnerCode: 'PTR-00005',
+      businessName: 'Umred Sheet Metal Works',
+      ownerName: 'Nitin Kale',
+      phone: '9811100005',
+      email: 'owner@umredsheetmetal.example',
+      city: 'Umred',
+      distanceKm: 48,
+      category: 'C' as const,
+      level: 'L1_MICRO' as const,
+      approvalStatus: 'CAPABILITY_AUDIT' as const,
+      auditStatus: 'SCHEDULED' as const,
+      maxCapacityHours: 320,
+      capabilities: ['BENDING', 'CUTTING', 'PAINTING'] as ProcessType[],
+    },
   ];
 
   const partners = [];
@@ -524,7 +764,15 @@ async function main(): Promise<void> {
       });
     }
 
-    for (const component of components) {
+    // A partner is only on a component's approved list if they can actually run its primary
+    // process — the same rule the API and the CSV importer enforce. Approving everyone for
+    // everything would make the allocation engine, the capability matrix and the concentration
+    // report meaningless at pilot scale.
+    const capableComponents = components.filter((component) =>
+      definition.capabilities.includes(component.primaryProcess),
+    );
+
+    for (const component of capableComponents) {
       await prisma.approvedPartnerComponent.upsert({
         where: { componentId_partnerId: { componentId: component.id, partnerId: partner.id } },
         create: {
@@ -540,12 +788,15 @@ async function main(): Promise<void> {
       await prisma.partnerRate.deleteMany({
         where: { partnerId: partner.id, componentId: component.id },
       });
+      // Rates vary a little by partner so the allocation engine's cost factor has a real spread
+      // to rank on rather than an identical number for everyone.
+      const discount = { A: 0.9, B: 0.88, C: 0.84, D: 0.82, SUSPENDED: 0.85 }[definition.category];
       await prisma.partnerRate.create({
         data: {
           companyId: company.id,
           partnerId: partner.id,
           componentId: component.id,
-          conversionRate: Math.round((component.standardConversionRate ?? 500) * 0.88),
+          conversionRate: Math.round((component.standardConversionRate ?? 500) * discount),
           effectiveFrom: days(-90),
           approvedBy: internalUsers.get('PROCUREMENT_USER'),
         },
@@ -679,13 +930,19 @@ async function main(): Promise<void> {
     componentIndex: number;
     partnerIndex: number;
     quantity: number;
-    status: Prisma.GridJobCreateInput['status'];
+    status: JobStatus;
     dueOffset: number;
     accepted?: number;
     rejected?: number;
+    /** Days past the due date this job was completed. Negative (the default) is early. */
+    lateDays?: number;
   }[] = [
+    // Component and partner indices are paired so the partner can actually run the component's
+    // primary process — the same pairing the approved list above allows.
+    //   components: 0 WELDING · 1 FABRICATION · 2 CUTTING · 3,5,13 MACHINING · 4 BENDING · 14 ASSEMBLY
+    //   partners:   0 weld/fab/cut · 1 machining · 2 cutting · 3 machining/fab/weld/assembly
     { suffix: '00001', componentIndex: 0, partnerIndex: 0, quantity: 6, status: 'IN_PRODUCTION', dueOffset: 8 },
-    { suffix: '00002', componentIndex: 1, partnerIndex: 1, quantity: 4, status: 'AWAITING_PARTNER_ACCEPTANCE', dueOffset: 14 },
+    { suffix: '00002', componentIndex: 1, partnerIndex: 3, quantity: 4, status: 'AWAITING_PARTNER_ACCEPTANCE', dueOffset: 14 },
     { suffix: '00003', componentIndex: 2, partnerIndex: 2, quantity: 40, status: 'INSPECTION_REQUESTED', dueOffset: 3 },
     {
       suffix: '00004',
@@ -697,7 +954,72 @@ async function main(): Promise<void> {
       accepted: 58,
       rejected: 2,
     },
-    { suffix: '00005', componentIndex: 0, partnerIndex: 1, quantity: 2, status: 'MATERIAL_ISSUED', dueOffset: -2 },
+    { suffix: '00005', componentIndex: 0, partnerIndex: 3, quantity: 2, status: 'MATERIAL_ISSUED', dueOffset: -2 },
+    // Enough further history for the scorecard to clear its minimum-jobs floor and for the
+    // concentration report and capacity board to show a real spread.
+    {
+      suffix: '00006',
+      componentIndex: 3,
+      partnerIndex: 1,
+      quantity: 12,
+      status: 'CLOSED',
+      dueOffset: -30,
+      accepted: 12,
+    },
+    {
+      suffix: '00007',
+      componentIndex: 5,
+      partnerIndex: 1,
+      quantity: 20,
+      status: 'CLOSED',
+      dueOffset: -22,
+      accepted: 19,
+      rejected: 1,
+      // Delivered late, so on-time-in-full is not a flat 100% across the network.
+      lateDays: 4,
+    },
+    {
+      suffix: '00008',
+      componentIndex: 13,
+      partnerIndex: 1,
+      quantity: 8,
+      status: 'CLOSED',
+      dueOffset: -15,
+      accepted: 8,
+    },
+    {
+      suffix: '00009',
+      componentIndex: 9,
+      partnerIndex: 3,
+      quantity: 10,
+      status: 'CLOSED',
+      dueOffset: -26,
+      accepted: 10,
+    },
+    {
+      suffix: '00010',
+      componentIndex: 6,
+      partnerIndex: 3,
+      quantity: 14,
+      status: 'CLOSED',
+      dueOffset: -18,
+      accepted: 13,
+      rejected: 1,
+      lateDays: 2,
+    },
+    {
+      suffix: '00011',
+      componentIndex: 14,
+      partnerIndex: 3,
+      quantity: 25,
+      status: 'CLOSED',
+      dueOffset: -9,
+      accepted: 25,
+    },
+    { suffix: '00012', componentIndex: 18, partnerIndex: 1, quantity: 30, status: 'IN_PRODUCTION', dueOffset: 6 },
+    { suffix: '00013', componentIndex: 7, partnerIndex: 2, quantity: 120, status: 'ACCEPTED', dueOffset: 11 },
+    { suffix: '00014', componentIndex: 16, partnerIndex: 0, quantity: 9, status: 'QUALITY_ACCEPTED', dueOffset: -1, accepted: 9 },
+    { suffix: '00015', componentIndex: 11, partnerIndex: 0, quantity: 5, status: 'DRAFT', dueOffset: 21 },
   ];
 
   const jobs = [];
@@ -733,8 +1055,14 @@ async function main(): Promise<void> {
         )
           ? days(-7)
           : null,
-        completedAt: definition.status === 'CLOSED' ? days(-13) : null,
-        closedAt: definition.status === 'CLOSED' ? days(-11) : null,
+        // Completion is measured against this job's own due date, not a fixed day, so a
+        // back-dated job is on time or late because the plan says so — which is what the
+        // on-time-in-full KPI reads.
+        completedAt:
+          definition.status === 'CLOSED' || definition.status === 'QUALITY_ACCEPTED'
+            ? days(definition.dueOffset + (definition.lateDays ?? -1))
+            : null,
+        closedAt: definition.status === 'CLOSED' ? days(definition.dueOffset + 1) : null,
         createdById: gridxHeadId,
         items: {
           create: [
@@ -919,23 +1247,32 @@ async function main(): Promise<void> {
     update: {},
   });
 
+  // Section 7 — settings the platform actually reads. The old `gridx.defaults` blob held four
+  // keys under one row that no rule ever consulted; the catalogue in @gridx/shared replaced it.
+  await prisma.systemSetting.deleteMany({ where: { key: 'gridx.defaults' } });
+
+  /**
+   * Section 18 — two-factor is required for senior roles by default, and this demo dataset turns
+   * that off.
+   *
+   * The seeded admin has no authenticator enrolled, so leaving the default in force would issue an
+   * enrolment-only session and make the demo login look broken. Production does not run the seed
+   * and therefore keeps the secure default; a pilot turns it back on from Administration →
+   * Settings once the real admins have enrolled.
+   */
   await prisma.systemSetting.upsert({
-    where: { key: 'gridx.defaults' },
-    create: {
-      key: 'gridx.defaults',
-      value: {
-        paymentTermsDays: 30,
-        scrapAllowancePercent: 5,
-        classAOutsourcingRequiresApproval: true,
-        drawingAccessExpiryDays: 30,
-      },
-    },
-    update: {},
+    where: { key: 'security.twoFactorRequiredRoles' },
+    create: { key: 'security.twoFactorRequiredRoles', value: [] },
+    update: { value: [] },
   });
 
   console.log('Seed complete.');
   console.log(`Internal login: admin@oswar.example / ${DEMO_PASSWORD}`);
   console.log(`Partner login (phone): 98111000 + role index, password ${DEMO_PASSWORD}`);
+  console.log(
+    'Two-factor enforcement is OFF in seeded data. Turn it on in Administration -> Settings ' +
+      'before the pilot goes live.',
+  );
 }
 
 main()

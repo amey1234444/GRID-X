@@ -9,6 +9,7 @@ import {
   saveInspectionResultsAction,
   startInspectionAction,
 } from '@/app/actions/control';
+import { ActivityTrail } from '@/components/app/activity-trail';
 import { ActionDialog } from '@/components/app/action-dialog';
 import { DataTable } from '@/components/app/data-table';
 import { DetailList } from '@/components/app/detail-list';
@@ -40,6 +41,7 @@ export default async function InspectionDetailPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="ShieldCheck"
         title={inspection.inspectionNumber}
         description={`${humanise(inspection.type)} inspection${inspection.job ? ` · job ${inspection.job.jobNumber}` : ''}`}
         actions={
@@ -115,7 +117,6 @@ export default async function InspectionDetailPage({
                       options: optionsFrom(INSPECTION_DECISIONS),
                       span: 2,
                     },
-                    { name: 'inspectedQuantity', label: 'Inspected quantity', type: 'number', required: true },
                     { name: 'acceptedQuantity', label: 'Accepted quantity', type: 'number', required: true },
                     { name: 'rejectedQuantity', label: 'Rejected quantity', type: 'number', defaultValue: '0' },
                     { name: 'reworkQuantity', label: 'Rework quantity', type: 'number', defaultValue: '0' },
@@ -128,6 +129,14 @@ export default async function InspectionDetailPage({
                       defaultValue: 'PARTNER',
                     },
                     { name: 'probableCause', label: 'Probable cause', type: 'textarea', span: 2 },
+                    {
+                      name: 'photographFileIds',
+                      label: 'Evidence photographs',
+                      type: 'files',
+                      category: 'PHOTOGRAPH',
+                      accept: 'image/*',
+                      span: 2,
+                    },
                     { name: 'remarks', label: 'Remarks', type: 'textarea', span: 2 },
                   ]}
                 />
@@ -349,6 +358,8 @@ export default async function InspectionDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      <ActivityTrail entityType="Inspection" entityId={inspection.id} />
     </div>
   );
 }

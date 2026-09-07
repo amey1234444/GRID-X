@@ -1,5 +1,7 @@
 # Deploying GRID-X on Render
 
+> Part of the [GRID-X documentation](README.md). See also [10 — Operations](10-operations.md).
+
 GRID-X ships a Render Blueprint (`render.yaml`) that provisions three resources:
 
 | Resource | Type | Purpose |
@@ -18,9 +20,10 @@ GRID-X ships a Render Blueprint (`render.yaml`) that provisions three resources:
    before drawings or photos can be uploaded — see step 3.
 5. **Apply**. The database is created first, then both services build.
 
-The API build runs, in order: install → build `@gridx/shared` → generate the
-Prisma client and build `@gridx/db` → build the Nest app → `prisma migrate
-deploy`. Schema migrations therefore always run before the new version starts.
+The API build runs, in order: install -> build `@gridx/shared` -> generate the
+Prisma client and build `@gridx/db` -> build the Nest app. Schema migrations run
+in the API service's Render pre-deploy command, where the service can reach the
+private Postgres hostname, and therefore still finish before the new version starts.
 
 ## 2. Environment variables
 
@@ -39,7 +42,7 @@ You must supply in the dashboard:
 | `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_REGION` | Drawing, photo and document storage with signed URLs |
 | `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD` + `NOTIFY_EMAIL_ENABLED=true` | Email notifications |
 | `WHATSAPP_API_URL`, `WHATSAPP_API_TOKEN` + `NOTIFY_WHATSAPP_ENABLED=true` | WhatsApp notifications to partners |
-| `IMS_BASE_URL`, `IMS_API_KEY` + `IMS_ENABLED=true` | IMS integration (masters in, status out) |
+| `IMS_DATABASE_URL`, `IMS_ORG_ID` + `IMS_ENABLED=true` | IMS integration (masters in, status out) |
 | `SENTRY_DSN` | Error monitoring |
 
 `NEXT_PUBLIC_API_URL` is resolved to the API service root. If you use a custom

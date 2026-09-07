@@ -3,6 +3,7 @@ import { KpiCode } from '@gridx/db';
 import {
   KPI_WEIGHTS,
   KpiInput,
+  categoryDropped,
   categoryForScore,
   computeScorecard,
   recommendationForCategory,
@@ -10,12 +11,17 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { SettingsService } from '../common/settings.service';
 import { RequestUser } from '../common/request-user';
+import { allowedCompanyIds, assertCompanyScope } from '../common/company-scope';
 
 interface Period {
   periodMonth: number;
   periodYear: number;
 }
+
+/** Scorecards are also produced by the monthly scheduler, which has no signed-in user. */
+export type ScorecardActor = RequestUser | null;
 
 /**
  * Module 12 — monthly partner scorecards. Every KPI is derived from transactional data
@@ -27,11 +33,19 @@ export class ScorecardsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly notifications: NotificationsService,
+    private readonly settings: SettingsService,
   ) {}
+
+  /** Scores hang off a partner, so company scope is applied one relation deep. */
+  private partnerScope(actor: RequestUser): { partner?: { companyId: { in: string[] } } } {
+    const ids = allowedCompanyIds(actor);
+    return ids ? { partner: { companyId: { in: ids } } } : {};
+  }
 
   async list(actor: RequestUser, period?: Partial<Period>) {
     return this.prisma.partnerScore.findMany({
       where: {
+        ...this.partnerScope(actor),
         ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
         ...(period?.periodMonth ? { periodMonth: period.periodMonth } : {}),
         ...(period?.periodYear ? { periodYear: period.periodYear } : {}),
@@ -48,6 +62,13 @@ export class ScorecardsService {
     if (actor.partnerId && actor.partnerId !== partnerId) {
       throw new ForbiddenException('Partners can only view their own scorecard');
     }
+    if (!actor.partnerId) {
+      const partner = await this.prisma.partner.findUniqueOrThrow({
+        where: { id: partnerId },
+        select: { companyId: true },
+      });
+      assertCompanyScope(actor, partner.companyId, 'partner');
+    }
     return this.prisma.partnerScore.findMany({
       where: { partnerId },
       orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
@@ -56,11 +77,18 @@ export class ScorecardsService {
     });
   }
 
-  /** Recomputes and stores the scorecard for one partner, or every active partner. */
-  async compute(actor: RequestUser, input: Period & { partnerId?: string }) {
+  /**
+   * Recomputes and stores the scorecard for one partner, or every active partner.
+   *
+   * `actor` is null when the monthly scheduler runs this, which the audit log records as SYSTEM.
+   * A null actor is also unscoped by company — the scheduler scores the whole network.
+   */
+  async compute(actor: ScorecardActor, input: Period & { partnerId?: string }) {
+    const companyIds = actor ? allowedCompanyIds(actor) : null;
     const partners = await this.prisma.partner.findMany({
       where: {
         ...(input.partnerId ? { id: input.partnerId } : {}),
+        ...(companyIds ? { companyId: { in: companyIds } } : {}),
         approvalStatus: { in: ['TRIAL_APPROVED', 'APPROVED', 'CERTIFIED', 'STRATEGIC'] },
       },
       select: { id: true, businessName: true },
@@ -72,7 +100,7 @@ export class ScorecardsService {
     return results;
   }
 
-  private async computeForPartner(actor: RequestUser, partnerId: string, period: Period) {
+  private async computeForPartner(actor: ScorecardActor, partnerId: string, period: Period) {
     const periodStart = new Date(Date.UTC(period.periodYear, period.periodMonth - 1, 1));
     const periodEnd = new Date(Date.UTC(period.periodYear, period.periodMonth, 1));
 
@@ -162,7 +190,27 @@ export class ScorecardsService {
       { code: 'SAFETY_AND_COMPLIANCE', value: safetyAndCompliance },
     ];
 
-    const result = computeScorecard(kpiInputs, openCriticalNcs > 2);
+    const result = computeScorecard(kpiInputs, openCriticalNcs > 2, {
+      jobsCompleted,
+      quantityOffered: offered,
+    });
+
+    // The category this partner held going into this period, so a fall can be flagged (Section 13).
+    // A period with too little work behind it is not a fall, so it is skipped here.
+    const previous = result.hasSufficientData
+      ? await this.prisma.partnerScore.findFirst({
+          where: {
+            partnerId,
+            hasSufficientData: true,
+            OR: [
+              { periodYear: { lt: period.periodYear } },
+              { periodYear: period.periodYear, periodMonth: { lt: period.periodMonth } },
+            ],
+          },
+          orderBy: [{ periodYear: 'desc' }, { periodMonth: 'desc' }],
+          select: { category: true, totalScore: true },
+        })
+      : null;
 
     const score = await this.prisma.$transaction(async (tx) => {
       const saved = await tx.partnerScore.upsert({
@@ -184,6 +232,8 @@ export class ScorecardsService {
           jobsOnTime,
           quantityAccepted,
           quantityRejected,
+          hasSufficientData: result.hasSufficientData,
+          insufficientDataReason: result.insufficientDataReason,
         },
         update: {
           totalScore: result.totalScore,
@@ -193,6 +243,8 @@ export class ScorecardsService {
           jobsOnTime,
           quantityAccepted,
           quantityRejected,
+          hasSufficientData: result.hasSufficientData,
+          insufficientDataReason: result.insufficientDataReason,
           computedAt: new Date(),
         },
       });
@@ -209,22 +261,64 @@ export class ScorecardsService {
           periodYear: period.periodYear,
         })),
       });
-      await tx.partner.update({
-        where: { id: partnerId },
-        data: { category: result.category, currentScore: result.totalScore },
-      });
+      // The partner's standing category only moves on a period that can actually judge them.
+      // Allocation reads currentScore, so a 100 earned by doing nothing must not reach it.
+      if (result.hasSufficientData) {
+        await tx.partner.update({
+          where: { id: partnerId },
+          data: { category: result.category, currentScore: result.totalScore },
+        });
+      }
       return saved;
     });
 
+    // Module 12 — a Suspended verdict used to change the category and nothing else. Allocation
+    // reads `approvalStatus` and `isActive`, so a partner the system had just judged as critically
+    // non-compliant kept taking jobs while every screen showed them as suspended.
+    const suspension =
+      result.hasSufficientData && result.category === 'SUSPENDED'
+        ? await this.applySuspensionVerdict(partnerId, result, period)
+        : null;
+
     await this.notifications.notify({
       event: 'SCORECARD_PUBLISHED',
-      title: `Scorecard published — ${result.totalScore}/100 (Category ${result.category})`,
-      body: `Period ${period.periodMonth}/${period.periodYear}. Recommendation: ${result.recommendation}.`,
+      title: result.hasSufficientData
+        ? `Scorecard published — ${result.totalScore}/100 (Category ${result.category})`
+        : `Scorecard published — not yet rated`,
+      body: result.hasSufficientData
+        ? `Period ${period.periodMonth}/${period.periodYear}. Recommendation: ${result.recommendation}.`
+        : `Period ${period.periodMonth}/${period.periodYear}. ${result.insufficientDataReason}`,
       link: '/partner/scorecard',
       entityType: 'PartnerScore',
       entityId: score.id,
       partnerId,
     });
+
+    if (previous && categoryDropped(previous.category, result.category)) {
+      const detail =
+        `Category ${previous.category} (${previous.totalScore}) → ` +
+        `${result.category} (${result.totalScore}) for ${period.periodMonth}/${period.periodYear}. ` +
+        `Recommendation: ${result.recommendation}.`;
+      await this.notifications.notify({
+        event: 'PARTNER_RATING_REDUCED',
+        title: `Your GRID-X rating has fallen to category ${result.category}`,
+        body: detail,
+        link: '/partner/scorecard',
+        entityType: 'PartnerScore',
+        entityId: score.id,
+        partnerId,
+        channels: ['IN_APP', 'WHATSAPP'],
+      });
+      await this.notifications.notify({
+        event: 'PARTNER_RATING_REDUCED',
+        title: `Partner rating reduced — category ${result.category}`,
+        body: detail,
+        link: `/app/partners/${partnerId}`,
+        entityType: 'PartnerScore',
+        entityId: score.id,
+        roleCodes: ['GRIDX_HEAD', 'OPERATIONS_HEAD', 'QUALITY_INSPECTOR'],
+      });
+    }
     await this.audit.record(actor, {
       action: 'SCORECARD_COMPUTED',
       entityType: 'PartnerScore',
@@ -233,29 +327,119 @@ export class ScorecardsService {
         totalScore: result.totalScore,
         category: result.category,
         period: `${period.periodMonth}/${period.periodYear}`,
+        suspended: suspension?.suspended ?? false,
       },
     });
 
-    return { ...score, kpis: result.kpis };
+    return { ...score, kpis: result.kpis, suspension };
+  }
+
+  /**
+   * Module 12 — acts on a Suspended verdict.
+   *
+   * Whether this suspends the partner outright or escalates for a person to decide is a
+   * `governance.autoSuspendOnCriticalViolation` setting, because the blueprint says the system
+   * should *recommend* — but leaving the partner allocatable while every screen calls them
+   * suspended is not a defensible middle ground, so one of the two has to actually happen.
+   *
+   * Existing jobs are deliberately left alone. Work in progress at a suspended partner still has
+   * OSWAR's material in it and has to be finished or formally recovered, not silently abandoned.
+   */
+  private async applySuspensionVerdict(
+    partnerId: string,
+    result: { totalScore: number; recommendation: string },
+    period: Period,
+  ): Promise<{ suspended: boolean; reason: string } | null> {
+    const autoSuspend = await this.settings.get('governance.autoSuspendOnCriticalViolation');
+    const partner = await this.prisma.partner.findUniqueOrThrow({
+      where: { id: partnerId },
+      select: { id: true, businessName: true, approvalStatus: true, isActive: true },
+    });
+
+    const reason =
+      `Scorecard ${period.periodMonth}/${period.periodYear} returned a critical violation ` +
+      `(score ${result.totalScore}).`;
+
+    if (!autoSuspend) {
+      // Escalate instead: someone has to look at this, and it must not just sit in a table.
+      await this.notifications.notify({
+        event: 'PARTNER_RATING_REDUCED',
+        title: `${partner.businessName} has hit a critical violation`,
+        body: `${reason} Automatic suspension is switched off, so this needs a decision. The partner can still be allocated work until someone acts.`,
+        link: `/app/partners/${partnerId}`,
+        entityType: 'Partner',
+        entityId: partnerId,
+        roleCodes: ['GROUP_ADMIN', 'GRIDX_HEAD'],
+      });
+      return { suspended: false, reason };
+    }
+
+    if (partner.approvalStatus === 'SUSPENDED' && !partner.isActive) {
+      return { suspended: true, reason };
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.partner.update({
+        where: { id: partnerId },
+        data: { approvalStatus: 'SUSPENDED', isActive: false, suspendedReason: reason },
+      }),
+      this.prisma.partnerStatusHistory.create({
+        data: {
+          partnerId,
+          fromStatus: partner.approvalStatus,
+          toStatus: 'SUSPENDED',
+          reason: `${reason} Suspended automatically by the monthly scorecard.`,
+        },
+      }),
+    ]);
+
+    await this.notifications.notify({
+      event: 'PARTNER_STATUS_CHANGED',
+      title: `${partner.businessName} has been suspended`,
+      body: `${reason} No new work can be allocated to this partner until the suspension is lifted. Jobs already in progress are unaffected.`,
+      link: `/app/partners/${partnerId}`,
+      entityType: 'Partner',
+      entityId: partnerId,
+      roleCodes: ['GROUP_ADMIN', 'GRIDX_HEAD', 'OPERATIONS_HEAD'],
+    });
+    await this.notifications.notify({
+      event: 'PARTNER_STATUS_CHANGED',
+      title: 'Your GRID-X account has been suspended',
+      body: `${reason} Please contact your GRID-X coordinator. Jobs already with you should be completed as normal.`,
+      link: '/partner/scorecard',
+      entityType: 'Partner',
+      entityId: partnerId,
+      partnerId,
+    });
+
+    return { suspended: true, reason };
   }
 
   /** Network view used by the management dashboard: category mix and ranking. */
-  async leaderboard(period: Period) {
+  async leaderboard(actor: RequestUser, period: Period) {
     const scores = await this.prisma.partnerScore.findMany({
-      where: { periodMonth: period.periodMonth, periodYear: period.periodYear },
+      where: {
+        ...this.partnerScope(actor),
+        periodMonth: period.periodMonth,
+        periodYear: period.periodYear,
+      },
       orderBy: { totalScore: 'desc' },
       include: { partner: { select: { id: true, businessName: true, city: true } } },
     });
-    const mix = scores.reduce<Record<string, number>>((acc, score) => {
+    // Partners without enough work behind them would otherwise pad the network average with a
+    // default 100 and inflate the category A count.
+    const rated = scores.filter((score) => score.hasSufficientData);
+    const mix = rated.reduce<Record<string, number>>((acc, score) => {
       acc[score.category] = (acc[score.category] ?? 0) + 1;
       return acc;
     }, {});
     return {
       weights: KPI_WEIGHTS,
       categoryMix: mix,
+      notYetRated: scores.length - rated.length,
       averageScore:
-        scores.length > 0
-          ? Math.round((scores.reduce((sum, s) => sum + s.totalScore, 0) / scores.length) * 100) / 100
+        rated.length > 0
+          ? Math.round((rated.reduce((sum, s) => sum + s.totalScore, 0) / rated.length) * 100) / 100
           : 0,
       rows: scores.map((score, index) => ({
         rank: index + 1,
@@ -267,6 +451,8 @@ export class ScorecardsService {
         recommendation: score.recommendation,
         jobsCompleted: score.jobsCompleted,
         jobsOnTime: score.jobsOnTime,
+        hasSufficientData: score.hasSufficientData,
+        insufficientDataReason: score.insufficientDataReason,
       })),
     };
   }

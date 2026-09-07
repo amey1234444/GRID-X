@@ -82,6 +82,7 @@ export default async function ReworkPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="ShieldCheck"
         title="Rework"
         description="Rework orders raised from rejections, with cost responsibility and completion tracking."
         actions={

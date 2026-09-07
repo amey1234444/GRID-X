@@ -7,6 +7,9 @@ import {
   PaymentAdjustment,
   SubmitInvoiceInput,
   calculatePayment,
+  earnedIncentives,
+  performanceForJobs,
+  type EarnedIncentive,
   createRateSchema,
   deductionSchema,
   holdInvoiceSchema,
@@ -20,13 +23,46 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { SequenceService } from '../audit/sequence.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ImsService } from '../ims/ims.service';
 import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
 import { assertTransition } from '../common/workflow';
+import {
+  assertCanWriteToCompany,
+  assertCompanyScope,
+  companyWhere,
+} from '../common/company-scope';
+
+/**
+ * Module 11 — a job may be invoiced once quality has accepted it and it is on its way back or
+ * settled. Shared by the picker that lists invoiceable jobs and the guard on submission, so the
+ * screen and the endpoint cannot disagree about what is billable.
+ */
+export const INVOICEABLE_JOB_STATUSES = [
+  'QUALITY_ACCEPTED',
+  'DISPATCHED',
+  'RECEIVED',
+  'CLOSED',
+] as const;
 
 export interface InvoiceFilters extends PaginationInput {
   status?: string;
   partnerId?: string;
+}
+
+export interface RateSummary {
+  /** Rate cards currently in force across the filtered set. */
+  active: number;
+  /** Mean conversion rate across the filtered set; null when nothing matches. */
+  averageRate: number | null;
+}
+
+export interface RateFilters extends PaginationInput {
+  partnerId?: string;
+  componentId?: string;
+  search?: string;
+  /** Omitted means the full revision history — active cards and superseded ones. */
+  isActive?: boolean;
 }
 
 /**
@@ -40,29 +76,69 @@ export class CommercialsService {
     private readonly audit: AuditService,
     private readonly sequence: SequenceService,
     private readonly notifications: NotificationsService,
+    private readonly ims: ImsService,
   ) {}
 
   // -------------------------------------------------------------------------
   // Rates
   // -------------------------------------------------------------------------
 
-  async listRates(partnerId?: string, componentId?: string) {
-    return this.prisma.partnerRate.findMany({
-      where: {
-        ...(partnerId ? { partnerId } : {}),
-        ...(componentId ? { componentId } : {}),
-        isActive: true,
-      },
-      orderBy: { effectiveFrom: 'desc' },
-      include: {
-        partner: { select: { id: true, businessName: true } },
-        component: { select: { id: true, componentCode: true, name: true } },
-      },
-    });
+  /**
+   * Rate cards, newest revision first. Returns a page envelope like every other
+   * list endpoint — the screen reads `data`/`total`, so a bare array breaks it.
+   *
+   * The full revision history is returned by default: the screen renders both
+   * ACTIVE and SUPERSEDED cards, so filtering to active here would leave it
+   * unable to show a rate's history at all. Pass `isActive` to narrow it.
+   */
+  async listRates(
+    actor: RequestUser,
+    filters: RateFilters,
+  ): Promise<Paginated<unknown> & { summary: RateSummary }> {
+    const where: Prisma.PartnerRateWhereInput = {
+      ...companyWhere(actor),
+      // A partner user only ever sees their own rate card.
+      ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
+      ...(filters.partnerId && !actor.partnerId ? { partnerId: filters.partnerId } : {}),
+      ...(filters.componentId ? { componentId: filters.componentId } : {}),
+      ...(filters.isActive === undefined ? {} : { isActive: filters.isActive }),
+      ...(filters.search
+        ? {
+            OR: [
+              { partner: { businessName: { contains: filters.search, mode: 'insensitive' } } },
+              { component: { componentCode: { contains: filters.search, mode: 'insensitive' } } },
+              { component: { name: { contains: filters.search, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+    };
+
+    const [data, total, activeCount, aggregate] = await Promise.all([
+      this.prisma.partnerRate.findMany({
+        where,
+        ...paginationArgs(filters),
+        orderBy: [{ effectiveFrom: 'desc' }, { createdAt: 'desc' }],
+        include: {
+          partner: { select: { id: true, businessName: true } },
+          component: { select: { id: true, componentCode: true, name: true } },
+        },
+      }),
+      this.prisma.partnerRate.count({ where }),
+      this.prisma.partnerRate.count({ where: { ...where, isActive: true } }),
+      this.prisma.partnerRate.aggregate({ where, _avg: { conversionRate: true } }),
+    ]);
+
+    // Summarised over the whole filtered set, not just the page — otherwise the
+    // headline figures would change every time someone paged through.
+    return {
+      ...paginate(data, total, filters),
+      summary: { active: activeCount, averageRate: aggregate._avg.conversionRate },
+    };
   }
 
   /** Rate revisions keep history: the previous rate is stored on the new record. */
   async createRate(actor: RequestUser, input: z.infer<typeof createRateSchema>) {
+    assertCanWriteToCompany(actor, input.companyId);
     const current = await this.prisma.partnerRate.findFirst({
       where: { partnerId: input.partnerId, componentId: input.componentId, isActive: true },
       orderBy: { effectiveFrom: 'desc' },
@@ -147,6 +223,7 @@ export class CommercialsService {
     if (actor.partnerId && invoice.partnerId !== actor.partnerId) {
       throw new ForbiddenException('This invoice belongs to another partner');
     }
+    assertCompanyScope(actor, invoice.companyId, 'invoice');
     return invoice;
   }
 
@@ -156,8 +233,9 @@ export class CommercialsService {
     if (!scopedPartnerId) throw new BadRequestException('partnerId is required');
     const jobs = await this.prisma.gridJob.findMany({
       where: {
+        ...companyWhere(actor),
         partnerId: scopedPartnerId,
-        status: { in: ['QUALITY_ACCEPTED', 'DISPATCHED', 'RECEIVED', 'CLOSED'] },
+        status: { in: [...INVOICEABLE_JOB_STATUSES] },
         acceptedQuantity: { gt: 0 },
         invoiceItems: { none: {} },
       },
@@ -180,7 +258,7 @@ export class CommercialsService {
     if (!partnerId) throw new BadRequestException('partnerId is required');
 
     const jobs = await this.prisma.gridJob.findMany({
-      where: { id: { in: input.jobIds }, partnerId },
+      where: { ...companyWhere(actor), id: { in: input.jobIds }, partnerId },
       include: { reworkOrders: true },
     });
     if (jobs.length !== input.jobIds.length) {
@@ -192,23 +270,54 @@ export class CommercialsService {
         `Quality acceptance is pending for ${notAccepted.map((job) => job.jobNumber).join(', ')}`,
       );
     }
+
+    // The job must have reached quality acceptance, not merely have some accepted quantity on it.
+    // A partially accepted job sitting in REWORK has an accepted quantity that is still moving —
+    // invoicing it bills for a figure that is not final. The `include: { reworkOrders: true }`
+    // above was the trace of a guard that was intended here and never written; the picker on the
+    // invoice screen filtered correctly, so only a direct API call reached this.
+    const notReady = jobs.filter(
+      (job) => !INVOICEABLE_JOB_STATUSES.includes(job.status as (typeof INVOICEABLE_JOB_STATUSES)[number]),
+    );
+    if (notReady.length > 0) {
+      throw new BadRequestException(
+        `Not ready to invoice: ${notReady
+          .map((job) => `${job.jobNumber} (${job.status.toLowerCase().replace(/_/g, ' ')})`)
+          .join(', ')}. Invoice once quality has accepted the work.`,
+      );
+    }
+
+    const openRework = jobs.filter((job) =>
+      job.reworkOrders.some(
+        (order) => order.status !== 'COMPLETED' && order.status !== 'SCRAPPED',
+      ),
+    );
+    if (openRework.length > 0) {
+      throw new BadRequestException(
+        `Rework is still open on ${openRework.map((job) => job.jobNumber).join(', ')}. ` +
+          'Close the rework so the accepted quantity and any deduction are final.',
+      );
+    }
     const alreadyInvoiced = await this.prisma.partnerInvoiceItem.findFirst({
       where: { jobId: { in: input.jobIds } },
     });
     if (alreadyInvoiced) throw new BadRequestException('One of these jobs is already invoiced');
 
-    const adjustments = await this.pendingAdjustments(partnerId);
-    const calculation = calculatePayment(
-      jobs.map((job) => ({
-        jobId: job.id,
-        jobNumber: job.jobNumber,
-        acceptedQuantity: job.acceptedQuantity,
-        conversionRate: job.rate,
-        amount: 0,
-      })),
-      adjustments,
-      input.taxPercent,
-    );
+    const lines = jobs.map((job) => ({
+      jobId: job.id,
+      jobNumber: job.jobNumber,
+      acceptedQuantity: job.acceptedQuantity,
+      conversionRate: job.rate,
+      amount: 0,
+    }));
+
+    // Incentives are earned against the basic amount, so that has to be known before the rules can
+    // be judged; calculatePayment is then run once more with the full adjustment set.
+    const basicAmount = calculatePayment(lines, [], 0).basicAmount;
+    const earned = await this.earnedIncentivesFor(partnerId, jobs, basicAmount);
+    const adjustments = [...(await this.pendingAdjustments(partnerId)), ...earned];
+
+    const calculation = calculatePayment(lines, adjustments, input.taxPercent);
 
     const invoiceNumber = await this.sequence.next('INVOICE');
     const invoice = await this.prisma.partnerInvoice.create({
@@ -245,6 +354,22 @@ export class CommercialsService {
       data: { invoiceId: invoice.id },
     });
 
+    // The adjustment ledger carries incentives as well as deductions, so an earned incentive is
+    // recorded line by line rather than disappearing into a single total on the invoice. They are
+    // written already attached to this invoice so the sweep above cannot pick them up twice.
+    if (earned.length > 0) {
+      await this.prisma.partnerDeduction.createMany({
+        data: earned.map((incentive) => ({
+          partnerId,
+          invoiceId: invoice.id,
+          type: incentive.type,
+          reason: incentive.label,
+          amount: incentive.amount,
+          approvedAt: new Date(),
+        })),
+      });
+    }
+
     await this.notifications.notify({
       event: 'INVOICE_SUBMITTED',
       title: `Invoice ${invoiceNumber} submitted`,
@@ -271,6 +396,7 @@ export class CommercialsService {
     stage: 'QUANTITY' | 'QUALITY' | 'MATERIAL' | 'FINANCE',
     input: z.infer<typeof invoiceActionSchema>,
   ) {
+    await this.findInvoice(actor, id);
     const invoice = await this.prisma.partnerInvoice.findUniqueOrThrow({
       where: { id },
       include: { items: true },
@@ -331,6 +457,12 @@ export class CommercialsService {
       entityId: id,
       partnerId: invoice.partnerId,
     });
+
+    // §10 — the approved invoice and the conversion cost behind it belong in IMS.
+    if (input.approved && stage === 'FINANCE') {
+      await this.ims.pushInBackground('partner-invoices', id);
+      await this.ims.pushInBackground('conversion-cost', id);
+    }
     await this.audit.record(actor, {
       action: `INVOICE_${stage}_${input.approved ? 'APPROVED' : 'HELD'}`,
       entityType: 'PartnerInvoice',
@@ -342,6 +474,7 @@ export class CommercialsService {
   }
 
   async hold(actor: RequestUser, id: string, input: z.infer<typeof holdInvoiceSchema>) {
+    await this.findInvoice(actor, id);
     const invoice = await this.prisma.partnerInvoice.findUniqueOrThrow({ where: { id } });
     assertTransition('Invoice', invoice.status, 'HELD', INVOICE_STATUS_TRANSITIONS);
     const updated = await this.prisma.partnerInvoice.update({
@@ -367,6 +500,7 @@ export class CommercialsService {
   }
 
   async schedule(actor: RequestUser, id: string, input: z.infer<typeof scheduleInvoiceSchema>) {
+    await this.findInvoice(actor, id);
     const invoice = await this.prisma.partnerInvoice.findUniqueOrThrow({ where: { id } });
     assertTransition('Invoice', invoice.status, 'PAYMENT_SCHEDULED', INVOICE_STATUS_TRANSITIONS);
     const updated = await this.prisma.partnerInvoice.update({
@@ -383,6 +517,7 @@ export class CommercialsService {
   }
 
   async recordPayment(actor: RequestUser, id: string, input: z.infer<typeof recordPaymentSchema>) {
+    await this.findInvoice(actor, id);
     const invoice = await this.prisma.partnerInvoice.findUniqueOrThrow({
       where: { id },
       include: { payments: true },
@@ -437,6 +572,11 @@ export class CommercialsService {
   // -------------------------------------------------------------------------
 
   async createDeduction(actor: RequestUser, input: z.infer<typeof deductionSchema>) {
+    const partner = await this.prisma.partner.findUniqueOrThrow({
+      where: { id: input.partnerId },
+      select: { companyId: true },
+    });
+    assertCompanyScope(actor, partner.companyId, 'partner');
     const deduction = await this.prisma.partnerDeduction.create({
       data: {
         partnerId: input.partnerId,
@@ -455,6 +595,65 @@ export class CommercialsService {
       after: { type: input.type, amount: input.amount, reason: input.reason },
     });
     return deduction;
+  }
+
+  /**
+   * Commercial - Approvals (Section 24). The invoice approval trail.
+   *
+   * Every stage sign-off was written to PaymentApproval and never read back, so the record of who
+   * verified quantity, quality, material and finance existed but could not be inspected — which is
+   * exactly the audit question this table is for.
+   */
+  async listApprovals(
+    actor: RequestUser,
+    filters: PaginationInput & { stage?: string; partnerId?: string; approved?: boolean },
+  ) {
+    const where: Prisma.PaymentApprovalWhereInput = {
+      invoice: {
+        ...companyWhere(actor),
+        ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
+        ...(filters.partnerId && !actor.partnerId ? { partnerId: filters.partnerId } : {}),
+      },
+      ...(filters.stage ? { stage: filters.stage } : {}),
+      ...(filters.approved === undefined ? {} : { approved: filters.approved }),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.paymentApproval.findMany({
+        where,
+        ...paginationArgs(filters),
+        orderBy: { createdAt: 'desc' },
+        include: {
+          approver: { select: { name: true } },
+          invoice: {
+            select: {
+              id: true,
+              invoiceNumber: true,
+              status: true,
+              netAmount: true,
+              partner: { select: { id: true, businessName: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.paymentApproval.count({ where }),
+    ]);
+
+    const data = rows.map((row) => ({
+      id: row.id,
+      stage: row.stage,
+      approved: row.approved,
+      remarks: row.remarks,
+      approverName: row.approver?.name ?? null,
+      createdAt: row.createdAt,
+      invoiceId: row.invoice.id,
+      invoiceNumber: row.invoice.invoiceNumber,
+      invoiceStatus: row.invoice.status,
+      netAmount: row.invoice.netAmount,
+      partnerName: row.invoice.partner?.businessName ?? null,
+    }));
+
+    return paginate(data, total, filters);
   }
 
   async listIncentiveRules(partnerId?: string) {
@@ -484,5 +683,38 @@ export class CommercialsService {
       label: deduction.reason,
       amount: deduction.amount,
     }));
+  }
+
+  /**
+   * Module 11 pays \"accepted quantity x conversion rate + quality incentive + on-time delivery
+   * incentive\", so an invoice that only ever subtracts is short. Rules configured against this
+   * partner win over the network-wide default of the same type, which is how procurement expresses
+   * a negotiated rate for one partner.
+   */
+  private async earnedIncentivesFor(
+    partnerId: string,
+    jobs: {
+      acceptedQuantity: number;
+      rejectedQuantity: number;
+      dueDate: Date | null;
+      completedAt: Date | null;
+    }[],
+    basicAmount: number,
+  ): Promise<EarnedIncentive[]> {
+    const rules = await this.prisma.partnerIncentiveRule.findMany({
+      where: { isActive: true, OR: [{ partnerId }, { partnerId: null }] },
+      orderBy: { partnerId: 'desc' },
+    });
+
+    const mostSpecific = new Map<string, (typeof rules)[number]>();
+    for (const rule of rules) {
+      if (!mostSpecific.has(rule.type)) mostSpecific.set(rule.type, rule);
+    }
+
+    return earnedIncentives(
+      [...mostSpecific.values()],
+      performanceForJobs(jobs),
+      basicAmount,
+    );
   }
 }

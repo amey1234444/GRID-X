@@ -150,6 +150,7 @@ export default async function ToolingPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Wrench"
         title="Tooling & gauges"
         description="OSWAR-owned tools, fixtures and gauges issued to partners, with calibration control."
         actions={
@@ -166,6 +167,14 @@ export default async function ToolingPage({
               { name: 'replacementValue', label: 'Replacement value', type: 'number', step: '0.01' },
               { name: 'calibrationRequired', label: 'Calibration required', type: 'checkbox' },
               { name: 'calibrationFrequencyDays', label: 'Calibration frequency (days)', type: 'number' },
+              {
+                name: 'photoFileId',
+                label: 'Tool photograph',
+                type: 'file',
+                category: 'PHOTOGRAPH',
+                accept: 'image/*',
+                span: 2,
+              },
             ]}
           />
         }

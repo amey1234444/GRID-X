@@ -178,6 +178,57 @@ export const PROCESS_LABELS: Record<ProcessType, string> = {
   TRANSPORT: 'Transport',
 };
 
+export const PROCESS_FAMILIES = [
+  'METALWORK',
+  'PRECISION',
+  'FINISHING',
+  'ELECTRICAL',
+  'LOGISTICS',
+] as const;
+export type ProcessFamily = (typeof PROCESS_FAMILIES)[number];
+
+export const PROCESS_FAMILY_LABELS: Record<ProcessFamily, string> = {
+  METALWORK: 'Metalwork',
+  PRECISION: 'Precision',
+  FINISHING: 'Finishing',
+  ELECTRICAL: 'Electrical',
+  LOGISTICS: 'Logistics',
+};
+
+/**
+ * Which family each process belongs to. The capability matrix groups its columns
+ * by family so a reader can see at a glance that a partner covers all of
+ * metalwork but none of precision — twelve ungrouped columns cannot show that.
+ *
+ * The order of PROCESS_TYPES already runs family by family; keep it that way so
+ * grouped columns stay contiguous without re-sorting.
+ */
+export const PROCESS_FAMILY: Record<ProcessType, ProcessFamily> = {
+  CUTTING: 'METALWORK',
+  BENDING: 'METALWORK',
+  WELDING: 'METALWORK',
+  FABRICATION: 'METALWORK',
+  MACHINING: 'PRECISION',
+  DRILLING: 'PRECISION',
+  GRINDING: 'PRECISION',
+  PAINTING: 'FINISHING',
+  ASSEMBLY: 'FINISHING',
+  PACKING: 'FINISHING',
+  ELECTRICAL_WIRING: 'ELECTRICAL',
+  TRANSPORT: 'LOGISTICS',
+};
+
+/** Processes of each family, in PROCESS_TYPES order. */
+export function processesByFamily(
+  processes: readonly ProcessType[] = PROCESS_TYPES,
+): { family: ProcessFamily; label: string; processes: ProcessType[] }[] {
+  return PROCESS_FAMILIES.map((family) => ({
+    family,
+    label: PROCESS_FAMILY_LABELS[family],
+    processes: processes.filter((process) => PROCESS_FAMILY[process] === family),
+  })).filter((group) => group.processes.length > 0);
+}
+
 export const MACHINE_CONDITIONS = ['EXCELLENT', 'GOOD', 'FAIR', 'POOR', 'UNDER_REPAIR'] as const;
 export type MachineCondition = (typeof MACHINE_CONDITIONS)[number];
 
@@ -382,6 +433,33 @@ export const MILESTONES_REQUIRING_PHOTO: MilestoneType[] = [
   'DISPATCHED',
 ];
 
+/**
+ * Section 2 core operating principle: production started → first article approved → batch
+ * completed. These milestones sit after the first article in that chain, so they may not be
+ * reported until a first-article inspection has been accepted.
+ */
+export const MILESTONES_REQUIRING_FIRST_ARTICLE: MilestoneType[] = [
+  'BATCH_25_PERCENT',
+  'BATCH_50_PERCENT',
+  'BATCH_READY_FOR_INSPECTION',
+  'DISPATCHED',
+];
+
+/**
+ * Whether a job must clear a first article before the batch may proceed.
+ *
+ * Level 1 visual work is waved through — a first article on a visual-only characteristic tells
+ * nobody anything. Everything measured, and every controlled-outsourcing component regardless of
+ * level, is gated.
+ */
+export function requiresFirstArticle(
+  inspectionLevel: InspectionLevel,
+  criticality: CriticalityClass,
+): boolean {
+  if (criticality === 'CLASS_A' || criticality === 'CLASS_B') return true;
+  return inspectionLevel !== 'LEVEL_1_VISUAL';
+}
+
 export const DELAY_REASONS = [
   'MATERIAL_SHORTAGE',
   'DRAWING_CLARIFICATION',
@@ -422,6 +500,24 @@ export const DELAY_RESPONSIBILITY: Record<DelayReason, ResponsibleParty> = {
 
 export const RESPONSIBLE_PARTIES = ['PARTNER', 'OSWAR', 'SHARED', 'EXTERNAL'] as const;
 export type ResponsibleParty = (typeof RESPONSIBLE_PARTIES)[number];
+
+/**
+ * Module 7 — "this will allow management to identify whether delays are caused by the partner or
+ * by OSWAR". The reason decides the owner, not who happened to report it.
+ *
+ * `MATERIAL_SHORTAGE` is resolved against the job's material responsibility rather than defaulting
+ * to OSWAR: material OSWAR undertook to supply is OSWAR's problem, material the partner procures
+ * is theirs.
+ */
+export function responsibilityForDelay(
+  reason: DelayReason,
+  materialResponsibility?: MaterialResponsibility,
+): ResponsibleParty {
+  if (reason === 'MATERIAL_SHORTAGE' && materialResponsibility) {
+    return materialResponsibility === 'OSWAR_SUPPLIED' ? 'OSWAR' : 'PARTNER';
+  }
+  return DELAY_RESPONSIBILITY[reason];
+}
 
 export const CLARIFICATION_STATUSES = ['OPEN', 'ANSWERED', 'CLOSED'] as const;
 export type ClarificationStatus = (typeof CLARIFICATION_STATUSES)[number];

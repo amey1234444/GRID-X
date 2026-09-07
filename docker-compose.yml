@@ -1,0 +1,35 @@
+# ---------------------------------------------------------------------------
+# Local development database for GRID-X.
+#
+#   docker compose up -d          start PostgreSQL 16 on localhost:5432
+#   docker compose down           stop it, keeping the data
+#   docker compose down -v        stop it and wipe the data volume
+#
+# Credentials match the DATABASE_URL in .env.example, so a fresh copy of that
+# file works against this container with no edits. Production uses Render's
+# managed PostgreSQL instead — see render.yaml.
+# ---------------------------------------------------------------------------
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gridx-postgres-local
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gridx
+      POSTGRES_PASSWORD: gridx
+      POSTGRES_DB: gridx
+    ports:
+      - "5432:5432"
+    volumes:
+      - gridx-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Prisma commands fail confusingly if they run before Postgres accepts
+      # connections; this lets `docker compose up --wait` block until it does.
+      test: ["CMD-SHELL", "pg_isready -U gridx -d gridx"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  gridx-pgdata:

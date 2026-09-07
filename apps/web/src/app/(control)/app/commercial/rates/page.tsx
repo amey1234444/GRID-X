@@ -9,8 +9,8 @@ import { StatusBadge } from '@/components/app/status-badge';
 import { formatCurrency, formatDate, formatNumber } from '@/lib/format';
 import { readPage, readParam, type SearchParams } from '@/lib/query';
 import { componentOptions, defaultCompanyId, partnerOptions } from '@/lib/reference';
-import { apiGet } from '@/lib/session';
-import { emptyPage, type Paginated, type RateRow } from '@/lib/types';
+import { apiGetPage } from '@/lib/session';
+import { type RateRow, type RateSummary } from '@/lib/types';
 
 export const metadata = { title: 'Conversion rates · GRID-X' };
 
@@ -27,21 +27,32 @@ export default async function RatesPage({
   }
 
   const [rates, partners, components, companyId] = await Promise.all([
-    apiGet<Paginated<RateRow>>(`/commercials/rates?${query.toString()}`, emptyPage<RateRow>()),
+    apiGetPage<RateRow, { summary: RateSummary }>(`/commercials/rates?${query.toString()}`),
     partnerOptions(),
     componentOptions(),
     defaultCompanyId(),
   ]);
+  const summary = rates.summary;
+
+  const pageAverage =
+    rates.data.length === 0
+      ? null
+      : rates.data.reduce((sum, row) => sum + row.conversionRate, 0) / rates.data.length;
+  const averageRate = summary?.averageRate ?? pageAverage;
 
   const columns: Column<RateRow>[] = [
-    { key: 'partner', header: 'Partner', render: (row) => <span className="font-medium">{row.partner.businessName}</span> },
+    {
+      key: 'partner',
+      header: 'Partner',
+      render: (row) => <span className="font-medium">{row.partner?.businessName ?? '—'}</span>,
+    },
     {
       key: 'component',
       header: 'Component',
       render: (row) => (
         <span className="block">
-          <span className="block">{row.component.componentCode}</span>
-          <span className="block text-xs text-muted-foreground">{row.component.name}</span>
+          <span className="block">{row.component?.componentCode ?? '—'}</span>
+          <span className="block text-xs text-muted-foreground">{row.component?.name ?? ''}</span>
         </span>
       ),
     },
@@ -64,6 +75,7 @@ export default async function RatesPage({
   return (
     <div className="space-y-6">
       <PageHeader
+        icon="Wallet"
         title="Conversion rates"
         description="Partner and component rate cards with revision history — invoices are always computed from the active rate."
         actions={
@@ -88,15 +100,11 @@ export default async function RatesPage({
 
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="Rate records" value={formatNumber(rates.total)} />
-        <StatCard label="Active" value={formatNumber(rates.data.filter((row) => row.isActive).length)} />
         <StatCard
-          label="Average rate"
-          value={
-            rates.data.length === 0
-              ? '—'
-              : formatCurrency(rates.data.reduce((sum, row) => sum + row.conversionRate, 0) / rates.data.length)
-          }
+          label="Active"
+          value={formatNumber(summary?.active ?? rates.data.filter((row) => row.isActive).length)}
         />
+        <StatCard label="Average rate" value={averageRate === null ? '—' : formatCurrency(averageRate)} />
       </div>
 
       <SearchFilters

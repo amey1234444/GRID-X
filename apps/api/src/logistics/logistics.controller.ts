@@ -16,8 +16,11 @@ import { LogisticsService } from './logistics.service';
 
 const shipmentQuerySchema = paginationSchema.extend({
   status: z.string().optional(),
+  statuses: z.string().optional(),
   direction: z.string().optional(),
   partnerId: z.string().optional(),
+  pickupOverdue: z.coerce.boolean().optional(),
+  deliveryOverdue: z.coerce.boolean().optional(),
 });
 
 @ApiTags('Logistics')

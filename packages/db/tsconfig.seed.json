@@ -1,0 +1,12 @@
+{
+  // The seed runs on deploy when RUN_SEED is set, so a type error in it fails a release rather
+  // than a build. It cannot join the main tsconfig because that emits declarations from src/
+  // only — this config typechecks the seed without emitting anything.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "rootDir": "."
+  },
+  "include": ["prisma/**/*.ts", "src/**/*.ts"]
+}

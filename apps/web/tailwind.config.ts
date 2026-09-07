@@ -12,14 +12,33 @@ const config: Config = {
     },
     extend: {
       colors: {
-        border: 'hsl(var(--border))',
+        border: {
+          DEFAULT: 'hsl(var(--border))',
+          subtle: 'hsl(var(--border-subtle))',
+          strong: 'hsl(var(--border-strong))',
+        },
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
+        surface: {
+          DEFAULT: 'hsl(var(--surface))',
+          elevated: 'hsl(var(--surface-elevated))',
+          hover: 'hsl(var(--surface-hover))',
+          active: 'hsl(var(--surface-active))',
+        },
         primary: {
           DEFAULT: 'hsl(var(--primary))',
+          hover: 'hsl(var(--primary-hover))',
           foreground: 'hsl(var(--primary-foreground))',
+        },
+        brand: {
+          DEFAULT: 'hsl(var(--brand))',
+          foreground: 'hsl(var(--brand-foreground))',
+        },
+        signal: {
+          DEFAULT: 'hsl(var(--signal))',
+          foreground: 'hsl(var(--signal-foreground))',
         },
         secondary: {
           DEFAULT: 'hsl(var(--secondary))',
@@ -36,6 +55,29 @@ const config: Config = {
         warning: {
           DEFAULT: 'hsl(var(--warning))',
           foreground: 'hsl(var(--warning-foreground))',
+        },
+        info: {
+          DEFAULT: 'hsl(var(--info))',
+          foreground: 'hsl(var(--info-foreground))',
+        },
+        subtle: {
+          foreground: 'hsl(var(--subtle-foreground))',
+        },
+        state: {
+          operational: 'hsl(var(--state-operational))',
+          warning: 'hsl(var(--state-warning))',
+          critical: 'hsl(var(--state-critical))',
+          offline: 'hsl(var(--state-offline))',
+          maintenance: 'hsl(var(--state-maintenance))',
+        },
+        chart: {
+          1: 'hsl(var(--chart-1))',
+          2: 'hsl(var(--chart-2))',
+          3: 'hsl(var(--chart-3))',
+          4: 'hsl(var(--chart-4))',
+          5: 'hsl(var(--chart-5))',
+          6: 'hsl(var(--chart-6))',
+          7: 'hsl(var(--chart-7))',
         },
         muted: {
           DEFAULT: 'hsl(var(--muted))',
@@ -58,14 +100,27 @@ const config: Config = {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        control: 'var(--radius-control)',
+        input: 'var(--radius-input)',
+        card: 'var(--radius-card)',
+        modal: 'var(--radius-modal)',
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display)', 'var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       boxShadow: {
-        subtle: '0 1px 2px 0 rgb(16 24 40 / 0.04), 0 1px 3px 0 rgb(16 24 40 / 0.06)',
-        elevated: '0 12px 32px -12px rgb(16 24 40 / 0.18), 0 4px 8px -4px rgb(16 24 40 / 0.06)',
-        glow: '0 0 0 1px rgb(255 255 255 / 0.06), 0 24px 64px -24px rgb(79 70 229 / 0.45)',
+        hairline: 'inset 0 0 0 1px hsl(0 0% 17% / 0.82)',
+        popover: '0 24px 70px -24px rgb(0 0 0 / 0.9), 0 0 0 1px hsl(0 0% 20% / 0.9)',
+        subtle: '0 1px 2px rgb(0 0 0 / 0.35), 0 0 0 1px hsl(0 0% 16% / 0.7)',
+        elevated: '0 28px 80px -36px rgb(0 0 0 / 0.95), 0 0 0 1px hsl(0 0% 20% / 0.85)',
+        glow: '0 0 0 1px rgb(255 255 255 / 0.06), 0 30px 90px -36px rgb(255 255 255 / 0.13)',
+        product: '0 70px 160px -60px rgb(255 255 255 / 0.12), 0 30px 80px -38px rgb(0 0 0 / 1)',
+      },
+      transitionTimingFunction: {
+        'out-expo': 'cubic-bezier(0.16, 1, 0.3, 1)',
+        spring: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
       },
       keyframes: {
         'accordion-down': {
@@ -87,12 +142,23 @@ const config: Config = {
         shimmer: {
           '100%': { transform: 'translateX(100%)' },
         },
+        'pulse-dot': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.35' },
+        },
+        'ping-ring': {
+          '0%': { transform: 'scale(1)', opacity: '0.55' },
+          '70%, 100%': { transform: 'scale(2.4)', opacity: '0' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'fade-up': 'fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both',
         marquee: 'marquee 32s linear infinite',
+        shimmer: 'shimmer 1.6s infinite',
+        'pulse-dot': 'pulse-dot 2.2s ease-in-out infinite',
+        'ping-ring': 'ping-ring 2s cubic-bezier(0, 0, 0.2, 1) infinite',
       },
     },
   },

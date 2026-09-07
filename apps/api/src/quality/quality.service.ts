@@ -10,7 +10,11 @@ import {
   createInspectionPlanSchema,
   createReworkSchema,
   decideDeviationSchema,
+  inspectionCharacteristicSchema,
   requestInspectionSchema,
+  SamplingCompliance,
+  samplingCompliance,
+  samplingRule,
   saveInspectionResultsSchema,
   updateReworkStatusSchema,
 } from '@gridx/shared';
@@ -22,7 +26,16 @@ import { FilesService } from '../files/files.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RequestUser } from '../common/request-user';
 import { paginate, paginationArgs } from '../common/pagination';
+import {
+  allowedCompanyIds,
+  assertCanWriteToCompany,
+  assertCompanyScope,
+  companyWhere,
+  nestedCompanyWhere,
+} from '../common/company-scope';
 import { JobsService } from '../jobs/jobs.service';
+import { ImsService } from '../ims/ims.service';
+import { DrawingsService } from '../drawings/drawings.service';
 
 export interface InspectionFilters extends PaginationInput {
   status?: string;
@@ -45,15 +58,41 @@ export class QualityService {
     private readonly files: FilesService,
     private readonly notifications: NotificationsService,
     private readonly jobs: JobsService,
+    private readonly ims: ImsService,
+    private readonly drawings: DrawingsService,
   ) {}
+
+  /** Guards a job reached by id: partner isolation first, then company reach (Section 4 and 18). */
+  private async assertJobScope(actor: RequestUser, jobId: string): Promise<void> {
+    const job = await this.prisma.gridJob.findUniqueOrThrow({
+      where: { id: jobId },
+      select: { companyId: true, partnerId: true },
+    });
+    if (actor.partnerId && job.partnerId !== actor.partnerId) {
+      throw new ForbiddenException('This job belongs to another partner');
+    }
+    assertCompanyScope(actor, job.companyId, 'job');
+  }
+
+  /** Same guard, reached through an inspection. */
+  private async assertInspectionScope(actor: RequestUser, inspectionId: string): Promise<void> {
+    const inspection = await this.prisma.inspection.findUniqueOrThrow({
+      where: { id: inspectionId },
+      select: { partnerId: true, job: { select: { companyId: true } } },
+    });
+    if (actor.partnerId && inspection.partnerId !== actor.partnerId) {
+      throw new ForbiddenException('This inspection belongs to another partner');
+    }
+    assertCompanyScope(actor, inspection.job.companyId, 'inspection');
+  }
 
   // -------------------------------------------------------------------------
   // Inspection plans
   // -------------------------------------------------------------------------
 
-  async listPlans(componentId?: string) {
+  async listPlans(actor: RequestUser, componentId?: string) {
     return this.prisma.inspectionPlan.findMany({
-      where: { ...(componentId ? { componentId } : {}), isActive: true },
+      where: { ...companyWhere(actor), ...(componentId ? { componentId } : {}), isActive: true },
       include: {
         characteristics: { orderBy: { sequence: 'asc' } },
         component: { select: { id: true, componentCode: true, name: true } },
@@ -63,6 +102,7 @@ export class QualityService {
   }
 
   async createPlan(actor: RequestUser, input: z.infer<typeof createInspectionPlanSchema>) {
+    assertCanWriteToCompany(actor, input.companyId);
     const plan = await this.prisma.inspectionPlan.create({
       data: {
         companyId: input.companyId,
@@ -70,6 +110,8 @@ export class QualityService {
         name: input.name,
         inspectionType: input.inspectionType,
         samplingPlan: input.samplingPlan,
+        samplePercent: input.samplePercent,
+        minSampleSize: input.minSampleSize,
         characteristics: { create: input.characteristics },
       },
       include: { characteristics: true },
@@ -84,12 +126,65 @@ export class QualityService {
     return plan;
   }
 
+  /** Appends a characteristic to an existing plan so plans can grow over time. */
+  async addPlanCharacteristic(
+    actor: RequestUser,
+    planId: string,
+    input: z.infer<typeof inspectionCharacteristicSchema>,
+  ) {
+    const plan = await this.prisma.inspectionPlan.findUniqueOrThrow({ where: { id: planId } });
+    assertCompanyScope(actor, plan.companyId, 'inspection plan');
+    const last = await this.prisma.inspectionCharacteristic.findFirst({
+      where: { inspectionPlanId: planId },
+      orderBy: { sequence: 'desc' },
+      select: { sequence: true },
+    });
+    const characteristic = await this.prisma.inspectionCharacteristic.create({
+      data: {
+        ...input,
+        sequence: input.sequence > 1 ? input.sequence : (last?.sequence ?? 0) + 1,
+        inspectionPlanId: planId,
+      },
+    });
+    await this.audit.record(actor, {
+      action: 'INSPECTION_CHARACTERISTIC_ADDED',
+      entityType: 'InspectionPlan',
+      entityId: planId,
+      companyId: plan.companyId,
+      after: { characteristic: characteristic.characteristic },
+    });
+    return characteristic;
+  }
+
+  async removePlanCharacteristic(actor: RequestUser, characteristicId: string) {
+    const characteristic = await this.prisma.inspectionCharacteristic.findUniqueOrThrow({
+      where: { id: characteristicId },
+      include: { inspectionPlan: { select: { companyId: true } } },
+    });
+    assertCompanyScope(actor, characteristic.inspectionPlan.companyId, 'inspection plan');
+    const remaining = await this.prisma.inspectionCharacteristic.count({
+      where: { inspectionPlanId: characteristic.inspectionPlanId },
+    });
+    if (remaining <= 1) {
+      throw new BadRequestException('A plan must keep at least one characteristic');
+    }
+    await this.prisma.inspectionCharacteristic.delete({ where: { id: characteristicId } });
+    await this.audit.record(actor, {
+      action: 'INSPECTION_CHARACTERISTIC_REMOVED',
+      entityType: 'InspectionPlan',
+      entityId: characteristic.inspectionPlanId,
+      before: { characteristic: characteristic.characteristic },
+    });
+    return { id: characteristicId, removed: true };
+  }
+
   // -------------------------------------------------------------------------
   // Inspections
   // -------------------------------------------------------------------------
 
   async list(actor: RequestUser, filters: InspectionFilters): Promise<Paginated<unknown>> {
     const where: Prisma.InspectionWhereInput = {
+      ...nestedCompanyWhere(actor, 'job'),
       ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
       ...(filters.partnerId && !actor.partnerId ? { partnerId: filters.partnerId } : {}),
       ...(filters.status ? { status: filters.status as Prisma.EnumInspectionStatusFilter } : {}),
@@ -139,6 +234,7 @@ export class QualityService {
     if (actor.partnerId && inspection.partnerId !== actor.partnerId) {
       throw new ForbiddenException('This inspection belongs to another partner');
     }
+    assertCompanyScope(actor, inspection.job.companyId, 'inspection');
     const photographs = await this.files.photographsFor('Inspection', id);
     return { ...inspection, photographs };
   }
@@ -152,8 +248,18 @@ export class QualityService {
     if (actor.partnerId && job.partnerId !== actor.partnerId) {
       throw new ForbiddenException('This job belongs to another partner');
     }
+    assertCompanyScope(actor, job.companyId, 'job');
     if (input.offeredQuantity > job.quantity) {
       throw new BadRequestException('Offered quantity cannot exceed the job quantity');
+    }
+
+    // Module 3 — offering work for inspection is a claim that it was built to the current revision.
+    if (job.partnerId) {
+      await this.drawings.assertRevisionAcknowledged(
+        job.partnerId,
+        job.id,
+        'requesting inspection',
+      );
     }
 
     const inspectionNumber = await this.sequence.next('INSPECTION');
@@ -206,6 +312,7 @@ export class QualityService {
   }
 
   async assign(actor: RequestUser, id: string, input: z.infer<typeof assignInspectionSchema>) {
+    await this.assertInspectionScope(actor, id);
     const inspection = await this.prisma.inspection.update({
       where: { id },
       data: { inspectorId: input.inspectorId, dueAt: input.dueAt, status: 'ASSIGNED' },
@@ -230,6 +337,7 @@ export class QualityService {
   }
 
   async start(actor: RequestUser, id: string) {
+    await this.assertInspectionScope(actor, id);
     return this.prisma.inspection.update({
       where: { id },
       data: {
@@ -246,6 +354,7 @@ export class QualityService {
     id: string,
     input: z.infer<typeof saveInspectionResultsSchema>,
   ) {
+    await this.assertInspectionScope(actor, id);
     const inspection = await this.prisma.inspection.findUniqueOrThrow({ where: { id } });
     if (inspection.status === 'COMPLETED' || inspection.status === 'CANCELLED') {
       throw new BadRequestException('This inspection is already closed');
@@ -268,13 +377,49 @@ export class QualityService {
       },
       include: { results: true },
     });
+    const compliance = await this.samplingComplianceFor(id);
     await this.audit.record(actor, {
       action: 'INSPECTION_RESULTS_RECORDED',
       entityType: 'Inspection',
       entityId: id,
-      after: { results: input.results.length },
+      after: {
+        results: input.results.length,
+        samplesRecorded: compliance.recordedSamples,
+        samplesRequired: compliance.requiredSamples,
+      },
     });
-    return updated;
+    // Returned rather than enforced here: an inspector saves as they measure, and refusing a
+    // partial save would lose work. The rule is enforced when the inspection is completed.
+    return { ...updated, sampling: compliance };
+  }
+
+  /**
+   * Module 8 — how much of the offered lot the plan requires to be measured, and how much has been.
+   *
+   * The sampling plan was free text and the component's inspection level drove nothing, so an
+   * inspector could record one sample against a 500-piece batch and the record looked complete.
+   *
+   * Counts distinct sample numbers rather than result rows: measuring six characteristics on one
+   * piece is one piece inspected, however many rows that produces.
+   */
+  async samplingComplianceFor(inspectionId: string): Promise<SamplingCompliance> {
+    const inspection = await this.prisma.inspection.findUniqueOrThrow({
+      where: { id: inspectionId },
+      select: {
+        offeredQuantity: true,
+        type: true,
+        job: { select: { component: { select: { inspectionLevel: true } } } },
+        inspectionPlan: { select: { samplePercent: true, minSampleSize: true } },
+        results: { select: { sampleNumber: true } },
+      },
+    });
+    const rule = samplingRule(inspection.job.component.inspectionLevel, inspection.inspectionPlan);
+    return samplingCompliance(
+      inspection.offeredQuantity,
+      inspection.results.map((result) => result.sampleNumber),
+      rule,
+      inspection.type,
+    );
   }
 
   /**
@@ -286,6 +431,7 @@ export class QualityService {
       where: { id },
       include: { job: { include: { component: true } } },
     });
+    assertCompanyScope(actor, inspection.job.companyId, 'inspection');
     if (inspection.status === 'COMPLETED') {
       throw new BadRequestException('This inspection is already completed');
     }
@@ -295,6 +441,23 @@ export class QualityService {
     }
     if (disposition > inspection.offeredQuantity) {
       throw new BadRequestException('Disposition cannot exceed the offered quantity');
+    }
+
+    // Module 8 — the plan says how much of the lot must be measured, and this is where that is
+    // enforced. An acceptance is a statement about the whole batch, so it may not rest on fewer
+    // samples than the plan calls for.
+    //
+    // A rejection is exempt: finding a defect early is a complete reason to stop, and demanding
+    // that an inspector measure the rest of a bad batch first would be perverse.
+    if (input.decision === 'ACCEPTED' || input.decision === 'ACCEPTED_WITH_DEVIATION') {
+      const compliance = await this.samplingComplianceFor(id);
+      if (!compliance.satisfied) {
+        throw new BadRequestException(
+          `The inspection plan requires ${compliance.requiredSamples} sample(s) ` +
+            `(${compliance.rule.label}); ${compliance.recordedSamples} recorded. ` +
+            `Measure ${compliance.shortfall} more before accepting.`,
+        );
+      }
     }
 
     const job = inspection.job;
@@ -405,6 +568,13 @@ export class QualityService {
       roleCodes: ['OPERATIONS_HEAD', 'QUALITY_INSPECTOR'],
       channels: ['IN_APP', 'WHATSAPP'],
     });
+
+    // §10 — rejected quantities and finished components received are facts IMS needs to keep its
+    // own stock and work-order picture straight.
+    if (rejectedQuantity > 0) await this.ims.pushInBackground('rejected-quantities', job.id);
+    if (nextStatus === 'QUALITY_ACCEPTED') {
+      await this.ims.pushInBackground('finished-components-received', job.id);
+    }
     await this.audit.record(actor, {
       action: 'INSPECTION_COMPLETED',
       entityType: 'Inspection',
@@ -417,7 +587,63 @@ export class QualityService {
         reworkQuantity: input.reworkQuantity,
       },
     });
+
+    await this.recordFirstArticleResult(actor, inspection, job, input.decision);
     return completed;
+  }
+
+  /**
+   * Module 2 and Module 8 — a first article that passes proves the partner can make the component,
+   * so the approved-partner record says so.
+   *
+   * `ApprovedPartnerComponent.firstArticleDone` was only ever set by hand, on a form or a CSV
+   * import, so the master record of "this partner has proven this component" drifted from the
+   * inspection evidence and depended on somebody remembering to tick a box.
+   */
+  private async recordFirstArticleResult(
+    actor: RequestUser,
+    inspection: { type: string; decision: string | null },
+    job: { id: string; jobNumber: string; componentId: string; partnerId: string | null },
+    decision: string,
+  ): Promise<void> {
+    if (inspection.type !== 'FIRST_ARTICLE' || !job.partnerId) return;
+    if (decision !== 'ACCEPTED' && decision !== 'ACCEPTED_WITH_DEVIATION') return;
+
+    const link = await this.prisma.approvedPartnerComponent.findUnique({
+      where: {
+        componentId_partnerId: { componentId: job.componentId, partnerId: job.partnerId },
+      },
+      select: { id: true, firstArticleDone: true },
+    });
+    // No approval link means the job was allocated some other way; there is nothing to update, and
+    // creating one here would be granting an approval the inspection did not ask for.
+    if (!link || link.firstArticleDone) return;
+
+    await this.prisma.approvedPartnerComponent.update({
+      where: { id: link.id },
+      data: { firstArticleDone: true, firstArticleDate: new Date() },
+    });
+    await this.audit.record(actor, {
+      action: 'FIRST_ARTICLE_APPROVED',
+      entityType: 'ApprovedPartnerComponent',
+      entityId: link.id,
+      after: {
+        componentId: job.componentId,
+        partnerId: job.partnerId,
+        provenOn: job.jobNumber,
+        decision,
+      },
+    });
+    await this.notifications.notify({
+      event: 'INSPECTION_COMPLETED',
+      title: 'First article approved',
+      body: `The first article on ${job.jobNumber} passed. This partner is now proven for the component and can take series work on it.`,
+      link: `/app/production/jobs/${job.id}`,
+      entityType: 'GridJob',
+      entityId: job.id,
+      partnerId: job.partnerId,
+      roleCodes: ['GRIDX_HEAD', 'OPERATIONS_HEAD', 'QUALITY_INSPECTOR'],
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -426,6 +652,7 @@ export class QualityService {
 
   async listNonConformances(actor: RequestUser, filters: PaginationInput & { jobId?: string }) {
     const where: Prisma.NonConformanceWhereInput = {
+      ...nestedCompanyWhere(actor, 'job'),
       ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
       ...(filters.jobId ? { jobId: filters.jobId } : {}),
     };
@@ -446,7 +673,138 @@ export class QualityService {
     return paginate(data, total, filters);
   }
 
+  /**
+   * The corrective-action queue (Section 24, Quality - Corrective Actions).
+   *
+   * A CAPA could be raised and advanced but never listed, so the only way to find an open one was
+   * to already know which non-conformance it hung off. Module 8's workflow only means something if
+   * somebody can see what is sitting at each stage.
+   */
+  async listCorrectiveActions(
+    actor: RequestUser,
+    filters: PaginationInput & { stage?: string; ownerId?: string; overdue?: boolean },
+  ) {
+    const where: Prisma.CorrectiveActionWhereInput = {
+      nonConformance: {
+        ...nestedCompanyWhere(actor, 'job'),
+        ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
+      },
+      ...(filters.stage ? { stage: filters.stage as Prisma.EnumCorrectiveActionStageFilter } : {}),
+      ...(filters.ownerId ? { ownerId: filters.ownerId } : {}),
+      ...(filters.overdue ? { dueDate: { lt: new Date() }, closedAt: null } : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.correctiveAction.findMany({
+        where,
+        ...paginationArgs(filters),
+        // Open first, oldest first: the one that has been sitting longest needs attention most.
+        orderBy: [{ closedAt: 'asc' }, { dueDate: 'asc' }],
+        include: {
+          owner: { select: { id: true, name: true } },
+          nonConformance: {
+            select: {
+              id: true,
+              ncNumber: true,
+              defectType: true,
+              quantityAffected: true,
+              job: { select: { id: true, jobNumber: true } },
+              partner: { select: { id: true, businessName: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.correctiveAction.count({ where }),
+    ]);
+
+    const now = Date.now();
+    const data = rows.map((row) => ({
+      id: row.id,
+      caNumber: row.caNumber,
+      stage: row.stage,
+      dueDate: row.dueDate,
+      closedAt: row.closedAt,
+      createdAt: row.createdAt,
+      ownerName: row.owner?.name ?? null,
+      ncNumber: row.nonConformance.ncNumber,
+      defectType: row.nonConformance.defectType,
+      quantityAffected: row.nonConformance.quantityAffected,
+      jobId: row.nonConformance.job?.id ?? null,
+      jobNumber: row.nonConformance.job?.jobNumber ?? null,
+      partnerName: row.nonConformance.partner?.businessName ?? null,
+      overdueDays:
+        row.closedAt === null && row.dueDate !== null && row.dueDate.getTime() < now
+          ? Math.floor((now - row.dueDate.getTime()) / 86_400_000)
+          : null,
+    }));
+
+    return paginate(data, total, filters);
+  }
+
+  /**
+   * Deviations awaiting an engineering decision (Module 8).
+   *
+   * Accepting a component that misses its specification is now an engineering call, so engineering
+   * needs somewhere to find the requests waiting on them.
+   */
+  async listDeviations(actor: RequestUser, filters: PaginationInput & { status?: string }) {
+    const where: Prisma.DeviationApprovalWhereInput = {
+      inspection: {
+        job: {
+          ...companyWhere(actor),
+          ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
+        },
+      },
+      ...(filters.status ? { status: filters.status as Prisma.EnumDeviationStatusFilter } : {}),
+    };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.deviationApproval.findMany({
+        where,
+        ...paginationArgs(filters),
+        orderBy: [{ status: 'asc' }, { createdAt: 'asc' }],
+        include: {
+          decidedBy: { select: { name: true } },
+          inspection: {
+            select: {
+              id: true,
+              inspectionNumber: true,
+              job: {
+                select: {
+                  id: true,
+                  jobNumber: true,
+                  component: { select: { componentCode: true, name: true } },
+                  partner: { select: { businessName: true } },
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.deviationApproval.count({ where }),
+    ]);
+
+    const data = rows.map((row) => ({
+      id: row.id,
+      status: row.status,
+      requestNote: row.requestNote,
+      decisionNote: row.decisionNote,
+      decidedByName: row.decidedBy?.name ?? null,
+      decidedAt: row.decidedAt,
+      createdAt: row.createdAt,
+      inspectionId: row.inspection.id,
+      inspectionNumber: row.inspection.inspectionNumber,
+      jobId: row.inspection.job?.id ?? null,
+      jobNumber: row.inspection.job?.jobNumber ?? null,
+      componentCode: row.inspection.job?.component?.componentCode ?? null,
+      partnerName: row.inspection.job?.partner?.businessName ?? null,
+    }));
+
+    return paginate(data, total, filters);
+  }
+
   async createRework(actor: RequestUser, input: z.infer<typeof createReworkSchema>) {
+    await this.assertJobScope(actor, input.jobId);
     const reworkNumber = await this.sequence.next('REWORK');
     const rework = await this.prisma.reworkOrder.create({
       data: {
@@ -483,8 +841,17 @@ export class QualityService {
   }
 
   async listRework(actor: RequestUser, filters: PaginationInput & { status?: string }) {
+    const companyIds = allowedCompanyIds(actor);
     const where: Prisma.ReworkOrderWhereInput = {
-      ...(actor.partnerId ? { job: { partnerId: actor.partnerId } } : {}),
+      // Both clauses narrow the same relation, so they are merged rather than spread separately.
+      ...(companyIds || actor.partnerId
+        ? {
+            job: {
+              ...(companyIds ? { companyId: { in: companyIds } } : {}),
+              ...(actor.partnerId ? { partnerId: actor.partnerId } : {}),
+            },
+          }
+        : {}),
       ...(filters.status ? { status: filters.status as Prisma.EnumReworkStatusFilter } : {}),
     };
     const [data, total] = await Promise.all([
@@ -506,18 +873,56 @@ export class QualityService {
     id: string,
     input: z.infer<typeof updateReworkStatusSchema>,
   ) {
+    const existing = await this.prisma.reworkOrder.findUniqueOrThrow({
+      where: { id },
+      select: { jobId: true },
+    });
+    await this.assertJobScope(actor, existing.jobId);
     const rework = await this.prisma.reworkOrder.update({
       where: { id },
       data: {
         status: input.status,
+        completedQuantity: input.completedQuantity,
+        scrappedQuantity: input.scrappedQuantity,
+        actualCost: input.actualCost,
         completedAt: input.status === 'COMPLETED' ? new Date() : undefined,
       },
     });
+
+    // Rework charged to the partner becomes a deduction once the real cost is known.
+    if (input.status === 'COMPLETED' && rework.chargeToPartner && rework.actualCost > 0) {
+      const job = await this.prisma.gridJob.findUnique({
+        where: { id: rework.jobId },
+        select: { partnerId: true, jobNumber: true },
+      });
+      if (job?.partnerId) {
+        const existing = await this.prisma.partnerDeduction.findFirst({
+          where: { partnerId: job.partnerId, reason: { contains: rework.reworkNumber } },
+        });
+        if (!existing) {
+          await this.prisma.partnerDeduction.create({
+            data: {
+              partnerId: job.partnerId,
+              type: 'REWORK_DEDUCTION',
+              amount: rework.actualCost,
+              reason: `Rework ${rework.reworkNumber} on ${job.jobNumber}`,
+            },
+          });
+        }
+      }
+    }
+
     await this.audit.record(actor, {
       action: 'REWORK_STATUS_UPDATED',
       entityType: 'ReworkOrder',
       entityId: id,
-      after: { status: input.status, remarks: input.remarks },
+      after: {
+        status: input.status,
+        completedQuantity: input.completedQuantity,
+        scrappedQuantity: input.scrappedQuantity,
+        actualCost: input.actualCost,
+        remarks: input.remarks,
+      },
     });
     return rework;
   }
@@ -526,6 +931,11 @@ export class QualityService {
     actor: RequestUser,
     input: z.infer<typeof createCorrectiveActionSchema>,
   ) {
+    const nc = await this.prisma.nonConformance.findUniqueOrThrow({
+      where: { id: input.nonConformanceId },
+      select: { jobId: true },
+    });
+    await this.assertJobScope(actor, nc.jobId);
     const caNumber = await this.sequence.next('CA');
     const action = await this.prisma.correctiveAction.create({
       data: {
@@ -552,7 +962,11 @@ export class QualityService {
     id: string,
     input: z.infer<typeof advanceCorrectiveActionSchema>,
   ) {
-    const current = await this.prisma.correctiveAction.findUniqueOrThrow({ where: { id } });
+    const current = await this.prisma.correctiveAction.findUniqueOrThrow({
+      where: { id },
+      include: { nonConformance: { select: { jobId: true } } },
+    });
+    await this.assertJobScope(actor, current.nonConformance.jobId);
     if (input.stage === 'CLOSED' && !(input.verification ?? current.verification)) {
       throw new BadRequestException('Verification evidence is required before closing');
     }
@@ -588,6 +1002,11 @@ export class QualityService {
     id: string,
     input: z.infer<typeof decideDeviationSchema>,
   ) {
+    const existing = await this.prisma.deviationApproval.findUniqueOrThrow({
+      where: { id },
+      select: { inspectionId: true },
+    });
+    await this.assertInspectionScope(actor, existing.inspectionId);
     const deviation = await this.prisma.deviationApproval.update({
       where: { id },
       data: {
