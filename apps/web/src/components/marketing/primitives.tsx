@@ -20,7 +20,7 @@ export function Eyebrow({
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-control bg-surface-elevated px-2 py-1',
+        'marketing-eyebrow inline-flex items-center rounded-control bg-surface-elevated px-2 py-1',
         'font-mono text-[0.625rem] font-medium uppercase tracking-[0.12em] text-muted-foreground shadow-hairline',
         className,
       )}
@@ -167,10 +167,7 @@ export function FeatureBand({
             >
               {item.icon}
             </span>
-            <span
-              className="font-mono text-[0.5625rem] tracking-[0.14em] text-subtle"
-              aria-hidden
-            >
+            <span className="font-mono text-[0.5625rem] tracking-[0.14em] text-subtle" aria-hidden>
               {String(index + 1).padStart(2, '0')}
             </span>
           </div>

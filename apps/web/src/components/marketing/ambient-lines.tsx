@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { AmbientField } from './ambient-field';
 
 type AmbientLinesVariant = 'network' | 'routes' | 'contour';
 
@@ -16,10 +17,12 @@ export function AmbientLines({
 }): React.JSX.Element {
   if (variant === 'contour') {
     return (
-      <div
-        className={cn('ambient-contours pointer-events-none absolute inset-0', className)}
-        aria-hidden
-      />
+      <AmbientField>
+        <div
+          className={cn('ambient-contours pointer-events-none absolute inset-0', className)}
+          aria-hidden
+        />
+      </AmbientField>
     );
   }
 
@@ -42,29 +45,34 @@ export function AmbientLines({
         ];
 
   return (
-    <svg
-      viewBox="0 0 1440 800"
-      preserveAspectRatio="none"
-      className={cn('ambient-lines pointer-events-none absolute inset-0 h-full w-full', className)}
-      aria-hidden
-    >
-      {paths.map((path, index) => (
-        <path
-          key={path}
-          d={path}
-          className={cn(
-            'ambient-line',
-            index === 1 && 'ambient-line--signal',
-            index === 3 && 'ambient-line--reverse',
-          )}
-        />
-      ))}
-      <g className="ambient-nodes">
-        <circle cx="300" cy="280" r="2.5" />
-        <circle cx="700" cy="290" r="2.5" />
-        <circle cx="1030" cy="250" r="2.5" />
-        <circle cx="1115" cy="645" r="2.5" />
-      </g>
-    </svg>
+    <AmbientField>
+      <svg
+        viewBox="0 0 1440 800"
+        preserveAspectRatio="none"
+        className={cn(
+          'ambient-lines pointer-events-none absolute inset-0 h-full w-full',
+          className,
+        )}
+        aria-hidden
+      >
+        {paths.map((path, index) => (
+          <path
+            key={path}
+            d={path}
+            className={cn(
+              'ambient-line',
+              index === 1 && 'ambient-line--signal',
+              index === 3 && 'ambient-line--reverse',
+            )}
+          />
+        ))}
+        <g className="ambient-nodes">
+          <circle cx="300" cy="280" r="2.5" />
+          <circle cx="700" cy="290" r="2.5" />
+          <circle cx="1030" cy="250" r="2.5" />
+          <circle cx="1115" cy="645" r="2.5" />
+        </g>
+      </svg>
+    </AmbientField>
   );
 }

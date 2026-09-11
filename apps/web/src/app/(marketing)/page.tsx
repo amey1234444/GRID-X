@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
 
 import { AmbientLines } from '@/components/marketing/ambient-lines';
@@ -138,7 +139,17 @@ const stages: Stage[] = [
 export default function MarketingHomePage(): React.JSX.Element {
   return (
     <>
-      <section className="linear-hero relative overflow-hidden border-b border-border-subtle">
+      <section className="marketing-home-hero linear-hero relative overflow-hidden border-b border-border-subtle">
+        <div className="marketing-hero-art" aria-hidden="true">
+          <Image
+            src="/media/marketing/network-sculpture.webp"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
+          />
+        </div>
         <AmbientLines variant="network" className="opacity-25" />
         <div className="container relative pb-16 pt-20 sm:pt-28 lg:pb-24 lg:pt-36">
           <Reveal>
@@ -147,14 +158,11 @@ export default function MarketingHomePage(): React.JSX.Element {
                 <span className="mr-2 h-1.5 w-1.5 animate-pulse-dot rounded-full bg-signal" />
                 GRID-X manufacturing network
               </Eyebrow>
-              <span className="hidden font-mono text-[0.625rem] uppercase tracking-[0.12em] text-subtle sm:inline">
-                System / 02
-              </span>
             </div>
           </Reveal>
 
           <Reveal delay={0.05}>
-            <h1 className="mt-8 max-w-[930px] text-balance text-[clamp(3.25rem,5.3vw,4.5rem)] font-medium leading-[1] tracking-[-0.045em]">
+            <h1 className="marketing-home-title mt-8 text-balance">
               The operating system for{' '}
               <span className="bg-gradient-to-r from-white via-white to-white/45 bg-clip-text text-transparent">
                 distributed manufacturing.
@@ -162,15 +170,15 @@ export default function MarketingHomePage(): React.JSX.Element {
             </h1>
           </Reveal>
 
-          <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_0.65fr] lg:items-end">
+          <div className="mt-7 grid gap-8">
             <Reveal delay={0.1}>
-              <p className="max-w-2xl text-pretty text-[0.9375rem] leading-7 text-muted-foreground sm:text-base">
+              <p className="max-w-[34rem] text-pretty text-base leading-7 text-muted-foreground">
                 Plan jobs, release drawings, trace material, verify quality and approve payment
                 across every partner as one live, auditable operation.
               </p>
             </Reveal>
             <Reveal delay={0.14}>
-              <div className="flex flex-col gap-3 sm:flex-row lg:justify-end">
+              <div className="marketing-hero-actions flex flex-col gap-3 sm:flex-row">
                 <Link
                   href="/login"
                   className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-foreground px-6 text-sm font-semibold text-primary-foreground transition-transform hover:scale-[1.02]"

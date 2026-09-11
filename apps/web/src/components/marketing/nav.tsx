@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowRight,
@@ -63,20 +64,39 @@ const productGroups = [
 ];
 
 export function MarketingNav(): React.JSX.Element {
+  const pathname = usePathname();
+  const productButton = useRef<HTMLButtonElement>(null);
+  const mobileButton = useRef<HTMLButtonElement>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
 
+  useEffect(() => {
+    setMobileOpen(false);
+    setProductOpen(false);
+  }, [pathname]);
+
   return (
     <header
-      className="sticky top-0 z-50 border-b border-border-subtle bg-background/82 backdrop-blur-2xl"
+      className="marketing-nav sticky z-50 backdrop-blur-2xl"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          setProductOpen(false);
+          setMobileOpen(false);
+          if (mobileOpen) mobileButton.current?.focus();
+          else if (productOpen) productButton.current?.focus();
+        }
+      }}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setProductOpen(false);
+      }}
       onMouseLeave={() => setProductOpen(false)}
     >
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/55 to-transparent" />
       <div className="container flex h-[72px] items-center justify-between gap-8">
         <Wordmark compact />
 
         <nav className="hidden h-full items-center gap-1 lg:flex" aria-label="Primary navigation">
           <button
+            ref={productButton}
             type="button"
             className={cn(
               'inline-flex h-10 items-center gap-1 rounded-full px-4 text-[0.8125rem] font-medium transition-colors',
@@ -87,6 +107,7 @@ export function MarketingNav(): React.JSX.Element {
             onMouseEnter={() => setProductOpen(true)}
             onClick={() => setProductOpen((value) => !value)}
             aria-expanded={productOpen}
+            aria-controls="marketing-product-menu"
           >
             Product
             <ChevronDown
@@ -97,6 +118,7 @@ export function MarketingNav(): React.JSX.Element {
             <Link
               key={link.href}
               href={link.href}
+              aria-current={pathname === link.href ? 'page' : undefined}
               className="inline-flex h-10 items-center rounded-full px-4 text-[0.8125rem] font-medium text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground"
             >
               {link.label}
@@ -104,7 +126,7 @@ export function MarketingNav(): React.JSX.Element {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-2 md:flex">
+        <div className="hidden items-center gap-2 lg:flex">
           <Link
             href="/partner/login"
             className="rounded-full px-4 py-2 text-[0.8125rem] font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -114,26 +136,31 @@ export function MarketingNav(): React.JSX.Element {
           <span className="mx-1 h-5 w-px bg-border" />
           <Link
             href="/login"
-            className="inline-flex h-10 items-center gap-2 rounded-full bg-foreground px-5 text-[0.8125rem] font-semibold text-primary-foreground shadow-[0_1px_0_rgb(255_255_255/0.45)_inset,0_8px_24px_-14px_rgb(255_255_255/0.5)] transition-transform hover:scale-[1.02] active:scale-[0.98]"
+            className="nav-open-button inline-flex h-10 items-center gap-2 rounded-full bg-foreground px-5 text-[0.8125rem] font-semibold text-primary-foreground shadow-[0_1px_0_rgb(255_255_255/0.45)_inset,0_8px_24px_-14px_rgb(255_255_255/0.5)] transition-transform hover:scale-[1.02] active:scale-[0.98]"
           >
             Open GRID-X <ArrowUpRight className="h-3.5 w-3.5" />
           </Link>
         </div>
 
         <button
+          ref={mobileButton}
           type="button"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground md:hidden"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-surface text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground lg:hidden"
           onClick={() => setMobileOpen((value) => !value)}
           aria-label="Toggle navigation"
+          aria-expanded={mobileOpen}
+          aria-controls="marketing-mobile-menu"
         >
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </div>
 
       <div
+        id="marketing-product-menu"
+        hidden={!productOpen}
         className={cn(
           'absolute left-1/2 top-[64px] hidden w-[min(1060px,calc(100%-3rem))] -translate-x-1/2 pt-3 lg:block',
-          productOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0',
+          productOpen ? 'pointer-events-auto opacity-100' : '!hidden',
           'transition-all duration-200 ease-out-expo',
         )}
       >
@@ -188,7 +215,8 @@ export function MarketingNav(): React.JSX.Element {
       </div>
 
       <div
-        className={cn('border-t border-border-subtle md:hidden', mobileOpen ? 'block' : 'hidden')}
+        id="marketing-mobile-menu"
+        className={cn('border-t border-border-subtle lg:hidden', mobileOpen ? 'block' : 'hidden')}
       >
         <div className="container grid gap-1 py-5">
           <Link
@@ -202,6 +230,7 @@ export function MarketingNav(): React.JSX.Element {
             <Link
               key={link.href}
               href={link.href}
+              aria-current={pathname === link.href ? 'page' : undefined}
               className="border-b border-border-subtle py-3 text-[0.875rem] font-medium text-muted-foreground"
               onClick={() => setMobileOpen(false)}
             >
