@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
+import { CinematicBackground } from './cinematic-background';
 import { cn } from '@/lib/utils';
 
 const filmStages = ['Allocate', 'Release', 'Reconcile', 'Inspect', 'Approve'];
@@ -30,28 +31,13 @@ export function ProductFilm({
     <section
       id={id}
       className={cn(
-        'marketing-film relative isolate overflow-hidden border-y border-border-subtle bg-black',
+        'marketing-film cinematic-film relative isolate overflow-hidden border-y border-border-subtle bg-black',
         compact ? 'min-h-[620px]' : 'min-h-[760px] lg:min-h-[820px]',
+        Heading === 'h1' && 'cinematic-hero',
         className,
       )}
     >
-      <video
-        className="absolute inset-0 h-full w-full object-cover opacity-[0.92]"
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="metadata"
-        poster="/media/gridx-control-network-poster.webp?v=3"
-        aria-hidden="true"
-        tabIndex={-1}
-      >
-        <source src="/media/gridx-control-network.mp4?v=3" type="video/mp4" />
-      </video>
-
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(5,5,5,0.04),rgba(5,5,5,0.08)_42%,rgba(5,5,5,0.88)_96%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_74%_30%,transparent,rgba(5,5,5,0.08)_52%,rgba(5,5,5,0.52)_100%)]" />
-      <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-[#080808] via-[#080808]/65 to-transparent" />
+      <CinematicBackground priority={Heading === 'h1'} />
 
       <div className="container absolute inset-x-0 top-8 z-10 sm:top-10">
         <div className="flex items-center justify-between border-t border-white/15 pt-4">
@@ -77,7 +63,7 @@ export function ProductFilm({
 
       <div
         className={cn(
-          'container relative z-10 flex min-h-[inherit] flex-col justify-end',
+          'container cinematic-film__content relative z-10 flex min-h-[inherit] flex-col justify-end',
           compact ? 'pb-14 sm:pb-18' : 'pb-16 sm:pb-20',
         )}
       >

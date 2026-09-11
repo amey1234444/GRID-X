@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
 
 import { AmbientLines } from '@/components/marketing/ambient-lines';
+import { CinematicBackground } from '@/components/marketing/cinematic-background';
 import { AppPreview } from '@/components/marketing/app-preview';
 import { ExperienceShowcase } from '@/components/marketing/experience-showcase';
 import { FieldReadinessShowcase } from '@/components/marketing/field-readiness-showcase';
@@ -139,19 +139,9 @@ const stages: Stage[] = [
 export default function MarketingHomePage(): React.JSX.Element {
   return (
     <>
-      <section className="marketing-home-hero linear-hero relative overflow-hidden border-b border-border-subtle">
-        <div className="marketing-hero-art" aria-hidden="true">
-          <Image
-            src="/media/marketing/network-sculpture.webp"
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover"
-          />
-        </div>
-        <AmbientLines variant="network" className="opacity-25" />
-        <div className="container relative pb-16 pt-20 sm:pt-28 lg:pb-24 lg:pt-36">
+      <section className="marketing-home-hero cinematic-hero linear-hero relative overflow-hidden border-b border-border-subtle">
+        <CinematicBackground priority />
+        <div className="container cinematic-hero__content relative">
           <Reveal>
             <div className="flex items-center gap-3">
               <Eyebrow className="rounded-full border border-brand/20 bg-brand/[0.07] px-3 py-1.5 text-brand shadow-none">
@@ -194,8 +184,12 @@ export default function MarketingHomePage(): React.JSX.Element {
               </div>
             </Reveal>
           </div>
+        </div>
+      </section>
 
-          <Reveal delay={0.18} y={24} className="mt-16 lg:mt-24">
+      <section className="marketing-product-preview">
+        <div className="container">
+          <Reveal y={20}>
             <AppPreview />
           </Reveal>
         </div>

@@ -1,3 +1,4 @@
+import { CinematicBackground } from '@/components/marketing/cinematic-background';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, Check } from 'lucide-react';
@@ -111,17 +112,19 @@ const questions: DisclosureItem[] = [
 export default function PricingPage(): React.JSX.Element {
   return (
     <>
-      <section className="relative overflow-hidden border-b border-border-subtle bg-[#080808] py-24 sm:py-32">
-        <AmbientLines variant="routes" className="opacity-30" />
-        <div className="container relative">
+      <section className="cinematic-hero cinematic-hero--interior relative overflow-hidden">
+        <CinematicBackground priority composition="detail" />
+        <div className="container cinematic-hero__content relative">
           <Reveal className="max-w-4xl">
             <Eyebrow>Rollout</Eyebrow>
             <Statement
               as="h1"
               className="mt-7"
               lead="Start with one plant. Scale to the whole group."
-              trail="Delivery is sequenced deliberately — prove the controlled flow first, then extend it."
             />
+            <p className="cinematic-hero__intro">
+              Delivery is sequenced deliberately — prove the controlled flow first, then extend it.
+            </p>
             <p className="mt-8 max-w-2xl text-[1.0625rem] leading-relaxed text-muted-foreground">
               A platform that governs drawings, material and payments is not something to switch on
               everywhere at once. Each stage ends with a system that works on its own terms.

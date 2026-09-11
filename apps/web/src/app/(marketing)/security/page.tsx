@@ -1,3 +1,4 @@
+import { CinematicBackground } from '@/components/marketing/cinematic-background';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
@@ -191,17 +192,16 @@ const questions: DisclosureItem[] = [
 export default function SecurityPage(): React.JSX.Element {
   return (
     <>
-      <section className="relative overflow-hidden border-b border-border-subtle bg-[#080808] py-24 sm:py-32">
-        <AmbientLines variant="routes" className="opacity-30" />
-        <div className="container relative">
+      <section className="cinematic-hero cinematic-hero--interior relative overflow-hidden">
+        <CinematicBackground priority composition="detail" />
+        <div className="container cinematic-hero__content relative">
           <Reveal className="max-w-4xl">
             <Eyebrow>Security</Eyebrow>
-            <Statement
-              as="h1"
-              className="mt-7"
-              lead="Drawings, quality and money."
-              trail="Three things you cannot afford to lose control of — each protected by design rather than by convention."
-            />
+            <Statement as="h1" className="mt-7" lead="Drawings, quality and money." />
+            <p className="cinematic-hero__intro">
+              Three things you cannot afford to lose control of — each protected by design rather
+              than by convention.
+            </p>
             <p className="mt-8 max-w-2xl text-[1.0625rem] leading-relaxed text-muted-foreground">
               Distributed manufacturing means your intellectual property leaves the building. GRID-X
               is built on the assumption that access has to be granted narrowly, expire on its own

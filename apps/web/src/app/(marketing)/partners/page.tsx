@@ -1,3 +1,4 @@
+import { CinematicBackground } from '@/components/marketing/cinematic-background';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
@@ -159,17 +160,19 @@ const quotes: [Quote, Quote] = [
 export default function PartnersPage(): React.JSX.Element {
   return (
     <>
-      <section className="relative overflow-hidden border-b border-border-subtle bg-[#080808] py-24 sm:py-32">
-        <AmbientLines variant="routes" className="opacity-30" />
-        <div className="container relative">
+      <section className="cinematic-hero cinematic-hero--interior relative overflow-hidden">
+        <CinematicBackground priority composition="detail" />
+        <div className="container cinematic-hero__content relative">
           <Reveal className="max-w-4xl">
             <Eyebrow>For partner units</Eyebrow>
             <Statement
               as="h1"
               className="mt-7"
               lead="More work, clearer instructions, faster payment."
-              trail="The same information the head office has — on the phone already in your pocket."
             />
+            <p className="cinematic-hero__intro">
+              The same information the head office has — on the phone already in your pocket.
+            </p>
             <p className="mt-8 max-w-2xl text-[1.0625rem] leading-relaxed text-muted-foreground">
               Partner units carry the risk of an unclear drawing, a disputed weight and a late
               payment. GRID-X removes all three by making the record shared rather than
